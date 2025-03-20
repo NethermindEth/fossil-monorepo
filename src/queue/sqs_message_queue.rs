@@ -4,6 +4,7 @@ use tracing::{debug, warn};
 
 use super::message_queue::{Queue, QueueError, QueueMessage};
 
+#[derive(Debug, Clone)]
 pub struct SqsMessageQueue {
     queue_url: String,
     client: Client,
