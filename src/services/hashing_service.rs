@@ -132,9 +132,7 @@ mod tests {
 
     use super::*;
 
-    #[ignore = "calling actual rpc node"]
-    #[tokio::test]
-    async fn should_retrieve_avg_fees_in_range() {
+    fn setup() -> HashingService {
         let provider = JsonRpcClient::new(HttpTransport::new(
             // Url::parse("https://rpc.starknet-testnet.lava.build:443").unwrap(),
             // Url::parse("https://starknet-sepolia.public.blastapi.io").unwrap(),
@@ -144,7 +142,7 @@ mod tests {
             Felt::from_hex("0x01710d5f515a17943f439c0a5ba4483d44bac0d2b04f5345639c222debc80b2c")
                 .unwrap();
         let hash_storage_address =
-            Felt::from_hex("0x0000000000000000000000000000000000000000000000000000000000000000")
+            Felt::from_hex("0x04807b7b062a49359e6984352590fbc1b285e79f677a8c40b758fd69d5232a89")
                 .unwrap();
         let signer = LocalWallet::from(SigningKey::from_secret_scalar(
             Felt::from_hex("0xa").unwrap(),
@@ -169,6 +167,14 @@ mod tests {
             account,
         );
 
+        hashing_service
+    }
+
+    #[ignore = "calling actual rpc node"]
+    #[tokio::test]
+    async fn should_retrieve_avg_fees_in_range() {
+        let hashing_service = setup();
+
         let avg_fees = hashing_service
             // .get_avg_fees_in_range(1739304000, 1739307600)
             .get_avg_fees_in_range(1734843600, 1742533200)
@@ -178,6 +184,17 @@ mod tests {
         println!("avg_fees_len: {:?}", avg_fees.len());
         println!("{:?}", avg_fees);
     }
-}
 
-// 349719203348147475353559950115090279260980510720
+    #[ignore = "calling actual rpc node"]
+    #[tokio::test]
+    async fn should_get_hash_stored_avg_fees() {
+        let hashing_service = setup();
+
+        let hash = hashing_service
+            .get_hash_stored_avg_fees(1734843600)
+            .await
+            .unwrap();
+
+        println!("{:?}", hash);
+    }
+}
