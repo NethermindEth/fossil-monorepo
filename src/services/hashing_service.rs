@@ -196,11 +196,11 @@ mod tests {
             Felt::from_hex(&dotenv::var("HASH_STORAGE_ADDRESS").unwrap()).unwrap();
 
         let private_key = dotenv::var("STARKNET_PRIVATE_KEY").unwrap();
-        let account = dotenv::var("STARKNET_ACCOUNT").unwrap();
+        let account_address = dotenv::var("STARKNET_ACCOUNT").unwrap();
         let signer = LocalWallet::from(SigningKey::from_secret_scalar(
             Felt::from_hex(&private_key).unwrap(),
         ));
-        let signer_address = Felt::from_hex(&account).unwrap();
+        let signer_address = Felt::from_hex(&account_address).unwrap();
         let mut account = SingleOwnerAccount::new(
             provider.clone(),
             signer,
@@ -271,6 +271,6 @@ mod tests {
         let hashing_service = setup();
 
         let result = hashing_service.hash_avg_fees_and_store(1739307600).await;
-        println!("{:?}", result.unwrap().transaction_hash);
+        println!("tx hash: {:?}", result.unwrap().transaction_hash);
     }
 }
