@@ -188,20 +188,19 @@ mod tests {
 
     fn setup() -> HashingService {
         let provider = JsonRpcClient::new(HttpTransport::new(
-            // Url::parse("https://rpc.starknet-testnet.lava.build:443").unwrap(),
-            // Url::parse("https://starknet-sepolia.public.blastapi.io").unwrap(),
-            Url::parse("https://free-rpc.nethermind.io/sepolia-juno").unwrap(),
+            Url::parse(&dotenv::var("RPC_URL").unwrap()).unwrap(),
         ));
         let fossil_light_client_address =
-            Felt::from_hex("0x01710d5f515a17943f439c0a5ba4483d44bac0d2b04f5345639c222debc80b2c")
-                .unwrap();
+            Felt::from_hex(&dotenv::var("FOSSIL_LIGHT_CLIENT_ADDRESS").unwrap()).unwrap();
         let hash_storage_address =
-            Felt::from_hex("0x04807b7b062a49359e6984352590fbc1b285e79f677a8c40b758fd69d5232a89")
-                .unwrap();
+            Felt::from_hex(&dotenv::var("HASH_STORAGE_ADDRESS").unwrap()).unwrap();
+
+        let private_key = dotenv::var("STARKNET_PRIVATE_KEY").unwrap();
+        let account = dotenv::var("STARKNET_ACCOUNT").unwrap();
         let signer = LocalWallet::from(SigningKey::from_secret_scalar(
-            Felt::from_hex("0xa").unwrap(),
+            Felt::from_hex(&private_key).unwrap(),
         ));
-        let signer_address = Felt::from_hex("0x1").unwrap();
+        let signer_address = Felt::from_hex(&account).unwrap();
         let mut account = SingleOwnerAccount::new(
             provider.clone(),
             signer,
@@ -245,7 +244,8 @@ mod tests {
         let hashing_service = setup();
 
         let hash = hashing_service
-            .get_hash_stored_avg_fees(1734843600)
+            .get_hash_stored_avg_fees(1739307600)
+            // .get_hash_stored_avg_fees(1734843600)
             .await
             .unwrap();
 
@@ -263,5 +263,14 @@ mod tests {
             .unwrap();
 
         println!("{:?}", hash);
+    }
+
+    #[ignore = "calling actual rpc node"]
+    #[tokio::test]
+    async fn should_hash_avg_fees_and_store() {
+        let hashing_service = setup();
+
+        let result = hashing_service.hash_avg_fees_and_store(1739307600).await;
+        println!("{:?}", result.unwrap().transaction_hash);
     }
 }

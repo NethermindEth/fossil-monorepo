@@ -22,3 +22,4 @@ common = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", packa
 
 [dev-dependencies]
 testcontainers-modules = { version = "0.11.6", features = ["localstack"] }
+dotenv = "0.15.0"
