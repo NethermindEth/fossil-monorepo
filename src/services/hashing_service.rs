@@ -1,3 +1,4 @@
+use common::convert_felt_to_f64;
 use starknet::{
     accounts::{Account, SingleOwnerAccount},
     core::types::{BlockId, BlockTag, Call, Felt, FunctionCall, InvokeTransactionResult, U256},
@@ -5,15 +6,6 @@ use starknet::{
     providers::{JsonRpcClient, Provider, ProviderError, jsonrpc::HttpTransport},
     signers::LocalWallet,
 };
-
-// TODO: to import from pitchlake-coprocessor repo
-fn convert_felt_to_f64(input: Felt) -> f64 {
-    let input_u256 = U256::from(input);
-
-    const TWO_POW_128: f64 = 340282366920938463463374607431768211456.0;
-    let decimal = input_u256.low() as f64 / TWO_POW_128;
-    input_u256.high() as f64 + decimal
-}
 
 pub struct HashingService {
     provider: JsonRpcClient<HttpTransport>,
