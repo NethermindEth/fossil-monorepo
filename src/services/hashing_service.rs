@@ -87,6 +87,30 @@ impl HashingService {
         Ok(result)
     }
 
+    pub async fn get_hash_batched_avg_fees(
+        &self,
+        start_timestamp: u64,
+    ) -> Result<[u32; 8], ProviderError> {
+        let call_result = self
+            .provider
+            .call(
+                FunctionCall {
+                    contract_address: self.hash_storage_address,
+                    entry_point_selector: selector!("get_hash_stored_batched_avg_fees"),
+                    calldata: vec![Felt::from(start_timestamp)],
+                },
+                BlockId::Tag(BlockTag::Latest),
+            )
+            .await?;
+
+        let mut result = [0; 8];
+        for i in 0..8 {
+            result[i] = U256::from(call_result[i]).low() as u32;
+        }
+
+        Ok(result)
+    }
+
     pub async fn hash_avg_fees_and_store(
         &self,
         start_timestamp: u64,
@@ -192,6 +216,19 @@ mod tests {
 
         let hash = hashing_service
             .get_hash_stored_avg_fees(1734843600)
+            .await
+            .unwrap();
+
+        println!("{:?}", hash);
+    }
+
+    #[ignore = "calling actual rpc node"]
+    #[tokio::test]
+    async fn should_get_hash_batched_avg_fees() {
+        let hashing_service = setup();
+
+        let hash = hashing_service
+            .get_hash_batched_avg_fees(1734843600)
             .await
             .unwrap();
 

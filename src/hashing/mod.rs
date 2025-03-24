@@ -35,18 +35,49 @@ impl HashingProcess {
     }
 
     pub async fn run(&self, start_timestamp: u64, end_timestamp: u64) -> Result<(), String> {
+        self.check_avg_fees_availability(start_timestamp, end_timestamp)
+            .await?;
+        let unavailable_batch_timestamp_hashes = self
+            .get_unavailable_batch_timestamp_hashes(start_timestamp, end_timestamp)
+            .await?;
+
+        if unavailable_batch_timestamp_hashes.len() > 0 {
+            self.hash_and_store_avg_fees_onchain(unavailable_batch_timestamp_hashes)
+                .await?;
+        }
+
+        if !self
+            .is_batch_hash_avg_fees_available(start_timestamp)
+            .await?
+        {
+            self.hash_batch_avg_fees_onchain(start_timestamp).await?;
+        }
+
+        Ok(())
+    }
+
+    async fn check_avg_fees_availability(
+        &self,
+        start_timestamp: u64,
+        end_timestamp: u64,
+    ) -> Result<(), String> {
         let avg_fees = self
             .hashing_service
             .get_avg_fees_in_range(start_timestamp, end_timestamp)
             .await
-            .unwrap();
+            .map_err(|e| e.to_string())?;
 
-        // some of the avg_fees are not available, we need to wait for the fossil light client to catch up
-        if avg_fees.len() != self.required_avg_fees_length {
+        if !avg_fees.len() == self.required_avg_fees_length {
             return Err("avg_fees_len is not equal to required_avg_fees_length".to_string());
         }
+        Ok(())
+    }
 
-        // check the batch of hashes
+    async fn get_unavailable_batch_timestamp_hashes(
+        &self,
+        start_timestamp: u64,
+        end_timestamp: u64,
+    ) -> Result<Vec<u64>, String> {
         let mut unavailable_batch_timestamp_hashes = vec![];
         for t in (start_timestamp..end_timestamp).step_by(3600 * self.hash_batch_size) {
             let hash = self.hashing_service.get_hash_stored_avg_fees(t).await;
@@ -59,8 +90,15 @@ impl HashingProcess {
             }
         }
 
-        // for batches that are not available, we need to make a transaction to store it
-        // hash avg fee and store
+        Ok(unavailable_batch_timestamp_hashes)
+    }
+
+    // for batches that are not available, we need to make a transaction to store it
+    // hash avg fee and store
+    async fn hash_and_store_avg_fees_onchain(
+        &self,
+        unavailable_batch_timestamp_hashes: Vec<u64>,
+    ) -> Result<(), String> {
         let tasks = unavailable_batch_timestamp_hashes
             .into_iter()
             .map(|t| {
@@ -115,6 +153,20 @@ impl HashingProcess {
             }
         }
 
+        Ok(())
+    }
+
+    async fn is_batch_hash_avg_fees_available(&self, start_timestamp: u64) -> Result<bool, String> {
+        let hash = self
+            .hashing_service
+            .get_hash_batched_avg_fees(start_timestamp)
+            .await
+            .map_err(|e| e.to_string())?;
+
+        Ok(hash != [0; 8])
+    }
+
+    async fn hash_batch_avg_fees_onchain(&self, start_timestamp: u64) -> Result<(), String> {
         // if everything is successful, we perform batch hash of hash of avg gas fee
         let batch_hash_invoke_res = self
             .hashing_service
