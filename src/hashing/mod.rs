@@ -35,7 +35,8 @@ impl<T: HashingServiceTrait + Sync + Send + 'static> HashingProcess<T> {
         }
     }
 
-    pub async fn run(&self, start_timestamp: u64, end_timestamp: u64) -> Result<(), String> {
+    pub async fn run(&self, start_timestamp: u64) -> Result<(), String> {
+        let end_timestamp = start_timestamp + 3600 * (self.required_avg_fees_length as u64 - 1);
         self.check_avg_fees_availability(start_timestamp, end_timestamp)
             .await?;
         let unavailable_batch_timestamp_hashes = self
@@ -117,7 +118,6 @@ impl<T: HashingServiceTrait + Sync + Send + 'static> HashingProcess<T> {
             receipts.push(receipt);
         }
 
-        // make transaction to hash and store hash on chain
         let mut invoke_tx_tasks = vec![];
         for receipt in receipts {
             if receipt.is_err() {
