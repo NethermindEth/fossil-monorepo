@@ -41,7 +41,7 @@ pub trait HashingServiceTrait {
 }
 
 impl HashingService {
-    fn new(
+    pub fn new(
         provider: JsonRpcClient<HttpTransport>,
         fossil_light_client_address: Felt,
         hash_storage_address: Felt,

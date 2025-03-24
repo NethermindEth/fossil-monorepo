@@ -13,17 +13,18 @@ use starknet::core::types::TransactionExecutionStatus;
 use starknet::core::types::TransactionReceipt::Invoke;
 use starknet::providers::Provider;
 
-use crate::services::hashing_service::HashingService;
+use crate::services::hashing_service::HashingServiceTrait;
+use std::marker::{Send, Sync};
 
-pub struct HashingProcess {
-    hashing_service: Arc<HashingService>,
+pub struct HashingProcess<T: HashingServiceTrait + Sync + Send + 'static> {
+    hashing_service: Arc<T>,
     required_avg_fees_length: usize,
     hash_batch_size: usize,
 }
 
-impl HashingProcess {
+impl<T: HashingServiceTrait + Sync + Send + 'static> HashingProcess<T> {
     pub fn new(
-        hashing_service: HashingService,
+        hashing_service: T,
         required_avg_fees_length: usize,
         hash_batch_size: usize,
     ) -> Self {
