@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use common::convert_felt_to_f64;
 use starknet::{
     accounts::{Account, SingleOwnerAccount},
@@ -14,8 +15,33 @@ pub struct HashingService {
     account: SingleOwnerAccount<JsonRpcClient<HttpTransport>, LocalWallet>,
 }
 
+#[async_trait]
+pub trait HashingServiceTrait {
+    fn get_provider(&self) -> &JsonRpcClient<HttpTransport>;
+    fn get_fossil_light_client_address(&self) -> &Felt;
+    fn get_hash_storage_address(&self) -> &Felt;
+    async fn get_avg_fees_in_range(
+        &self,
+        start_timestamp: u64,
+        end_timestamp: u64,
+    ) -> Result<Vec<f64>, ProviderError>;
+    async fn get_hash_stored_avg_fees(&self, timestamp: u64) -> Result<[u32; 8], ProviderError>;
+    async fn get_hash_batched_avg_fees(
+        &self,
+        start_timestamp: u64,
+    ) -> Result<[u32; 8], ProviderError>;
+    async fn hash_avg_fees_and_store(
+        &self,
+        start_timestamp: u64,
+    ) -> Result<InvokeTransactionResult, String>;
+    async fn hash_batched_avg_fees(
+        &self,
+        start_timestamp: u64,
+    ) -> Result<InvokeTransactionResult, String>;
+}
+
 impl HashingService {
-    pub fn new(
+    fn new(
         provider: JsonRpcClient<HttpTransport>,
         fossil_light_client_address: Felt,
         hash_storage_address: Felt,
@@ -28,16 +54,23 @@ impl HashingService {
             account,
         }
     }
+}
 
-    pub fn get_provider(&self) -> &JsonRpcClient<HttpTransport> {
+#[async_trait]
+impl HashingServiceTrait for HashingService {
+    fn get_provider(&self) -> &JsonRpcClient<HttpTransport> {
         &self.provider
     }
 
-    pub fn get_fossil_light_client_address(&self) -> &Felt {
+    fn get_fossil_light_client_address(&self) -> &Felt {
         &self.fossil_light_client_address
     }
 
-    pub async fn get_avg_fees_in_range(
+    fn get_hash_storage_address(&self) -> &Felt {
+        &self.hash_storage_address
+    }
+
+    async fn get_avg_fees_in_range(
         &self,
         start_timestamp: u64,
         end_timestamp: u64,
@@ -63,10 +96,7 @@ impl HashingService {
         Ok(avg_hourly_fees)
     }
 
-    pub async fn get_hash_stored_avg_fees(
-        &self,
-        timestamp: u64,
-    ) -> Result<[u32; 8], ProviderError> {
+    async fn get_hash_stored_avg_fees(&self, timestamp: u64) -> Result<[u32; 8], ProviderError> {
         let call_result = self
             .provider
             .call(
@@ -87,7 +117,7 @@ impl HashingService {
         Ok(result)
     }
 
-    pub async fn get_hash_batched_avg_fees(
+    async fn get_hash_batched_avg_fees(
         &self,
         start_timestamp: u64,
     ) -> Result<[u32; 8], ProviderError> {
@@ -111,7 +141,7 @@ impl HashingService {
         Ok(result)
     }
 
-    pub async fn hash_avg_fees_and_store(
+    async fn hash_avg_fees_and_store(
         &self,
         start_timestamp: u64,
     ) -> Result<InvokeTransactionResult, String> {
@@ -129,7 +159,7 @@ impl HashingService {
         result
     }
 
-    pub async fn hash_batched_avg_fees(
+    async fn hash_batched_avg_fees(
         &self,
         start_timestamp: u64,
     ) -> Result<InvokeTransactionResult, String> {
