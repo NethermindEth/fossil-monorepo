@@ -184,19 +184,23 @@ mod tests {
         accounts::ExecutionEncoding, core::chain_id, providers::Url, signers::SigningKey,
     };
 
+    use dotenv::dotenv;
+    use std::env;
     use super::*;
 
     fn setup() -> HashingService {
+        dotenv().ok();
+
         let provider = JsonRpcClient::new(HttpTransport::new(
-            Url::parse(&dotenv::var("RPC_URL").unwrap()).unwrap(),
+            Url::parse(&env::var("RPC_URL").unwrap()).unwrap(),
         ));
         let fossil_light_client_address =
-            Felt::from_hex(&dotenv::var("FOSSIL_LIGHT_CLIENT_ADDRESS").unwrap()).unwrap();
+            Felt::from_hex(&env::var("FOSSIL_LIGHT_CLIENT_ADDRESS").unwrap()).unwrap();
         let hash_storage_address =
-            Felt::from_hex(&dotenv::var("HASH_STORAGE_ADDRESS").unwrap()).unwrap();
+            Felt::from_hex(&env::var("HASH_STORAGE_ADDRESS").unwrap()).unwrap();
 
-        let private_key = dotenv::var("STARKNET_PRIVATE_KEY").unwrap();
-        let account_address = dotenv::var("STARKNET_ACCOUNT").unwrap();
+        let private_key = env::var("STARKNET_PRIVATE_KEY").unwrap();
+        let account_address = env::var("STARKNET_ACCOUNT").unwrap();
         let signer = LocalWallet::from(SigningKey::from_secret_scalar(
             Felt::from_hex(&private_key).unwrap(),
         ));

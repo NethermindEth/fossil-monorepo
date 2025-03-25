@@ -783,7 +783,7 @@ dependencies = [
 [[package]]
 name = "common"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#8b54062699b5700fd3c7bfcbe00547a884e348ef"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor?tag=1.0.0#8b54062699b5700fd3c7bfcbe00547a884e348ef"
 dependencies = [
  "approx",
  "chrono",
