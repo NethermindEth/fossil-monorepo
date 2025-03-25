@@ -1,185 +1,277 @@
-mod test;
+use async_trait::async_trait;
+use common::convert_felt_to_f64;
+use starknet::{
+    accounts::{Account, SingleOwnerAccount},
+    core::types::{BlockId, BlockTag, Call, Felt, FunctionCall, InvokeTransactionResult, U256},
+    macros::selector,
+    providers::{JsonRpcClient, Provider, ProviderError, jsonrpc::HttpTransport},
+    signers::LocalWallet,
+};
 
-use std::sync::Arc;
-
-use starknet::core::types::TransactionExecutionStatus;
-use starknet::core::types::TransactionReceipt::Invoke;
-use starknet::providers::Provider;
-
-use crate::services::hashing_service::HashingServiceTrait;
-use std::marker::{Send, Sync};
-
-pub struct HashingProcess<T: HashingServiceTrait + Sync + Send + 'static> {
-    hashing_service: Arc<T>,
-    required_avg_fees_length: usize,
-    hash_batch_size: usize,
+pub struct HashingProvider {
+    provider: JsonRpcClient<HttpTransport>,
+    fossil_light_client_address: Felt,
+    hash_storage_address: Felt,
+    account: SingleOwnerAccount<JsonRpcClient<HttpTransport>, LocalWallet>,
 }
 
-impl<T: HashingServiceTrait + Sync + Send + 'static> HashingProcess<T> {
+#[async_trait]
+pub trait HashingProviderTrait {
+    fn get_provider(&self) -> &JsonRpcClient<HttpTransport>;
+    fn get_fossil_light_client_address(&self) -> &Felt;
+    fn get_hash_storage_address(&self) -> &Felt;
+    async fn get_avg_fees_in_range(
+        &self,
+        start_timestamp: u64,
+        end_timestamp: u64,
+    ) -> Result<Vec<f64>, ProviderError>;
+    async fn get_hash_stored_avg_fees(&self, timestamp: u64) -> Result<[u32; 8], ProviderError>;
+    async fn get_hash_batched_avg_fees(
+        &self,
+        start_timestamp: u64,
+    ) -> Result<[u32; 8], ProviderError>;
+    async fn hash_avg_fees_and_store(
+        &self,
+        start_timestamp: u64,
+    ) -> Result<InvokeTransactionResult, String>;
+    async fn hash_batched_avg_fees(
+        &self,
+        start_timestamp: u64,
+    ) -> Result<InvokeTransactionResult, String>;
+}
+
+impl HashingProvider {
     pub fn new(
-        hashing_service: T,
-        required_avg_fees_length: usize,
-        hash_batch_size: usize,
+        provider: JsonRpcClient<HttpTransport>,
+        fossil_light_client_address: Felt,
+        hash_storage_address: Felt,
+        account: SingleOwnerAccount<JsonRpcClient<HttpTransport>, LocalWallet>,
     ) -> Self {
         Self {
-            hashing_service: hashing_service.into(),
-            required_avg_fees_length,
-            hash_batch_size,
+            provider,
+            fossil_light_client_address,
+            hash_storage_address,
+            account,
         }
     }
+}
 
-    pub async fn run(&self, start_timestamp: u64) -> Result<(), String> {
-        let end_timestamp = start_timestamp + 3600 * (self.required_avg_fees_length as u64 - 1);
-        self.check_avg_fees_availability(start_timestamp, end_timestamp)
-            .await?;
-        let unavailable_batch_timestamp_hashes = self
-            .get_unavailable_batch_timestamp_hashes(start_timestamp, end_timestamp)
-            .await?;
-
-        if unavailable_batch_timestamp_hashes.len() > 0 {
-            self.hash_and_store_avg_fees_onchain(unavailable_batch_timestamp_hashes)
-                .await?;
-        }
-
-        if !self
-            .is_batch_hash_avg_fees_available(start_timestamp)
-            .await?
-        {
-            self.hash_batch_avg_fees_onchain(start_timestamp).await?;
-        }
-
-        Ok(())
+#[async_trait]
+impl HashingProviderTrait for HashingProvider {
+    fn get_provider(&self) -> &JsonRpcClient<HttpTransport> {
+        &self.provider
     }
 
-    async fn check_avg_fees_availability(
+    fn get_fossil_light_client_address(&self) -> &Felt {
+        &self.fossil_light_client_address
+    }
+
+    fn get_hash_storage_address(&self) -> &Felt {
+        &self.hash_storage_address
+    }
+
+    async fn get_avg_fees_in_range(
         &self,
         start_timestamp: u64,
         end_timestamp: u64,
-    ) -> Result<(), String> {
-        let avg_fees = self
-            .hashing_service
-            .get_avg_fees_in_range(start_timestamp, end_timestamp)
-            .await
-            .map_err(|e| e.to_string())?;
+    ) -> Result<Vec<f64>, ProviderError> {
+        let mut call_result = self
+            .provider
+            .call(
+                FunctionCall {
+                    contract_address: self.fossil_light_client_address,
+                    entry_point_selector: selector!("get_avg_fees_in_range"),
+                    calldata: vec![Felt::from(start_timestamp), Felt::from(end_timestamp)],
+                },
+                BlockId::Tag(BlockTag::Latest),
+            )
+            .await?;
+        call_result.remove(0); // the first element is the length of the array, which is not needed by us
 
-        if avg_fees.len() != self.required_avg_fees_length {
-            return Err("avg_fees_len is not equal to required_avg_fees_length".to_string());
-        }
-        Ok(())
+        let avg_hourly_fees = call_result
+            .iter()
+            .map(|fee| convert_felt_to_f64(*fee))
+            .collect();
+
+        Ok(avg_hourly_fees)
     }
 
-    async fn get_unavailable_batch_timestamp_hashes(
+    async fn get_hash_stored_avg_fees(&self, timestamp: u64) -> Result<[u32; 8], ProviderError> {
+        let call_result = self
+            .provider
+            .call(
+                FunctionCall {
+                    contract_address: self.hash_storage_address,
+                    entry_point_selector: selector!("get_hash_stored_avg_fees"),
+                    calldata: vec![Felt::from(timestamp)],
+                },
+                BlockId::Tag(BlockTag::Latest),
+            )
+            .await?;
+
+        let mut result = [0; 8];
+        for i in 0..8 {
+            result[i] = U256::from(call_result[i]).low() as u32;
+        }
+
+        Ok(result)
+    }
+
+    async fn get_hash_batched_avg_fees(
         &self,
         start_timestamp: u64,
-        end_timestamp: u64,
-    ) -> Result<Vec<u64>, String> {
-        let mut unavailable_batch_timestamp_hashes = vec![];
-        for t in (start_timestamp..end_timestamp).step_by(3600 * self.hash_batch_size) {
-            let hash = self.hashing_service.get_hash_stored_avg_fees(t).await;
-            if hash.is_err() {
-                return Err(hash.err().unwrap().to_string());
-            }
+    ) -> Result<[u32; 8], ProviderError> {
+        let call_result = self
+            .provider
+            .call(
+                FunctionCall {
+                    contract_address: self.hash_storage_address,
+                    entry_point_selector: selector!("get_hash_stored_batched_avg_fees"),
+                    calldata: vec![Felt::from(start_timestamp)],
+                },
+                BlockId::Tag(BlockTag::Latest),
+            )
+            .await?;
 
-            if hash.unwrap() == [0; 8] {
-                unavailable_batch_timestamp_hashes.push(t);
-            }
+        let mut result = [0; 8];
+        for i in 0..8 {
+            result[i] = U256::from(call_result[i]).low() as u32;
         }
 
-        Ok(unavailable_batch_timestamp_hashes)
+        Ok(result)
     }
 
-    // for batches that are not available, we need to make a transaction to store it
-    // hash avg fee and store
-    async fn hash_and_store_avg_fees_onchain(
+    async fn hash_avg_fees_and_store(
         &self,
-        unavailable_batch_timestamp_hashes: Vec<u64>,
-    ) -> Result<(), String> {
-        let tasks = unavailable_batch_timestamp_hashes
-            .into_iter()
-            .map(|t| {
-                let hashing_service = self.hashing_service.clone();
-                tokio::task::spawn(async move {
-                    let res = hashing_service.hash_avg_fees_and_store(t).await;
-                    res
-                })
-            })
-            .collect::<Vec<_>>();
+        start_timestamp: u64,
+    ) -> Result<InvokeTransactionResult, String> {
+        let result = self
+            .account
+            .execute_v3(vec![Call {
+                to: self.hash_storage_address,
+                selector: selector!("hash_avg_fees_and_store"),
+                calldata: vec![Felt::from(start_timestamp)],
+            }])
+            .send()
+            .await
+            .map_err(|_| "Error".to_string());
 
-        let mut receipts = vec![];
-        for task in tasks {
-            let receipt = task.await.map_err(|e| e.to_string())?;
-            receipts.push(receipt);
-        }
-
-        let mut invoke_tx_tasks = vec![];
-        for receipt in receipts {
-            if receipt.is_err() {
-                return Err(receipt.err().unwrap().to_string());
-            }
-            let invoke_tx_result = receipt.unwrap();
-            let hashing_service = self.hashing_service.clone();
-
-            let task = tokio::task::spawn(async move {
-                hashing_service
-                    .get_provider()
-                    .get_transaction_receipt(invoke_tx_result.transaction_hash)
-                    .await
-            });
-            invoke_tx_tasks.push(task);
-        }
-
-        // check if the invocation is successful and has been stored onchain
-        let mut invoke_tx_results = vec![];
-        for task in invoke_tx_tasks {
-            let res = task.await.map_err(|e| e.to_string())?;
-            invoke_tx_results.push(res);
-        }
-
-        for invoke_tx_result in invoke_tx_results {
-            if invoke_tx_result.is_err() {
-                return Err(invoke_tx_result.err().unwrap().to_string());
-            }
-            if let Invoke(invoke_receipt) = invoke_tx_result.unwrap().receipt {
-                if invoke_receipt.execution_result.status() == TransactionExecutionStatus::Reverted
-                {
-                    return Err("invoke reverted".to_string());
-                }
-            }
-        }
-
-        Ok(())
+        result
     }
 
-    async fn is_batch_hash_avg_fees_available(&self, start_timestamp: u64) -> Result<bool, String> {
-        let hash = self
-            .hashing_service
-            .get_hash_batched_avg_fees(start_timestamp)
+    async fn hash_batched_avg_fees(
+        &self,
+        start_timestamp: u64,
+    ) -> Result<InvokeTransactionResult, String> {
+        let result = self
+            .account
+            .execute_v3(vec![Call {
+                to: self.hash_storage_address,
+                selector: selector!("hash_batched_avg_fees"),
+                calldata: vec![Felt::from(start_timestamp)],
+            }])
+            .send()
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|_| "Error".to_string());
 
-        Ok(hash != [0; 8])
+        result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use starknet::{
+        accounts::ExecutionEncoding, core::chain_id, providers::Url, signers::SigningKey,
+    };
+
+    use super::*;
+    use dotenv::dotenv;
+    use std::env;
+
+    fn setup() -> HashingProvider {
+        dotenv().ok();
+
+        let provider = JsonRpcClient::new(HttpTransport::new(
+            Url::parse(&env::var("RPC_URL").unwrap()).unwrap(),
+        ));
+        let fossil_light_client_address =
+            Felt::from_hex(&env::var("FOSSIL_LIGHT_CLIENT_ADDRESS").unwrap()).unwrap();
+        let hash_storage_address =
+            Felt::from_hex(&env::var("HASH_STORAGE_ADDRESS").unwrap()).unwrap();
+
+        let private_key = env::var("STARKNET_PRIVATE_KEY").unwrap();
+        let account_address = env::var("STARKNET_ACCOUNT").unwrap();
+        let signer = LocalWallet::from(SigningKey::from_secret_scalar(
+            Felt::from_hex(&private_key).unwrap(),
+        ));
+        let signer_address = Felt::from_hex(&account_address).unwrap();
+        let mut account = SingleOwnerAccount::new(
+            provider.clone(),
+            signer,
+            signer_address,
+            chain_id::SEPOLIA,
+            ExecutionEncoding::New,
+        );
+
+        // `SingleOwnerAccount` defaults to checking nonce and estimating fees against the latest
+        // block. Optionally change the target block to pending with the following line:
+        account.set_block_id(BlockId::Tag(BlockTag::Pending));
+
+        let hashing = HashingProvider::new(
+            provider,
+            fossil_light_client_address,
+            hash_storage_address,
+            account,
+        );
+
+        hashing
     }
 
-    async fn hash_batch_avg_fees_onchain(&self, start_timestamp: u64) -> Result<(), String> {
-        // if everything is successful, we perform batch hash of hash of avg gas fee
-        let batch_hash_invoke_res = self
-            .hashing_service
-            .hash_batched_avg_fees(start_timestamp)
+    #[ignore = "calling actual rpc node"]
+    #[tokio::test]
+    async fn should_retrieve_avg_fees_in_range() {
+        let hashing = setup();
+
+        let avg_fees = hashing
+            // .get_avg_fees_in_range(1739304000, 1739307600)
+            .get_avg_fees_in_range(1734843600, 1742533200)
             .await
-            .map_err(|e| e.to_string())?;
+            .unwrap();
 
-        // check if it has been successfully stored onchain
-        let receipt = self
-            .hashing_service
-            .get_provider()
-            .get_transaction_receipt(batch_hash_invoke_res.transaction_hash)
+        println!("avg_fees_len: {:?}", avg_fees.len());
+        println!("{:?}", avg_fees);
+    }
+
+    #[ignore = "calling actual rpc node"]
+    #[tokio::test]
+    async fn should_get_hash_stored_avg_fees() {
+        let hashing = setup();
+
+        let hash = hashing
+            .get_hash_stored_avg_fees(1739307600)
+            // .get_hash_stored_avg_fees(1734843600)
             .await
-            .map_err(|e| e.to_string())?;
+            .unwrap();
 
-        if receipt.receipt.execution_result().status() == TransactionExecutionStatus::Reverted {
-            return Err("batch hash reverted".to_string());
-        }
+        println!("{:?}", hash);
+    }
 
-        Ok(())
+    #[ignore = "calling actual rpc node"]
+    #[tokio::test]
+    async fn should_get_hash_batched_avg_fees() {
+        let hashing = setup();
+
+        let hash = hashing.get_hash_batched_avg_fees(1734843600).await.unwrap();
+
+        println!("{:?}", hash);
+    }
+
+    #[ignore = "calling actual rpc node"]
+    #[tokio::test]
+    async fn should_hash_avg_fees_and_store() {
+        let hashing = setup();
+
+        let result = hashing.hash_avg_fees_and_store(1739307600).await;
+        println!("tx hash: {:?}", result.unwrap().transaction_hash);
     }
 }
