@@ -1,8 +1,8 @@
 use aws_config::{BehaviorVersion, Region};
 use eyre::Result;
-use prover_service::queue::sqs_message_queue::SqsMessageQueue;
-use prover_service::services::job_dispatcher::Job;
-use prover_service::services::{
+use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
+use message_handlers::services::job_dispatcher::Job;
+use message_handlers::services::{
     job_dispatcher::JobDispatcher, simple_prove_service::ExampleJobProcessor,
 };
 use std::sync::{Arc, atomic::AtomicBool};
