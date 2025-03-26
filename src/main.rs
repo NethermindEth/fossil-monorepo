@@ -10,15 +10,14 @@ use tracing::debug;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Load .env file
+    dotenv::dotenv().ok();
+
     // Initialize AWS SQS client
-    let config = aws_config::load_defaults(BehaviorVersion::latest())
-        .await
-        .into_builder()
-        .region(Region::new("us-east-1"))
-        .build();
+    let config = aws_config::load_from_env().await;
 
     // Create queue URL - replace with your actual queue URL
-    let queue_url = "your-sqs-queue-url".to_string();
+    let queue_url = "https://sqs.us-east-1.amazonaws.com/654654236251/fossilQueue".to_string();
 
     let queue = SqsMessageQueue::new(queue_url, config);
 

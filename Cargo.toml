@@ -16,8 +16,8 @@ async-trait = "0.1"
 
 aws-config = "1.6.0"
 aws-sdk-sqs = "1.62.0"
-starknet = "0.13.0"
-
+starknet = "0.14.0"
+dotenv = "0.15.0"
 common = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", tag = "1.0.0", package = "common" }
 
 [dev-dependencies]
