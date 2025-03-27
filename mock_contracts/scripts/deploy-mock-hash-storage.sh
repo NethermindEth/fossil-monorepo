@@ -16,12 +16,18 @@ echo "$STARKNET_RPC"
 
 # Declare contract
 echo -e "\nDeclaring Hash Store contract"
-CLASS_HASH=$(starkli declare ./target/dev/mock_contracts_MockHashStorage.contract_class.json --strk --rpc $STARKNET_RPC --private-key $STARKNET_PRIVATE_KEY --account $STARKNET_ACCOUNT | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
+CLASS_HASH_HASH_STORAGE=$(starkli declare ./target/dev/mock_contracts_MockHashStorage.contract_class.json --strk --rpc $STARKNET_RPC --private-key $STARKNET_PRIVATE_KEY --account $STARKNET_ACCOUNT | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
 
-echo "Class hash: $CLASS_HASH"
+echo -e "\nDeclaring Fossil Light Client contract"
+CLASS_HASH_FOSSIL_LIGHT_CLIENT=$(starkli declare ./target/dev/mock_contracts_MockFossilLightClient.contract_class.json --strk --rpc $STARKNET_RPC --private-key $STARKNET_PRIVATE_KEY --account $STARKNET_ACCOUNT | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
+
+echo "Class hash Hash Storage: $CLASS_HASH_HASH_STORAGE"
+echo "Class hash Fossil Light Client: $CLASS_HASH_FOSSIL_LIGHT_CLIENT"
 
 # Deploy contract
-echo "Contract deployed to $CONTRACT_ADDRESS"
-CONTRACT_ADDRESS=$(starkli deploy $CLASS_HASH --strk --private-key $STARKNET_PRIVATE_KEY  --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC --salt 1 -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
+echo "Deploying contracts"
+CONTRACT_ADDRESS_HASH_STORAGE=$(starkli deploy $CLASS_HASH_HASH_STORAGE --strk --private-key $STARKNET_PRIVATE_KEY  --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC --salt 1 -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
+CONTRACT_ADDRESS_FOSSIL_LIGHT_CLIENT=$(starkli deploy $CLASS_HASH_FOSSIL_LIGHT_CLIENT --strk --private-key $STARKNET_PRIVATE_KEY  --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC --salt 1 -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
 
-echo "Contract address: $CONTRACT_ADDRESS"
+echo "Contract address Hash Storage: $CONTRACT_ADDRESS_HASH_STORAGE"
+echo "Contract address Fossil Light Client: $CONTRACT_ADDRESS_FOSSIL_LIGHT_CLIENT"
