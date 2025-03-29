@@ -11,8 +11,14 @@ serde_json = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-
+dotenv = "0.15.0"
+sqlx = { version = "0.8", features = [
+    "postgres",
+    "runtime-tokio-native-tls",
+    "bigdecimal",
+    "chrono",
+    "macros",
+] }
 
 [dev-dependencies]
-testcontainers-modules = { version = "0.11.6", features = ["localstack"] }
-dotenv = "0.15.0"
+testcontainers-modules = { workspace = true }
