@@ -34,7 +34,7 @@ impl<T: HashingProviderTrait + Sync + Send + 'static> HashingService<T> {
             .get_unavailable_batch_timestamp_hashes(start_timestamp, end_timestamp)
             .await?;
 
-        if unavailable_batch_timestamp_hashes.len() > 0 {
+        if !unavailable_batch_timestamp_hashes.is_empty() {
             self.hash_and_store_avg_fees_onchain(unavailable_batch_timestamp_hashes)
                 .await?;
         }
@@ -97,8 +97,7 @@ impl<T: HashingProviderTrait + Sync + Send + 'static> HashingService<T> {
             .map(|t| {
                 let hashing_service = self.hashing_provider.clone();
                 tokio::task::spawn(async move {
-                    let res = hashing_service.hash_avg_fees_and_store(t).await;
-                    res
+                    hashing_service.hash_avg_fees_and_store(t).await
                 })
             })
             .collect::<Vec<_>>();
@@ -114,13 +113,12 @@ impl<T: HashingProviderTrait + Sync + Send + 'static> HashingService<T> {
             if receipt.is_err() {
                 return Err(receipt.err().unwrap().to_string());
             }
-            let invoke_tx_result = receipt.unwrap();
             let hashing_service = self.hashing_provider.clone();
 
             let task = tokio::task::spawn(async move {
                 hashing_service
                     .get_provider()
-                    .get_transaction_receipt(invoke_tx_result.transaction_hash)
+                    .get_transaction_receipt(receipt.unwrap().transaction_hash)
                     .await
             });
             invoke_tx_tasks.push(task);
