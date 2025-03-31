@@ -14,7 +14,7 @@ pub trait IMockHashStorage<TContractState> {
 
 #[starknet::contract]
 mod MockHashStorage {
-    use core::starknet::storage::{
+    use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
     };
     use crate::mock_fossil_light_client::IMockFossilLightClientDispatcher;

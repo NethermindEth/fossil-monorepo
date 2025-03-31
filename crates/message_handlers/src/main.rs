@@ -1,4 +1,5 @@
-use aws_config::{BehaviorVersion, Region};
+use aws_config::BehaviorVersion;
+use aws_config::load_defaults;
 use eyre::Result;
 use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
 use message_handlers::services::job_dispatcher::Job;
@@ -14,7 +15,7 @@ async fn main() -> Result<()> {
     dotenv::dotenv().ok();
 
     // Initialize AWS SQS client
-    let config = aws_config::load_from_env().await;
+    let config = load_defaults(BehaviorVersion::latest()).await;
 
     // Create queue URL - replace with your actual queue URL
     let queue_url = "https://sqs.us-east-1.amazonaws.com/654654236251/fossilQueue".to_string();
