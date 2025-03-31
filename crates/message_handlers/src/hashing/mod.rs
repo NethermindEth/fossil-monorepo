@@ -145,8 +145,7 @@ impl HashingProviderTrait for HashingProvider {
         &self,
         start_timestamp: u64,
     ) -> Result<InvokeTransactionResult, String> {
-        self
-            .account
+        self.account
             .execute_v3(vec![Call {
                 to: self.hash_storage_address,
                 selector: selector!("hash_avg_fees_and_store"),
@@ -161,8 +160,7 @@ impl HashingProviderTrait for HashingProvider {
         &self,
         start_timestamp: u64,
     ) -> Result<InvokeTransactionResult, String> {
-        self
-            .account
+        self.account
             .execute_v3(vec![Call {
                 to: self.hash_storage_address,
                 selector: selector!("hash_batched_avg_fees"),

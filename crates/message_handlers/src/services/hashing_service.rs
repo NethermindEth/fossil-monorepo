@@ -96,9 +96,7 @@ impl<T: HashingProviderTrait + Sync + Send + 'static> HashingService<T> {
             .into_iter()
             .map(|t| {
                 let hashing_service = self.hashing_provider.clone();
-                tokio::task::spawn(async move {
-                    hashing_service.hash_avg_fees_and_store(t).await
-                })
+                tokio::task::spawn(async move { hashing_service.hash_avg_fees_and_store(t).await })
             })
             .collect::<Vec<_>>();
 
