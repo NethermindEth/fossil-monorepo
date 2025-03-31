@@ -1,4 +1,4 @@
-use sqlx::{types::BigDecimal, Error};
+use sqlx::{Error, types::BigDecimal};
 use std::sync::Arc;
 
 use crate::DbConnection;
