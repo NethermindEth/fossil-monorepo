@@ -33,6 +33,22 @@ jobs:
     
     - name: Build
       run: cargo build --verbose
+
+    - name: Start PostgreSQL
+      run: docker compose -f docker-compose.test.yml up -d postgres
+    
+    - name: Wait for PostgreSQL to be ready
+      run: |
+        for i in {1..30}; do
+          if docker exec $(docker ps -q -f name=postgres) pg_isready -U postgres; then
+            break
+          fi
+          sleep 1
+        done
     
     - name: Run tests
       run: cargo test --verbose
+
+    - name: Stop PostgreSQL
+      if: always()
+      run: docker compose -f docker-compose.test.yml down

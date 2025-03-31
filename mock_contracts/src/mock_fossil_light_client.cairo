@@ -10,7 +10,6 @@ pub trait IMockFossilLightClient<TContractState> {
 
 #[starknet::contract]
 mod MockFossilLightClient {
-    use core::starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
 
     #[storage]
     struct Storage {}

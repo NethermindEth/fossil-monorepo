@@ -145,8 +145,7 @@ impl HashingProviderTrait for HashingProvider {
         &self,
         start_timestamp: u64,
     ) -> Result<InvokeTransactionResult, String> {
-        let result = self
-            .account
+        self.account
             .execute_v3(vec![Call {
                 to: self.hash_storage_address,
                 selector: selector!("hash_avg_fees_and_store"),
@@ -154,17 +153,14 @@ impl HashingProviderTrait for HashingProvider {
             }])
             .send()
             .await
-            .map_err(|_| "Error".to_string());
-
-        result
+            .map_err(|_| "Error".to_string())
     }
 
     async fn hash_batched_avg_fees(
         &self,
         start_timestamp: u64,
     ) -> Result<InvokeTransactionResult, String> {
-        let result = self
-            .account
+        self.account
             .execute_v3(vec![Call {
                 to: self.hash_storage_address,
                 selector: selector!("hash_batched_avg_fees"),
@@ -172,9 +168,7 @@ impl HashingProviderTrait for HashingProvider {
             }])
             .send()
             .await
-            .map_err(|_| "Error".to_string());
-
-        result
+            .map_err(|_| "Error".to_string())
     }
 }
 
