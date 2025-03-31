@@ -1,4 +1,5 @@
 use aws_config::BehaviorVersion;
+use aws_config::load_defaults;
 use eyre::Result;
 use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
 use message_handlers::services::job_dispatcher::Job;
@@ -7,7 +8,6 @@ use message_handlers::services::{
 };
 use std::sync::{Arc, atomic::AtomicBool};
 use tracing::debug;
-use aws_config::load_defaults;
 
 #[tokio::main]
 async fn main() -> Result<()> {
