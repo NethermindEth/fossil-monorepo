@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use common::convert_felt_to_f64;
+use coprocessor_common::convert_felt_to_f64;
 use starknet::{
     accounts::{Account, SingleOwnerAccount},
     core::types::{BlockId, BlockTag, Call, Felt, FunctionCall, InvokeTransactionResult, U256},

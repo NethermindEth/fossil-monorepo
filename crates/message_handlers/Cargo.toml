@@ -26,8 +26,33 @@ starknet-crypto = { workspace = true }
 
 # Utilities
 dotenv = { workspace = true }
-common = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", tag = "1.0.0", package = "common" }
+
+db = { path = "../db" }
+
+# Proving deps
+coprocessor_common = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "common" }
+coprocessor_core = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "core" }
+
+add_twap_7d_error_bound_floating = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "add-twap-7d-error-bound-floating" }
+max_return_floating = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "max-return-floating" }
+remove_seasonality_error_bound_floating = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "remove-seasonality-error-bound-floating" }
+simulate_price_verify_position_floating = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "simulate-price-verify-position-floating" }
+calculate_pt_pt1_error_bound_floating = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "calculate-pt-pt1-error-bound-floating" }
+twap_error_bound_floating = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "twap-error-bound-floating" }
+hashing_felts = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "hashing-felts" }
+proof_composition_twap_maxreturn_reserveprice_floating_hashing_methods = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "proof-composition-twap-maxreturn-reserveprice-floating-hashing-methods" }
+
+risc0-zkvm = { version = "=2.0.0" }
+uuid = { version = "1.16.0", features = ["v4"] }
 
 [dev-dependencies]
 testcontainers-modules = { workspace = true }
 url = { workspace = true }
+
+[[bin]]
+name = "message_handlers"
+path = "src/main.rs"
+
+[[bin]]
+name = "example_message_handler"
+path = "src/example_service_main.rs"

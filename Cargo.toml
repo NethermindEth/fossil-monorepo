@@ -41,5 +41,8 @@ starknet = "0.14.0"
 starknet-crypto = "0.7.4"
 
 # Testing
-testcontainers-modules = { version = "0.11.6", features = ["localstack", "postgres"] }
+testcontainers-modules = { version = "0.11.6", features = [
+    "localstack",
+    "postgres",
+] }
 url = "2.4.1"

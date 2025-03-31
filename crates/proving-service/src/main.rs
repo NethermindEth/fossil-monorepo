@@ -2,7 +2,7 @@ use aws_config::{BehaviorVersion, defaults};
 use eyre::Result;
 use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
 use proving_service::create_router;
-use std::env;
+use std::{env, sync::Arc};
 use tokio::signal;
 use tracing::{Level, info};
 use tracing_subscriber::FmtSubscriber;
@@ -30,7 +30,7 @@ async fn main() -> Result<()> {
     let config = defaults(BehaviorVersion::latest()).load().await;
     info!("AWS configuration loaded");
 
-    let queue = SqsMessageQueue::new(queue_url, config);
+    let queue = Arc::new(SqsMessageQueue::new(queue_url, config));
 
     // Create and start the HTTP server
     let app = create_router(queue).await;

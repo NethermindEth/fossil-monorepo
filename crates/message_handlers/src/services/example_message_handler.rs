@@ -1,6 +1,6 @@
 use std::sync::{Arc, atomic::AtomicBool};
 
-use crate::queue::{message_queue::Queue, sqs_message_queue::SqsMessageQueue};
+use crate::queue::message_queue::Queue;
 use eyre::Result;
 use serde::Deserialize;
 use tokio::task;
@@ -13,13 +13,13 @@ pub struct Job {
     pub end_timestamp: i64,
 }
 
-pub struct ExampleJobProcessor {
-    queue: SqsMessageQueue,
+pub struct ExampleMessageHandler<Q: Queue + Send + Sync + 'static> {
+    queue: Arc<Q>,
     terminator: Arc<AtomicBool>,
 }
 
-impl ExampleJobProcessor {
-    pub const fn new(queue: SqsMessageQueue, terminator: Arc<AtomicBool>) -> Self {
+impl<Q: Queue + Send + Sync + 'static> ExampleMessageHandler<Q> {
+    pub fn new(queue: Arc<Q>, terminator: Arc<AtomicBool>) -> Self {
         Self { queue, terminator }
     }
 
@@ -49,9 +49,11 @@ impl ExampleJobProcessor {
 
                         let job: Job = serde_json::from_str(&message.body)?;
 
+                        let queue_clone = self.queue.clone();
                         task::spawn(async move {
-                            info!("Processing job: {:?}", job);
-                            // TODO: Implement the logic to process the job
+                            let message_clone = message.clone();
+                            println!("Received & processing job: {:?}", job);
+                            queue_clone.delete_message(&message_clone).await.unwrap();
                         });
                     }
                 }
