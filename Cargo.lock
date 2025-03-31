@@ -2248,10 +2248,12 @@ dependencies = [
  "serde",
  "serde_json",
  "starknet",
+ "starknet-crypto",
  "testcontainers-modules",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "url",
 ]
 
 [[package]]
