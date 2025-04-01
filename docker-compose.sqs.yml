@@ -1,0 +1,16 @@
+services:
+  localstack:
+    container_name: sqs-localstack
+    image: localstack/localstack:latest
+    ports:
+      - "4567:4566"            # Map LocalStack's 4566 to host's 4567
+    environment:
+      - SERVICES=sqs
+      - DEBUG=${DEBUG-}
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    volumes:
+      - "./localstack:/var/lib/localstack"
+      - "/var/run/docker.sock:/var/run/docker.sock" 
