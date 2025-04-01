@@ -18,14 +18,23 @@ Send a POST request with a JSON body in the following format:
 
 ```json
 {
-    "type": "twap",  // One of: "twap", "reserve-price", "max-return"
-    "start_timestamp": 1234567890,
-    "end_timestamp": 1234567891,
-    "job_group_id": "job_123"  // Optional: Groups related proofs together
+    "job_group_id": "job_123",
+    "twap": {
+        "start_timestamp": 1234567890,
+        "end_timestamp": 1234567891
+    },
+    "reserve_price": {
+        "start_timestamp": 1234567890,
+        "end_timestamp": 1234567891
+    },
+    "max_return": {
+        "start_timestamp": 1234567890,
+        "end_timestamp": 1234567891
+    }
 }
 ```
 
-The `job_group_id` field is optional but recommended when submitting multiple proofs that are part of the same job. This helps track and manage related proofs together.
+The `job_group_id` field is required and groups all three proofs together. Each proof type (twap, reserve_price, max_return) requires its own time range.
 
 ### Response Format
 
@@ -34,9 +43,8 @@ The `job_group_id` field is optional but recommended when submitting multiple pr
 ```json
 {
     "status": "success",
-    "message": "Job dispatched successfully",
-    "job_id": "twap",
-    "job_group_id": "job_123"  // Echoes back the job_group_id if provided
+    "message": "All jobs dispatched successfully",
+    "job_group_id": "job_123"
 }
 ```
 
@@ -45,9 +53,8 @@ The `job_group_id` field is optional but recommended when submitting multiple pr
 ```json
 {
     "status": "error",
-    "message": "Error message here",
-    "job_id": "twap",
-    "job_group_id": "job_123"  // Echoes back the job_group_id if provided
+    "message": "TWAP job failed: error1, Reserve Price job failed: error2",
+    "job_group_id": "job_123"
 }
 ```
 
@@ -57,10 +64,19 @@ The `job_group_id` field is optional but recommended when submitting multiple pr
 curl -X POST http://127.0.0.1:3000/api/job \
   -H "Content-Type: application/json" \
   -d '{
-    "type": "twap",
-    "start_timestamp": 1234567890,
-    "end_timestamp": 1234567891,
-    "job_group_id": "job_123"
+    "job_group_id": "job_123",
+    "twap": {
+        "start_timestamp": 1234567890,
+        "end_timestamp": 1234567891
+    },
+    "reserve_price": {
+        "start_timestamp": 1234567890,
+        "end_timestamp": 1234567891
+    },
+    "max_return": {
+        "start_timestamp": 1234567890,
+        "end_timestamp": 1234567891
+    }
   }'
 ```
 
@@ -77,10 +93,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let response = client
         .post("http://127.0.0.1:3000/api/job")
         .json(&json!({
-            "type": "twap",
-            "start_timestamp": 1234567890,
-            "end_timestamp": 1234567891,
-            "job_group_id": "job_123"
+            "job_group_id": "job_123",
+            "twap": {
+                "start_timestamp": 1234567890,
+                "end_timestamp": 1234567891
+            },
+            "reserve_price": {
+                "start_timestamp": 1234567890,
+                "end_timestamp": 1234567891
+            },
+            "max_return": {
+                "start_timestamp": 1234567890,
+                "end_timestamp": 1234567891
+            }
         }))
         .send()
         .await?;
