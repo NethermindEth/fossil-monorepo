@@ -14,64 +14,80 @@ use std::sync::Arc;
 pub struct TimeRange {
     start_timestamp: i64,
     end_timestamp: i64,
-    job_group_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(tag = "type")]
-pub enum RequestType {
-    #[serde(rename = "twap")]
-    Twap(TimeRange),
-    #[serde(rename = "reserve-price")]
-    ReservePrice(TimeRange),
-    #[serde(rename = "max-return")]
-    MaxReturn(TimeRange),
+pub struct JobRequest {
+    job_group_id: String,
+    twap: TimeRange,
+    reserve_price: TimeRange,
+    max_return: TimeRange,
 }
 
 #[derive(Debug, Serialize)]
 pub struct Response {
     status: String,
     message: String,
-    job_id: String,
-    job_group_id: Option<String>,
+    job_group_id: String,
 }
 
 async fn handle_request(
     State(dispatcher): State<Arc<JobDispatcher>>,
-    Json(request): Json<RequestType>,
+    Json(request): Json<JobRequest>,
 ) -> impl IntoResponse {
-    let (job_id, time_range) = match request {
-        RequestType::Twap(range) => ("twap", range),
-        RequestType::ReservePrice(range) => ("reserve_price", range),
-        RequestType::MaxReturn(range) => ("max_return", range),
-    };
+    let mut errors = Vec::new();
 
-    let job = crate::services::job_dispatcher::Job {
-        job_id: job_id.to_string(),
-        start_timestamp: time_range.start_timestamp,
-        end_timestamp: time_range.end_timestamp,
-        job_group_id: time_range.job_group_id.clone(),
+    // Dispatch TWAP job
+    let twap_job = crate::services::job_dispatcher::Job {
+        job_id: "twap".to_string(),
+        start_timestamp: request.twap.start_timestamp,
+        end_timestamp: request.twap.end_timestamp,
+        job_group_id: Some(request.job_group_id.clone()),
     };
+    if let Err(e) = dispatcher.dispatch_job(twap_job).await {
+        errors.push(format!("TWAP job failed: {}", e));
+    }
 
-    match dispatcher.dispatch_job(job).await {
-        Ok(_) => (
+    // Dispatch Reserve Price job
+    let reserve_price_job = crate::services::job_dispatcher::Job {
+        job_id: "reserve_price".to_string(),
+        start_timestamp: request.reserve_price.start_timestamp,
+        end_timestamp: request.reserve_price.end_timestamp,
+        job_group_id: Some(request.job_group_id.clone()),
+    };
+    if let Err(e) = dispatcher.dispatch_job(reserve_price_job).await {
+        errors.push(format!("Reserve Price job failed: {}", e));
+    }
+
+    // Dispatch Max Return job
+    let max_return_job = crate::services::job_dispatcher::Job {
+        job_id: "max_return".to_string(),
+        start_timestamp: request.max_return.start_timestamp,
+        end_timestamp: request.max_return.end_timestamp,
+        job_group_id: Some(request.job_group_id.clone()),
+    };
+    if let Err(e) = dispatcher.dispatch_job(max_return_job).await {
+        errors.push(format!("Max Return job failed: {}", e));
+    }
+
+    if errors.is_empty() {
+        (
             StatusCode::OK,
             Json(Response {
                 status: "success".to_string(),
-                message: "Job dispatched successfully".to_string(),
-                job_id: job_id.to_string(),
-                job_group_id: time_range.job_group_id,
+                message: "All jobs dispatched successfully".to_string(),
+                job_group_id: request.job_group_id,
             }),
-        ),
-        Err(e) => (
+        )
+    } else {
+        (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(Response {
                 status: "error".to_string(),
-                message: e.to_string(),
-                job_id: job_id.to_string(),
-                job_group_id: time_range.job_group_id,
+                message: errors.join(", "),
+                job_group_id: request.job_group_id,
             }),
-        ),
+        )
     }
 }
 
