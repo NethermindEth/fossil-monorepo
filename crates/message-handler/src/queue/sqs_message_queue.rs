@@ -74,7 +74,7 @@ impl Queue for SqsMessageQueue {
                         message
                             .message_id
                             .clone()
-                            .unwrap_or("no message id".to_string())
+                            .unwrap_or_else(|| "no message id".to_string())
                     );
                 }
 
