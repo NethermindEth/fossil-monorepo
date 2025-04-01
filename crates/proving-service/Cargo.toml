@@ -8,6 +8,7 @@ name = "proving-service"
 path = "src/main.rs"
 
 [dependencies]
+# Core dependencies
 eyre = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
@@ -15,10 +16,18 @@ serde_json = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-axum = "0.8.1"
-dotenv = "0.15.0"
-aws-config = "1.6.0"
-aws-sdk-sqs = "1.62.0"
+
+# Web framework
+axum = { workspace = true }
+
+# AWS
+aws-config = { workspace = true }
+aws-sdk-sqs = { workspace = true }
+
+# Utilities
+dotenv = { workspace = true }
+
+# Internal dependencies
 message-handler = { path = "../message-handler" }
 
 [dev-dependencies] 
