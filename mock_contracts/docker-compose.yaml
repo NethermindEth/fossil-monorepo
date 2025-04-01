@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   starknet-devnet:
     image: shardlabs/starknet-devnet-rs:latest-seed0
@@ -14,9 +12,7 @@ services:
       timeout: 5s
       retries: 5
   deployer:
-    build: 
-      context: .   # Use the current directory (where Dockerfile is located)
-      dockerfile: Dockerfile  # Optional if the file is named "Dockerfile"
+    image: deploy
     container_name: deployer
     volumes:
       - .:/app  # Mounts the current directory into /app in the container
