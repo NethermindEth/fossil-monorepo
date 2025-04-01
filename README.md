@@ -20,9 +20,12 @@ Send a POST request with a JSON body in the following format:
 {
     "type": "twap",  // One of: "twap", "reserve-price", "max-return"
     "start_timestamp": 1234567890,
-    "end_timestamp": 1234567891
+    "end_timestamp": 1234567891,
+    "job_group_id": "job_123"  // Optional: Groups related proofs together
 }
 ```
+
+The `job_group_id` field is optional but recommended when submitting multiple proofs that are part of the same job. This helps track and manage related proofs together.
 
 ### Response Format
 
@@ -32,7 +35,8 @@ Send a POST request with a JSON body in the following format:
 {
     "status": "success",
     "message": "Job dispatched successfully",
-    "job_id": "twap"
+    "job_id": "twap",
+    "job_group_id": "job_123"  // Echoes back the job_group_id if provided
 }
 ```
 
@@ -42,7 +46,8 @@ Send a POST request with a JSON body in the following format:
 {
     "status": "error",
     "message": "Error message here",
-    "job_id": "twap"
+    "job_id": "twap",
+    "job_group_id": "job_123"  // Echoes back the job_group_id if provided
 }
 ```
 
@@ -54,7 +59,8 @@ curl -X POST http://127.0.0.1:3000/api/job \
   -d '{
     "type": "twap",
     "start_timestamp": 1234567890,
-    "end_timestamp": 1234567891
+    "end_timestamp": 1234567891,
+    "job_group_id": "job_123"
   }'
 ```
 
@@ -73,7 +79,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .json(&json!({
             "type": "twap",
             "start_timestamp": 1234567890,
-            "end_timestamp": 1234567891
+            "end_timestamp": 1234567891,
+            "job_group_id": "job_123"
         }))
         .send()
         .await?;
