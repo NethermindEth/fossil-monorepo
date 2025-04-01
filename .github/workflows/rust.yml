@@ -35,7 +35,8 @@ jobs:
       run: codespell
     
     - name: Clippy
-      run: cargo +nightly clippy \
+      run: |
+        cargo +nightly clippy \
         --no-deps \
         -p db \
         -p message-handler \
