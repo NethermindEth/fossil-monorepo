@@ -14,6 +14,7 @@ use std::sync::Arc;
 pub struct TimeRange {
     start_timestamp: i64,
     end_timestamp: i64,
+    job_group_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -32,6 +33,7 @@ pub struct Response {
     status: String,
     message: String,
     job_id: String,
+    job_group_id: Option<String>,
 }
 
 async fn handle_request(
@@ -48,6 +50,7 @@ async fn handle_request(
         job_id: job_id.to_string(),
         start_timestamp: time_range.start_timestamp,
         end_timestamp: time_range.end_timestamp,
+        job_group_id: time_range.job_group_id.clone(),
     };
 
     match dispatcher.dispatch_job(job).await {
@@ -57,6 +60,7 @@ async fn handle_request(
                 status: "success".to_string(),
                 message: "Job dispatched successfully".to_string(),
                 job_id: job_id.to_string(),
+                job_group_id: time_range.job_group_id,
             }),
         ),
         Err(e) => (
@@ -65,6 +69,7 @@ async fn handle_request(
                 status: "error".to_string(),
                 message: e.to_string(),
                 job_id: job_id.to_string(),
+                job_group_id: time_range.job_group_id,
             }),
         ),
     }
