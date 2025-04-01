@@ -1,5 +1,4 @@
-use aws_config::BehaviorVersion;
-use aws_config::{from_env, load_defaults};
+use aws_config::{BehaviorVersion, defaults};
 use eyre::Result;
 use message_handlers::http::create_router;
 use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
@@ -30,7 +29,7 @@ async fn main() -> Result<()> {
 
     // Load AWS SDK config from environment variables
     // This will respect AWS_ENDPOINT_URL from the .env file
-    let config = from_env().load().await;
+    let config = defaults(BehaviorVersion::latest()).load().await;
     info!("AWS configuration loaded");
 
     let queue = SqsMessageQueue::new(queue_url, config);
