@@ -1,11 +1,9 @@
 use aws_config::BehaviorVersion;
 use aws_config::load_defaults;
 use eyre::Result;
+use message_handlers::http::create_router;
 use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
-use message_handlers::services::job_dispatcher::Job;
-use message_handlers::services::{
-    job_dispatcher::JobDispatcher, simple_prove_service::ExampleJobProcessor,
-};
+use message_handlers::services::simple_prove_service::ExampleJobProcessor;
 use std::sync::{Arc, atomic::AtomicBool};
 use tracing::debug;
 
@@ -25,10 +23,9 @@ async fn main() -> Result<()> {
     let terminator = Arc::new(AtomicBool::new(false));
     let terminator_clone = terminator.clone();
 
-    let dispatcher = JobDispatcher::new(queue.clone());
-
     let processor = ExampleJobProcessor::new(queue.clone(), terminator.clone());
 
+    // Start the job processor in a separate task
     tokio::spawn(async move {
         loop {
             let result = processor.receive_job().await;
@@ -44,21 +41,11 @@ async fn main() -> Result<()> {
         terminator_clone.store(true, std::sync::atomic::Ordering::Relaxed);
     });
 
-    // Dispatching a job
-    dispatcher
-        .dispatch_job(Job {
-            job_id: "1".to_string(),
-            start_timestamp: 1,
-            end_timestamp: 2,
-        })
-        .await?;
-    dispatcher
-        .dispatch_job(Job {
-            job_id: "2".to_string(),
-            start_timestamp: 2,
-            end_timestamp: 3,
-        })
-        .await?;
+    // Create and start the HTTP server
+    let app = create_router(queue.clone()).await;
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 3000));
+    println!("Starting HTTP server on {}", addr);
+    axum::serve(tokio::net::TcpListener::bind(addr).await?, app).await?;
 
     Ok(())
 }
