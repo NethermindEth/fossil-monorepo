@@ -1,4 +1,4 @@
-[workspace  ]
+[workspace]
 members = ["crates/*"]
 
 resolver = "2"
@@ -8,6 +8,7 @@ version = "0.1.0"
 edition = "2024"
 
 [workspace.dependencies]
+# Common core dependencies
 eyre = "0.6.12"
 tokio = { version = "1.39.0", features = ["full"] }
 serde = { version = "1.0.219", features = ["derive"] }
@@ -15,4 +16,30 @@ serde_json = "1.0.140"
 async-trait = "0.1"
 tracing = "0.1.41"
 tracing-subscriber = "0.3.19"
+
+# AWS related
+aws-config = "1.6.0"
+aws-sdk-sqs = "1.62.0"
+
+# Web frameworks
+axum = "0.8.1"
+
+# Database
+sqlx = { version = "0.8", features = [
+    "postgres",
+    "runtime-tokio-native-tls",
+    "bigdecimal",
+    "chrono",
+    "macros",
+] }
+
+# Utilities
+dotenv = "0.15.0"
+
+# Starknet 
+starknet = "0.14.0"
+starknet-crypto = "0.7.4"
+
+# Testing
 testcontainers-modules = { version = "0.11.6", features = ["localstack", "postgres"] }
+url = "2.4.1"

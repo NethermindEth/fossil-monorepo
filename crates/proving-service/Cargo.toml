@@ -1,7 +1,11 @@
 [package]
-name = "db"
+name = "proving-service"
 version = "0.1.0"
 edition = "2024"
+
+[[bin]]
+name = "proving-service"
+path = "src/main.rs"
 
 [dependencies]
 # Core dependencies
@@ -13,11 +17,17 @@ async-trait = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 
-# Database
-sqlx = { workspace = true }
+# Web framework
+axum = { workspace = true }
+
+# AWS
+aws-config = { workspace = true }
+aws-sdk-sqs = { workspace = true }
 
 # Utilities
 dotenv = { workspace = true }
 
-[dev-dependencies]
-testcontainers-modules = { workspace = true }
+# Internal dependencies
+message-handler = { path = "../message-handler" }
+
+[dev-dependencies] 

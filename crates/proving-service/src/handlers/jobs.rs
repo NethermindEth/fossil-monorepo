@@ -1,12 +1,9 @@
-use crate::queue::sqs_message_queue::SqsMessageQueue;
-use crate::services::job_dispatcher::JobDispatcher;
 use axum::{
-    Router,
     extract::{Json, State},
     http::StatusCode,
     response::IntoResponse,
-    routing::post,
 };
+use message_handler::services::job_dispatcher::{Job, JobDispatcher};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{error, info};
@@ -32,7 +29,7 @@ pub struct Response {
     job_group_id: String,
 }
 
-async fn handle_request(
+pub async fn handle_job_request(
     State(dispatcher): State<Arc<JobDispatcher>>,
     Json(request): Json<JobRequest>,
 ) -> impl IntoResponse {
@@ -40,7 +37,7 @@ async fn handle_request(
     let mut errors = Vec::new();
 
     // Dispatch TWAP job
-    let twap_job = crate::services::job_dispatcher::Job {
+    let twap_job = Job {
         job_id: "twap".to_string(),
         start_timestamp: request.twap.start_timestamp,
         end_timestamp: request.twap.end_timestamp,
@@ -53,7 +50,7 @@ async fn handle_request(
     }
 
     // Dispatch Reserve Price job
-    let reserve_price_job = crate::services::job_dispatcher::Job {
+    let reserve_price_job = Job {
         job_id: "reserve_price".to_string(),
         start_timestamp: request.reserve_price.start_timestamp,
         end_timestamp: request.reserve_price.end_timestamp,
@@ -69,7 +66,7 @@ async fn handle_request(
     }
 
     // Dispatch Max Return job
-    let max_return_job = crate::services::job_dispatcher::Job {
+    let max_return_job = Job {
         job_id: "max_return".to_string(),
         start_timestamp: request.max_return.start_timestamp,
         end_timestamp: request.max_return.end_timestamp,
@@ -112,12 +109,4 @@ async fn handle_request(
             }),
         )
     }
-}
-
-pub async fn create_router(queue: SqsMessageQueue) -> Router {
-    let dispatcher = Arc::new(JobDispatcher::new(queue));
-
-    Router::new()
-        .route("/api/job", post(handle_request))
-        .with_state(dispatcher)
 }
