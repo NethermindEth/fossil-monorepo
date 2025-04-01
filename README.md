@@ -2,6 +2,39 @@
 
 A service that processes jobs through AWS SQS and exposes an HTTP API for job submission.
 
+## Development Setup
+
+### LocalStack SQS Setup
+
+The service uses AWS SQS for message queuing. For local development, you can use LocalStack to create a local SQS service:
+
+1. Start the LocalStack container:
+
+   ```bash
+   docker-compose -f docker-compose.sqs.yml up -d
+   ```
+
+2. Set up the SQS queue:
+
+   ```bash
+   ./setup-localstack.sh
+   ```
+
+3. Verify the queue was created successfully by checking the output of the script.
+
+### Running the Application
+
+Run the application with:
+
+```bash
+cargo run -p message_handlers
+```
+
+The service will:
+
+- Connect to the LocalStack SQS queue
+- Start the HTTP server on <http://127.0.0.1:3000>
+
 ## HTTP API
 
 The service exposes a single HTTP endpoint for submitting jobs:
