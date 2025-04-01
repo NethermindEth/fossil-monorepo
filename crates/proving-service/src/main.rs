@@ -52,3 +52,12 @@ async fn main() -> Result<()> {
     info!("Shutdown complete");
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_main_builds() {
+        // This test simply verifies that the main.rs file compiles
+        assert!(true);
+    }
+}

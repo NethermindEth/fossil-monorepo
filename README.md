@@ -168,3 +168,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+## Testing
+
+### Setup Test Environment
+
+Start the required services for testing:
+
+```bash
+docker-compose -f docker-compose.test.yml up -d
+```
+
+### Running Tests
+
+Run all tests:
+
+```bash
+cargo test
+```
+
+Run tests for a specific crate:
+
+```bash
+cargo test -p proving-service
+```
+
+### Cleanup
+
+After testing, clean up the test environment:
+
+```bash
+docker-compose -f docker-compose.test.yml down
+```
+
+## Continuous Integration
+
+The project uses GitHub Actions for continuous integration:
+
+- **Unit Tests**: Run on every PR and push to main
+- **Integration Tests**: Run on every PR and push to main
+- **Code Coverage**: Generated for the test suite
+
+You can find the CI pipeline configuration in `.github/workflows`.
