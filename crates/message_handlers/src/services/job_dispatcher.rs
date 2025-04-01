@@ -7,6 +7,7 @@ pub struct Job {
     pub job_id: String,
     pub start_timestamp: i64,
     pub end_timestamp: i64,
+    pub job_group_id: Option<String>,
 }
 
 pub struct JobDispatcher {
