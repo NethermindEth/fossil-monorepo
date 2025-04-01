@@ -34,20 +34,13 @@ async fn main() -> Result<()> {
     let queue = SqsMessageQueue::new(queue_url, config);
 
     let terminator = Arc::new(AtomicBool::new(false));
-    let terminator_clone = terminator.clone();
-
     let processor = ExampleJobProcessor::new(queue.clone(), terminator.clone());
 
     // Start the job processor in a separate task
     let processor_handle = tokio::spawn(async move {
-        loop {
-            if terminator_clone.load(std::sync::atomic::Ordering::Relaxed) {
-                info!("Processor received shutdown signal, stopping...");
-                break;
-            }
-            let result = processor.receive_job().await;
-            debug!("Job err?: {:?}", result);
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        // Run once - the receive_job method has its own loop
+        if let Err(e) = processor.receive_job().await {
+            debug!("Job processor exited with error: {:?}", e);
         }
     });
 
@@ -61,7 +54,7 @@ async fn main() -> Result<()> {
 
     // Wait for the processor to finish
     info!("Waiting for processor to finish...");
-    processor_handle.await?;
+    let _ = processor_handle.await;
 
     info!("Shutdown complete");
     Ok(())

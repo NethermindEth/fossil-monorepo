@@ -1,7 +1,7 @@
 use aws_config::{BehaviorVersion, defaults};
 use eyre::Result;
-use proving_service::create_router;
 use message_handler::queue::sqs_message_queue::SqsMessageQueue;
+use proving_service::create_router;
 use std::env;
 use tokio::signal;
 use tracing::{Level, info};
@@ -40,7 +40,7 @@ async fn main() -> Result<()> {
 
     // Handle Ctrl+C for graceful shutdown
     let handle = tokio::spawn(async move { server.await });
-    
+
     info!("Waiting for shutdown signal...");
     signal::ctrl_c().await?;
     info!("Received shutdown signal, initiating graceful shutdown...");
@@ -51,4 +51,4 @@ async fn main() -> Result<()> {
 
     info!("Shutdown complete");
     Ok(())
-} 
+}
