@@ -13,6 +13,11 @@ pub struct HashingService<T: HashingProviderTrait + Sync + Send + 'static> {
     hash_batch_size: usize,
 }
 
+// Move the helper function to the module level
+fn err_to_string<E: std::fmt::Display>(err: E) -> String {
+    format!("{}", err)
+}
+
 impl<T: HashingProviderTrait + Sync + Send + 'static> HashingService<T> {
     pub fn new(
         hashing_service: T,
@@ -71,15 +76,18 @@ impl<T: HashingProviderTrait + Sync + Send + 'static> HashingService<T> {
         start_timestamp: u64,
         end_timestamp: u64,
     ) -> Result<Vec<u64>, String> {
-        let mut unavailable_batch_timestamp_hashes = vec![];
+        let mut unavailable_batch_timestamp_hashes = Vec::new();
+
         for t in (start_timestamp..end_timestamp).step_by(3600 * self.hash_batch_size) {
             let hash = self.hashing_provider.get_hash_stored_avg_fees(t).await;
-            if hash.is_err() {
-                return Err(hash.err().unwrap().to_string());
+            if let Err(err) = hash {
+                return Err(err.to_string());
             }
 
-            if hash.unwrap() == [0; 8] {
-                unavailable_batch_timestamp_hashes.push(t);
+            if let Ok(hash_value) = hash {
+                if hash_value == [0; 8] {
+                    unavailable_batch_timestamp_hashes.push(t);
+                }
             }
         }
 
@@ -108,15 +116,13 @@ impl<T: HashingProviderTrait + Sync + Send + 'static> HashingService<T> {
 
         let mut invoke_tx_tasks = vec![];
         for receipt in receipts {
-            if receipt.is_err() {
-                return Err(receipt.err().unwrap().to_string());
-            }
+            let tx_receipt = receipt?;
             let hashing_service = self.hashing_provider.clone();
 
             let task = tokio::task::spawn(async move {
                 hashing_service
                     .get_provider()
-                    .get_transaction_receipt(receipt.unwrap().transaction_hash)
+                    .get_transaction_receipt(tx_receipt.transaction_hash)
                     .await
             });
             invoke_tx_tasks.push(task);
@@ -130,13 +136,17 @@ impl<T: HashingProviderTrait + Sync + Send + 'static> HashingService<T> {
         }
 
         for invoke_tx_result in invoke_tx_results {
-            if invoke_tx_result.is_err() {
-                return Err(invoke_tx_result.err().unwrap().to_string());
+            if let Err(err) = invoke_tx_result {
+                return Err(err.to_string());
             }
-            if let Invoke(invoke_receipt) = invoke_tx_result.unwrap().receipt {
-                if invoke_receipt.execution_result.status() == TransactionExecutionStatus::Reverted
-                {
-                    return Err("invoke reverted".to_string());
+
+            if let Ok(result) = invoke_tx_result {
+                if let Invoke(invoke_receipt) = result.receipt {
+                    if invoke_receipt.execution_result.status()
+                        == TransactionExecutionStatus::Reverted
+                    {
+                        return Err("invoke reverted".to_string());
+                    }
                 }
             }
         }
@@ -145,30 +155,39 @@ impl<T: HashingProviderTrait + Sync + Send + 'static> HashingService<T> {
     }
 
     async fn is_batch_hash_avg_fees_available(&self, start_timestamp: u64) -> Result<bool, String> {
-        let hash = self
+        let hash = match self
             .hashing_provider
             .get_hash_batched_avg_fees(start_timestamp)
             .await
-            .map_err(|e| e.to_string())?;
+        {
+            Ok(hash) => hash,
+            Err(err) => return Err(err_to_string(err)),
+        };
 
         Ok(hash != [0; 8])
     }
 
     async fn hash_batch_avg_fees_onchain(&self, start_timestamp: u64) -> Result<(), String> {
         // if everything is successful, we perform batch hash of hash of avg gas fee
-        let batch_hash_invoke_res = self
+        let batch_hash_invoke_res = match self
             .hashing_provider
             .hash_batched_avg_fees(start_timestamp)
             .await
-            .map_err(|e| e.to_string())?;
+        {
+            Ok(res) => res,
+            Err(err) => return Err(err_to_string(err)),
+        };
 
         // check if it has been successfully stored onchain
-        let receipt = self
+        let receipt = match self
             .hashing_provider
             .get_provider()
             .get_transaction_receipt(batch_hash_invoke_res.transaction_hash)
             .await
-            .map_err(|e| e.to_string())?;
+        {
+            Ok(receipt) => receipt,
+            Err(err) => return Err(err_to_string(err)),
+        };
 
         if receipt.receipt.execution_result().status() == TransactionExecutionStatus::Reverted {
             return Err("batch hash reverted".to_string());

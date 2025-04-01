@@ -2,6 +2,39 @@
 
 A service that processes jobs through AWS SQS and exposes an HTTP API for job submission.
 
+## Getting Started with Make
+
+This project includes a comprehensive Makefile to simplify common development tasks. Here are the main commands:
+
+```bash
+# Setup your development environment
+make setup              # Install all dependencies
+make setup-rust         # Install Rust and toolchains
+make setup-postgres     # Set up PostgreSQL for development
+make setup-localstack   # Set up LocalStack for AWS services
+
+# Development
+make build              # Build the project in release mode
+make build-debug        # Build the project in debug mode
+make dev-services       # Start all development services
+make dev-services-stop  # Stop all development services
+
+# Testing
+make test               # Run all tests with database dependencies
+make test-clean         # Clean up test environment
+
+# Code Quality
+make lint               # Run all linters
+make fmt                # Format code with rustfmt
+make clippy             # Run clippy linter
+make pr                 # Prepare code for a pull request
+
+# Help
+make help               # Display all available commands
+```
+
+For more details on each command, run `make help`.
+
 ## Project Structure
 
 The project is organized into multiple crates:
@@ -169,38 +202,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## Testing
-
-### Setup Test Environment
-
-Start the required services for testing:
-
-```bash
-docker-compose -f docker-compose.test.yml up -d
-```
-
-### Running Tests
-
-Run all tests:
-
-```bash
-cargo test
-```
-
-Run tests for a specific crate:
-
-```bash
-cargo test -p proving-service
-```
-
-### Cleanup
-
-After testing, clean up the test environment:
-
-```bash
-docker-compose -f docker-compose.test.yml down
-```
-
 ## Continuous Integration
 
 The project uses GitHub Actions for continuous integration:
@@ -208,5 +209,3 @@ The project uses GitHub Actions for continuous integration:
 - **Unit Tests**: Run on every PR and push to main
 - **Integration Tests**: Run on every PR and push to main
 - **Code Coverage**: Generated for the test suite
-
-You can find the CI pipeline configuration in `.github/workflows`.
