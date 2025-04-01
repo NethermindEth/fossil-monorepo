@@ -6,10 +6,19 @@ use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
 use message_handlers::services::simple_prove_service::ExampleJobProcessor;
 use std::sync::{Arc, atomic::AtomicBool};
 use tokio::signal;
-use tracing::{debug, info};
+use tracing::{Level, debug, info};
+use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Initialize tracing with INFO level default
+    let subscriber = FmtSubscriber::builder()
+        .with_max_level(Level::INFO)
+        .finish();
+    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+
+    info!("Starting Fossil Prover Service");
+
     // Load .env file
     dotenv::dotenv().ok();
 
@@ -42,7 +51,7 @@ async fn main() -> Result<()> {
     // Create and start the HTTP server
     let app = create_router(queue.clone()).await;
     let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 3000));
-    println!("Starting HTTP server on {}", addr);
+    info!("Starting HTTP server on {}", addr);
 
     let server = axum::serve(tokio::net::TcpListener::bind(addr).await?, app);
     let server_handle = tokio::spawn(async move { server.await });
