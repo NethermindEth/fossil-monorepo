@@ -1,9 +1,10 @@
 use aws_config::BehaviorVersion;
-use aws_config::load_defaults;
+use aws_config::{from_env, load_defaults};
 use eyre::Result;
 use message_handlers::http::create_router;
 use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
 use message_handlers::services::simple_prove_service::ExampleJobProcessor;
+use std::env;
 use std::sync::{Arc, atomic::AtomicBool};
 use tokio::signal;
 use tracing::{Level, debug, info};
@@ -22,11 +23,15 @@ async fn main() -> Result<()> {
     // Load .env file
     dotenv::dotenv().ok();
 
-    // Initialize AWS SQS client
-    let config = load_defaults(BehaviorVersion::latest()).await;
+    // Get the queue URL from environment variable
+    let queue_url = env::var("SQS_QUEUE_URL")
+        .unwrap_or_else(|_| "http://localhost:4566/000000000000/fossilQueue".to_string());
+    info!("Using SQS Queue URL: {}", queue_url);
 
-    // Create queue URL - replace with your actual queue URL
-    let queue_url = "https://sqs.us-east-1.amazonaws.com/654654236251/fossilQueue".to_string();
+    // Load AWS SDK config from environment variables
+    // This will respect AWS_ENDPOINT_URL from the .env file
+    let config = from_env().load().await;
+    info!("AWS configuration loaded");
 
     let queue = SqsMessageQueue::new(queue_url, config);
 
