@@ -13,7 +13,8 @@ async fn main() -> Result<()> {
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .finish();
-    tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+    tracing::subscriber::set_global_default(subscriber)
+        .map_err(|e| eyre::eyre!("setting default subscriber failed: {}", e))?;
 
     info!("Starting Fossil Prover HTTP Service");
 

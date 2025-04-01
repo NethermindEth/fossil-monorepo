@@ -19,7 +19,7 @@ pub struct ExampleJobProcessor {
 }
 
 impl ExampleJobProcessor {
-    pub fn new(queue: SqsMessageQueue, terminator: Arc<AtomicBool>) -> Self {
+    pub const fn new(queue: SqsMessageQueue, terminator: Arc<AtomicBool>) -> Self {
         Self { queue, terminator }
     }
 

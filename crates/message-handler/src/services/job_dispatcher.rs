@@ -15,7 +15,7 @@ pub struct JobDispatcher {
 }
 
 impl JobDispatcher {
-    pub fn new(queue: SqsMessageQueue) -> Self {
+    pub const fn new(queue: SqsMessageQueue) -> Self {
         Self { queue }
     }
 
