@@ -1,8 +1,7 @@
 use aws_config::{BehaviorVersion, defaults};
 use eyre::Result;
-use message_handlers::http::create_router;
-use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
-use message_handlers::services::simple_prove_service::ExampleJobProcessor;
+use message_handler::queue::sqs_message_queue::SqsMessageQueue;
+use message_handler::services::simple_prove_service::ExampleJobProcessor;
 use std::env;
 use std::sync::{Arc, atomic::AtomicBool};
 use tokio::signal;
@@ -17,7 +16,7 @@ async fn main() -> Result<()> {
         .finish();
     tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
-    info!("Starting Fossil Prover Service");
+    info!("Starting Fossil Prover Message Handler Service");
 
     // Load .env file
     dotenv::dotenv().ok();
@@ -52,14 +51,6 @@ async fn main() -> Result<()> {
         }
     });
 
-    // Create and start the HTTP server
-    let app = create_router(queue.clone()).await;
-    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 3000));
-    info!("Starting HTTP server on {}", addr);
-
-    let server = axum::serve(tokio::net::TcpListener::bind(addr).await?, app);
-    let server_handle = tokio::spawn(async move { server.await });
-
     // Handle Ctrl+C for graceful shutdown
     info!("Waiting for shutdown signal...");
     signal::ctrl_c().await?;
@@ -71,10 +62,6 @@ async fn main() -> Result<()> {
     // Wait for the processor to finish
     info!("Waiting for processor to finish...");
     processor_handle.await?;
-
-    // Shutdown the HTTP server
-    info!("Shutting down HTTP server...");
-    server_handle.abort();
 
     info!("Shutdown complete");
     Ok(())

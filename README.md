@@ -2,6 +2,14 @@
 
 A service that processes jobs through AWS SQS and exposes an HTTP API for job submission.
 
+## Project Structure
+
+The project is organized into multiple crates:
+
+- `message-handler` - Handles message processing from queues
+- `proving-service` - Provides the HTTP API for job submission
+- `db` - Database interface for persisting data
+
 ## Development Setup
 
 ### LocalStack SQS Setup
@@ -24,16 +32,27 @@ The service uses AWS SQS for message queuing. For local development, you can use
 
 ### Running the Application
 
-Run the application with:
+You can run both services separately:
+
+#### HTTP API Service
+
+Run the HTTP API service with:
 
 ```bash
-cargo run -p message_handlers
+cargo run -p proving-service
 ```
 
-The service will:
+This will start the HTTP server on <http://127.0.0.1:3000> and connect to the SQS queue.
 
-- Connect to the LocalStack SQS queue
-- Start the HTTP server on <http://127.0.0.1:3000>
+#### Message Handler Service
+
+Run the message handler service with:
+
+```bash
+cargo run -p message-handler
+```
+
+This will start a service that consumes messages from the SQS queue.
 
 ## HTTP API
 

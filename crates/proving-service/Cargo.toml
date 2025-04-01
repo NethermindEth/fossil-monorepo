@@ -1,7 +1,11 @@
 [package]
-name = "message_handlers"
+name = "proving-service"
 version = "0.1.0"
 edition = "2024"
+
+[[bin]]
+name = "proving-service"
+path = "src/main.rs"
 
 [dependencies]
 eyre = { workspace = true }
@@ -11,16 +15,10 @@ serde_json = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-
 axum = "0.8.1"
+dotenv = "0.15.0"
 aws-config = "1.6.0"
 aws-sdk-sqs = "1.62.0"
-starknet = "0.14.0"
-starknet-crypto = "0.7.4"
-dotenv = "0.15.0"
-common = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", tag = "1.0.0", package = "common" }
+message-handler = { path = "../message-handler" }
 
-
-[dev-dependencies]
-testcontainers-modules = { version = "0.11.6", features = ["localstack"] }
-url = "2.4.1"
+[dev-dependencies] 
