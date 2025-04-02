@@ -90,7 +90,7 @@ clippy: ## Run clippy linter with project-specific settings.
 	cargo +nightly clippy \
 		--no-deps \
 		-p db \
-		-p message-handler \
+		-p message_handlers \
 		-p proving-service \
 		-- \
 		-W clippy::branches_sharing_code \
