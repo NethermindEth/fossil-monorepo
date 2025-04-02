@@ -354,17 +354,13 @@ mod tests {
 
     #[tokio::test]
     async fn should_hash_and_store_avg_fees_onchain() {
-        // let docker_compose_started = StartDockerCompose::start_docker_compose().await;
-        // assert!(docker_compose_started);
+        let docker_compose_started = StartDockerCompose::start_docker_compose().await;
+        assert!(docker_compose_started);
 
-        // let provider =
-        //     JsonRpcClient::new(HttpTransport::new(Url::parse(LOCALHOST_RPC_URL).unwrap()));
-        // let private_key = LOCALHOST_STARKNET_PRIVATE_KEY;
-        // let account_address = LOCALHOST_STARKNET_ACCOUNT_ADDRESS;
         let provider =
-        JsonRpcClient::new(HttpTransport::new(Url::parse("https://starknet-sepolia.public.blastapi.io").unwrap()));
-        let private_key = "0x065212981820d81714ae3f49ffee54363290eab7a411df1f20d29709a7dbb031";
-        let account_address = "0x6307443811a38f62d6eb0908b51f150c91a6c110d8b3a555907f26fbab50d";
+            JsonRpcClient::new(HttpTransport::new(Url::parse(LOCALHOST_RPC_URL).unwrap()));
+        let private_key = LOCALHOST_STARKNET_PRIVATE_KEY;
+        let account_address = LOCALHOST_STARKNET_ACCOUNT_ADDRESS;
         let signer = LocalWallet::from(SigningKey::from_secret_scalar(
             Felt::from_hex(&private_key).unwrap(),
         ));
@@ -379,8 +375,8 @@ mod tests {
         );
         let fossil_light_client_address =
             Felt::from_hex(LOCALHOST_FOSSIL_LIGHT_CLIENT_ADDRESS).unwrap();
-        let hash_storage_address = Felt::from_hex("0x05b0f3088aa18e506d1b42e606e22bb25bdbfeef48f7821108fecfabd5c3d4a5").unwrap();
-        // let hash_storage_address = Felt::from_hex(LOCALHOST_HASH_STORAGE_ADDRESS).unwrap();
+        // let hash_storage_address = Felt::from_hex("0x05b0f3088aa18e506d1b42e606e22bb25bdbfeef48f7821108fecfabd5c3d4a5").unwrap();
+        let hash_storage_address = Felt::from_hex(LOCALHOST_HASH_STORAGE_ADDRESS).unwrap();
 
         let hashing_provider = HashingProvider::new(
             provider,
