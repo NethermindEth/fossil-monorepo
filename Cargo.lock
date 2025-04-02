@@ -5,7 +5,7 @@ version = 4
 [[package]]
 name = "add-twap-7d-error-bound-floating"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "add-twap-7d-error-bound-floating-methods",
  "common",
@@ -16,7 +16,7 @@ dependencies = [
 [[package]]
 name = "add-twap-7d-error-bound-floating-methods"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "risc0-build",
 ]
@@ -1167,7 +1167,7 @@ dependencies = [
 [[package]]
 name = "calculate-pt-pt1-error-bound-floating"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "calculate-pt-pt1-error-bound-floating-methods",
  "common",
@@ -1178,7 +1178,7 @@ dependencies = [
 [[package]]
 name = "calculate-pt-pt1-error-bound-floating-methods"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "risc0-build",
 ]
@@ -1364,7 +1364,7 @@ dependencies = [
 [[package]]
 name = "common"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "approx 0.5.1",
  "chrono",
@@ -1439,7 +1439,7 @@ dependencies = [
 [[package]]
 name = "core"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "nalgebra 0.33.2",
  "serde",
@@ -2414,7 +2414,7 @@ dependencies = [
 [[package]]
 name = "hashing-felts"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "common",
  "core",
@@ -2426,7 +2426,7 @@ dependencies = [
 [[package]]
 name = "hashing-felts-methods"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "risc0-build",
 ]
@@ -2982,15 +2982,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "itertools"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
-dependencies = [
- "either",
-]
-
-[[package]]
 name = "itoa"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3296,7 +3287,7 @@ dependencies = [
 [[package]]
 name = "max-return-floating"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "common",
  "core",
@@ -3307,7 +3298,7 @@ dependencies = [
 [[package]]
 name = "max-return-floating-methods"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "risc0-build",
 ]
@@ -4566,7 +4557,7 @@ dependencies = [
 [[package]]
 name = "proof-composition-twap-maxreturn-reserveprice-floating-hashing-methods"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "risc0-build",
 ]
@@ -4588,7 +4579,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.12.1",
  "proc-macro2",
  "quote",
  "syn 2.0.100",
@@ -4897,7 +4888,7 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 [[package]]
 name = "remove-seasonality-error-bound-floating"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "common",
  "core",
@@ -4908,7 +4899,7 @@ dependencies = [
 [[package]]
 name = "remove-seasonality-error-bound-floating-methods"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "risc0-build",
 ]
@@ -5045,9 +5036,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-build"
-version = "2.0.1"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8f4a3e21f17465e618cd3ed755b121627f2c188d1416be1cec2757cffe1adf8"
+checksum = "eb85162c19a2ba2151c02f1f157804cd89e163ca694afda399fc3f415c03a3de"
 dependencies = [
  "anyhow",
  "cargo_metadata",
@@ -5069,9 +5060,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-circuit-keccak"
-version = "1.4.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d400df98740acb35306194f8979ca45c2a6b63b8f8686198d99ce126c335d64a"
+checksum = "dc6af6fc80443a05d9e8e25aeba78082fc58e8a3c6a6b92017cae0a404494ba9"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -5085,9 +5076,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-circuit-recursion"
-version = "1.4.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14fa62cd0d2a33cb1c8e6b4bcba54a615f6def8d43324922f67c1a9ef6c410e3"
+checksum = "1c7bdd11df4ed470b3c032ac4c5bfb2729f6151af33ee255b66169de0c35611e"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -5100,9 +5091,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-circuit-rv32im"
-version = "2.0.1"
+version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e543671f49a94fb87cf7a75441def1ace5ee827190f0be233154e8aef4e8003"
+checksum = "c98a4d9e438aac2e661b8376f6dd48b17a0949b29dbb0aed6e88e62de0bd5940"
 dependencies = [
  "anyhow",
  "bit-vec",
@@ -5129,9 +5120,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-groth16"
-version = "1.4.0"
+version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d3090293edf52c603dd3021588cf42c231501ae51c88086f7b732ac48c6684d6"
+checksum = "a800c55717c52f764325bdb18a164843d417a4c8c8a123b7d4206705c11a54c3"
 dependencies = [
  "anyhow",
  "ark-bn254",
@@ -5185,9 +5176,9 @@ dependencies = [
 
 [[package]]
 name = "risc0-zkvm"
-version = "2.0.0"
+version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "da62ed54fa6cfd16b93b79ca48f2d58f6ee818a630f5132e61a43003b65478a1"
+checksum = "5881af78a17ca292037ef38383233f8d617ab679d68cc07c865e3ddabef1db80"
 dependencies = [
  "anyhow",
  "bincode",
@@ -5798,7 +5789,7 @@ checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
 [[package]]
 name = "simulate-price-verify-position-floating"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "common",
  "core",
@@ -5811,7 +5802,7 @@ dependencies = [
 [[package]]
 name = "simulate-price-verify-position-floating-methods"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "risc0-build",
 ]
@@ -6912,7 +6903,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 [[package]]
 name = "twap-error-bound-floating"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "common",
  "core",
@@ -6923,7 +6914,7 @@ dependencies = [
 [[package]]
 name = "twap-error-bound-floating-methods"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#b7253efcd158cdf146e026fcd89cb3f21ca94410"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor#ad886e9264730ed287eca83707625a0f00013fc8"
 dependencies = [
  "risc0-build",
 ]

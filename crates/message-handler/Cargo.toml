@@ -42,7 +42,7 @@ twap_error_bound_floating = { git = "https://github.com/NethermindEth/pitchlake-
 hashing_felts = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "hashing-felts" }
 proof_composition_twap_maxreturn_reserveprice_floating_hashing_methods = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "proof-composition-twap-maxreturn-reserveprice-floating-hashing-methods" }
 
-risc0-zkvm = { version = "=2.0.0" }
+risc0-zkvm = { version = "2.0.1" }
 uuid = { version = "1.16.0", features = ["v4"] }
 
 [dev-dependencies]
