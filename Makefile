@@ -21,6 +21,52 @@ test: ## Run all tests with database dependencies.
 test-clean: ## Clean up test environment.
 	docker compose -f docker-compose.test.yml down
 
+##@ Coverage
+
+.PHONY: coverage-dir
+coverage-dir: ## Create coverage directory if it doesn't exist
+	@mkdir -p .coverage
+
+.PHONY: coverage
+coverage: coverage-dir ## Run tests with code coverage and generate HTML report.
+	@rustup component add llvm-tools-preview
+	docker compose -f docker-compose.test.yml up -d &&\
+	CARGO_INCREMENTAL=0 \
+	RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
+	LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
+	cargo test --workspace --all-features &&\
+	grcov . --binary-path ./target/debug/ -s . -t html --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/html &&\
+	echo "Coverage report generated at .coverage/html/index.html"
+
+.PHONY: coverage-xml
+coverage-xml: coverage-dir ## Generate code coverage report in XML format for CI.
+	@rustup component add llvm-tools-preview
+	CARGO_INCREMENTAL=0 \
+	RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
+	LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
+	cargo test --workspace --all-features &&\
+	grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info
+
+.PHONY: coverage-clean
+coverage-clean: ## Clean up coverage artifacts.
+	rm -rf .coverage
+
+.PHONY: coverage-view
+coverage-view: ## Open coverage report in the default browser (after running make coverage).
+	@if [ -f .coverage/html/index.html ]; then \
+		./open-coverage.sh; \
+	else \
+		echo "Coverage report not found. Run 'make coverage' first."; \
+	fi
+
+.PHONY: coverage-summary
+coverage-summary: ## Display a text summary of the code coverage report.
+	@if [ -f .coverage/html/index.html ]; then \
+		./coverage-summary.sh; \
+	else \
+		echo "Coverage report not found. Run 'make coverage' first."; \
+	fi
+
 ##@ Linting
 
 .PHONY: fmt
@@ -144,7 +190,7 @@ pr: ## Prepare code for a pull request.
 ##@ Setup
 
 .PHONY: setup
-setup: setup-rust setup-postgres setup-localstack setup-dev-env ## Install all dependencies.
+setup: setup-rust setup-postgres setup-localstack setup-dev-env setup-coverage ## Install all dependencies.
 	@echo "✅ All dependencies installed successfully!"
 
 .PHONY: setup-rust
@@ -184,6 +230,19 @@ setup-dev-env: ## Set up development environment variables.
 	else \
 		echo "✅ .env file already exists"; \
 	fi
+
+.PHONY: setup-coverage
+setup-coverage: ## Install coverage tools.
+	@echo "🔧 Setting up code coverage tools..."
+	@rustup component add llvm-tools-preview
+	@if ! command -v grcov &> /dev/null; then \
+		echo "Installing grcov..."; \
+		cargo install grcov; \
+		echo "✅ grcov installed"; \
+	else \
+		echo "✅ grcov already installed"; \
+	fi
+	@echo "✅ LLVM tools installed via rustup"
 
 ##@ Help
 

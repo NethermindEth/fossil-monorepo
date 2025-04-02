@@ -20,13 +20,21 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@nightly
       with:
-        components: rustfmt, clippy
+        components: rustfmt, clippy, llvm-tools-preview
     
+    - name: Verify LLVM tools
+      run: |
+        rustup component add llvm-tools-preview
+        echo "LLVM_PROFILE_DIR=$GITHUB_WORKSPACE/target/profiles" >> $GITHUB_ENV
+
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
     
     - name: Setup codespell
       run: pip install codespell
+    
+    - name: Install grcov
+      run: cargo install grcov
     
     - name: Check formatting
       run: cargo fmt --all -- --check
@@ -116,8 +124,25 @@ jobs:
           sleep 1
         done
     
-    - name: Run tests
-      run: cargo test --verbose
+    - name: Run tests with coverage
+      run: |
+        rustup component add llvm-tools-preview
+        mkdir -p .coverage
+        CARGO_INCREMENTAL=0 \
+        RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
+        LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
+        cargo test --workspace --all-features
+      
+    - name: Generate coverage report
+      run: |
+        grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info
+        
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        file: .coverage/lcov.info
+        fail_ci_if_error: false
 
     - name: Stop PostgreSQL
       if: always()
