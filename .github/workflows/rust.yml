@@ -20,13 +20,21 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@nightly
       with:
-        components: rustfmt, clippy
+        components: rustfmt, clippy, llvm-tools-preview
     
+    - name: Verify LLVM tools
+      run: |
+        rustup component add llvm-tools-preview
+        echo "LLVM_PROFILE_DIR=$GITHUB_WORKSPACE/target/profiles" >> $GITHUB_ENV
+
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
     
     - name: Setup codespell
       run: pip install codespell
+    
+    - name: Install grcov
+      run: cargo install grcov
     
     - name: Check formatting
       run: cargo fmt --all -- --check
@@ -116,8 +124,47 @@ jobs:
           sleep 1
         done
     
-    - name: Run tests
-      run: cargo test --verbose
+    - name: Run tests with coverage
+      run: |
+        rustup component add llvm-tools-preview
+        mkdir -p .coverage
+        CARGO_INCREMENTAL=0 \
+        RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
+        LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
+        cargo test --workspace --all-features
+      
+    - name: Generate coverage report
+      run: |
+        grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info
+        
+    # Generate badge from coverage data
+    - name: Generate coverage badge
+      run: |
+        # Extract coverage percentage from lcov info
+        COVERAGE_PCT=$(grep -m 1 "LF:" .coverage/lcov.info | awk '{print $2}')
+        COVERAGE_HIT=$(grep -m 1 "LH:" .coverage/lcov.info | awk '{print $2}')
+        
+        if [ -n "$COVERAGE_PCT" ] && [ -n "$COVERAGE_HIT" ] && [ "$COVERAGE_PCT" -gt 0 ]; then
+          COVERAGE=$(awk "BEGIN { printf \"%.1f\", ($COVERAGE_HIT / $COVERAGE_PCT) * 100 }")
+          echo "Coverage percentage: $COVERAGE%"
+          
+          # Determine badge color based on coverage
+          if (( $(echo "$COVERAGE < 50" | bc -l) )); then
+            COLOR="red"
+          elif (( $(echo "$COVERAGE < 70" | bc -l) )); then
+            COLOR="yellow"
+          elif (( $(echo "$COVERAGE < 90" | bc -l) )); then
+            COLOR="green"
+          else
+            COLOR="brightgreen"
+          fi
+          
+          # Save badge URL to a file for documentation
+          echo "https://img.shields.io/badge/coverage-$COVERAGE%25-$COLOR" > .coverage/badge_url.txt
+          echo "Coverage badge URL saved to .coverage/badge_url.txt"
+        else
+          echo "Could not determine coverage percentage"
+        fi
 
     - name: Stop PostgreSQL
       if: always()

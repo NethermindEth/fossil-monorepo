@@ -1,5 +1,8 @@
 # Prover service
 
+[![Rust CI](https://github.com/NethermindEth/fossil-prover-service/workflows/Rust%20CI/badge.svg)](https://github.com/NethermindEth/fossil-prover-service/actions?query=workflow%3A%22Rust+CI%22)
+[![Coverage](https://img.shields.io/badge/coverage-53.3%25-yellow)](https://github.com/NethermindEth/fossil-prover-service)
+
 A service that processes jobs through AWS SQS and exposes an HTTP API for job submission.
 
 ## Getting Started with Make
@@ -12,6 +15,7 @@ make setup              # Install all dependencies
 make setup-rust         # Install Rust and toolchains
 make setup-postgres     # Set up PostgreSQL for development
 make setup-localstack   # Set up LocalStack for AWS services
+make setup-coverage     # Install code coverage tools
 
 # Development
 make build              # Build the project in release mode
@@ -22,6 +26,14 @@ make dev-services-stop  # Stop all development services
 # Testing
 make test               # Run all tests with database dependencies
 make test-clean         # Clean up test environment
+
+# Code Coverage
+make coverage           # Run tests with coverage and generate HTML report
+make coverage-view      # Open the coverage report in a browser
+make coverage-xml       # Generate code coverage report in XML format for CI
+make coverage-clean     # Clean up coverage artifacts
+make coverage-summary   # Display a text summary of the coverage report
+make coverage-badge     # Generate a badge for the README
 
 # Code Quality
 make lint               # Run all linters
@@ -208,4 +220,90 @@ The project uses GitHub Actions for continuous integration:
 
 - **Unit Tests**: Run on every PR and push to main
 - **Integration Tests**: Run on every PR and push to main
-- **Code Coverage**: Generated for the test suite
+- **Code Coverage**: Generated during test runs with coverage reporting shown in the README badge
+
+## Code Coverage
+
+The project includes comprehensive code coverage tracking using LLVM's source-based code coverage tools and grcov.
+
+### Setting Up Coverage Tools
+
+The easiest way to set up code coverage tools is to run:
+
+```bash
+./setup-coverage.sh
+```
+
+This script will:
+1. Install the LLVM tools component via rustup
+2. Install grcov if not already installed
+3. Create a dedicated `.coverage` directory for all coverage files
+4. Set up necessary environment variables
+
+Alternatively, you can set up the tools manually:
+
+```bash
+# Install LLVM tools
+rustup component add llvm-tools-preview
+
+# Install grcov
+cargo install grcov
+
+# Create coverage directory
+mkdir -p .coverage
+```
+
+### Viewing Coverage Reports Locally
+
+Run the tests with coverage enabled and generate an HTML report:
+
+```bash
+make coverage
+```
+
+This will:
+1. Install LLVM tools component if necessary
+2. Start any required dependencies
+3. Run the test suite with coverage instrumentation
+4. Generate an HTML report at `.coverage/html/index.html`
+
+### Generating a Coverage Badge
+
+To generate a coverage badge for your README:
+
+```bash
+make coverage-badge
+```
+
+This command will:
+1. Extract the coverage percentage from the HTML report
+2. Generate a badge image in `.coverage/badge/coverage.svg` 
+3. Print instructions for adding the badge to your README
+
+### Opening the Report
+
+To automatically open the report in your default browser:
+
+```bash
+make coverage-view
+```
+
+Alternatively, you can use the dedicated browser-opening script:
+
+```bash
+./open-coverage.sh
+```
+
+This script will attempt to find and use an appropriate browser on your system.
+
+You can also manually open the HTML file at `.coverage/html/index.html` in your browser to view a detailed coverage report.
+
+### Cleaning Up Coverage Data
+
+To clean up coverage artifacts:
+
+```bash
+make coverage-clean
+```
+
+This removes all profiling data and generated reports by deleting the `.coverage` directory.
