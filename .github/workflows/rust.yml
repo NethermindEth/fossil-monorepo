@@ -21,6 +21,12 @@ jobs:
       uses: dtolnay/rust-toolchain@nightly
       with:
         components: rustfmt, clippy, llvm-tools-preview
+      
+    - name: Install RISC Zero toolchain
+      run: |
+          curl -L https://risczero.com/install | bash
+          export PATH="$HOME/.risc0/bin:$PATH"
+          rzup install
     
     - name: Verify LLVM tools
       run: |
