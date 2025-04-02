@@ -179,11 +179,10 @@ mod tests {
     };
 
     use super::*;
+    use async_trait::async_trait;
     use dotenv::dotenv;
     use std::env;
-    use std::sync::Arc;
     use std::sync::RwLock;
-    use async_trait::async_trait;
 
     // MockHashingProvider for unit testing without real RPC calls
     struct MockHashingProvider {
@@ -202,7 +201,7 @@ mod tests {
             let provider = JsonRpcClient::new(HttpTransport::new(
                 Url::parse("http://localhost:1234").unwrap(),
             ));
-            
+
             Self {
                 provider,
                 fossil_light_client_address: Felt::from_hex("0x1").unwrap(),
@@ -248,7 +247,10 @@ mod tests {
             Ok(self.avg_fees_in_range.read().unwrap().clone())
         }
 
-        async fn get_hash_stored_avg_fees(&self, _timestamp: u64) -> Result<[u32; 8], ProviderError> {
+        async fn get_hash_stored_avg_fees(
+            &self,
+            _timestamp: u64,
+        ) -> Result<[u32; 8], ProviderError> {
             Ok(*self.hash_stored_avg_fees.read().unwrap())
         }
 
@@ -284,14 +286,14 @@ mod tests {
     async fn test_mock_get_avg_fees_in_range() {
         // Create mock provider
         let mock = MockHashingProvider::new();
-        
+
         // Set expected response
         let expected_fees = vec![1.0, 2.0, 3.0, 4.0];
         mock.set_avg_fees_in_range(expected_fees.clone());
-        
+
         // Call function
         let result = mock.get_avg_fees_in_range(1000, 2000).await.unwrap();
-        
+
         // Verify result
         assert_eq!(result, expected_fees);
     }
@@ -300,14 +302,14 @@ mod tests {
     async fn test_mock_get_hash_stored_avg_fees() {
         // Create mock provider
         let mock = MockHashingProvider::new();
-        
+
         // Set expected response
         let expected_hash = [1, 2, 3, 4, 5, 6, 7, 8];
         mock.set_hash_stored_avg_fees(expected_hash);
-        
+
         // Call function
         let result = mock.get_hash_stored_avg_fees(1000).await.unwrap();
-        
+
         // Verify result
         assert_eq!(result, expected_hash);
     }
@@ -316,14 +318,14 @@ mod tests {
     async fn test_mock_get_hash_batched_avg_fees() {
         // Create mock provider
         let mock = MockHashingProvider::new();
-        
+
         // Set expected response
         let expected_hash = [8, 7, 6, 5, 4, 3, 2, 1];
         mock.set_hash_batched_avg_fees(expected_hash);
-        
+
         // Call function
         let result = mock.get_hash_batched_avg_fees(1000).await.unwrap();
-        
+
         // Verify result
         assert_eq!(result, expected_hash);
     }
@@ -332,10 +334,10 @@ mod tests {
     async fn test_mock_hash_avg_fees_and_store() {
         // Create mock provider
         let mock = MockHashingProvider::new();
-        
+
         // Call function
         let result = mock.hash_avg_fees_and_store(1000).await.unwrap();
-        
+
         // Verify result
         assert_eq!(result.transaction_hash, Felt::from_hex("0x1234").unwrap());
     }
@@ -344,16 +346,16 @@ mod tests {
     async fn test_mock_hash_batched_avg_fees() {
         // Create mock provider
         let mock = MockHashingProvider::new();
-        
+
         // Call function
         let result = mock.hash_batched_avg_fees(1000).await.unwrap();
-        
+
         // Verify result
         assert_eq!(result.transaction_hash, Felt::from_hex("0x5678").unwrap());
     }
 
     // Keep existing tests but leave them ignored
-    
+
     fn setup() -> HashingProvider {
         dotenv().ok();
 
