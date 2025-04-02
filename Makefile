@@ -59,6 +59,7 @@ coverage-xml: coverage-dir coverage-clean ## Generate code coverage report in XM
 .PHONY: coverage-clean
 coverage-clean: ## Clean up coverage artifacts.
 	rm -rf .coverage
+	find crates -name ".coverage" -type d -exec rm -rf {} +
 
 .PHONY: coverage-view
 coverage-view: ## Open coverage report in the default browser (after running make coverage).
