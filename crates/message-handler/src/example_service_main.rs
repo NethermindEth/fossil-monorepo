@@ -1,10 +1,10 @@
 use aws_config::BehaviorVersion;
 use aws_config::load_defaults;
 use eyre::Result;
-use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
-use message_handlers::services::example_message_handler::ExampleMessageHandler;
-use message_handlers::services::job_dispatcher::JobDispatcher;
-use message_handlers::services::jobs::{Job, RequestProof};
+use message_handler::queue::sqs_message_queue::SqsMessageQueue;
+use message_handler::services::example_message_handler::ExampleMessageHandler;
+use message_handler::services::job_dispatcher::JobDispatcher;
+use message_handler::services::jobs::{Job, RequestProof};
 use std::sync::{Arc, atomic::AtomicBool};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::join;

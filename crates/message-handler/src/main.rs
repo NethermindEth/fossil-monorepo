@@ -1,9 +1,9 @@
 use aws_config::{BehaviorVersion, defaults};
 use db::DbConnection;
 use eyre::Result;
-use message_handlers::proof_composition::BonsaiProofProvider;
-use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
-use message_handlers::services::proof_job_handler::ProofJobHandler;
+use message_handler::proof_composition::BonsaiProofProvider;
+use message_handler::queue::sqs_message_queue::SqsMessageQueue;
+use message_handler::services::proof_job_handler::ProofJobHandler;
 use std::sync::{Arc, atomic::AtomicBool};
 use tokio::signal;
 use tracing::{Level, debug, info};

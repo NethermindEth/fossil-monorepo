@@ -1,5 +1,5 @@
 [package]
-name = "message_handlers"
+name = "message-handler"
 version = "0.1.0"
 edition = "2024"
 
@@ -50,9 +50,9 @@ testcontainers-modules = { workspace = true }
 url = { workspace = true }
 
 [[bin]]
-name = "message_handlers"
+name = "message-handler"
 path = "src/main.rs"
 
 [[bin]]
-name = "example_message_handler"
+name = "example-message-handler"
 path = "src/example_service_main.rs"

@@ -3361,7 +3361,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "message_handlers"
+name = "message-handler"
 version = "0.1.0"
 dependencies = [
  "add-twap-7d-error-bound-floating",
@@ -4604,7 +4604,7 @@ dependencies = [
  "axum",
  "dotenv",
  "eyre",
- "message_handlers",
+ "message-handler",
  "serde",
  "serde_json",
  "tokio",
