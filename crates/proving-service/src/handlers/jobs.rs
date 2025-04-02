@@ -116,8 +116,8 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use axum::http::StatusCode;
-    use message_handler::queue::message_queue::{Queue, QueueError, QueueMessage};
-    use message_handler::services::job_dispatcher::Job;
+    use message_handlers::queue::message_queue::{Queue, QueueError, QueueMessage};
+    use message_handlers::services::job_dispatcher::Job;
     use std::sync::Arc;
 
     // Define a wrapper struct that we can use with JobDispatcher

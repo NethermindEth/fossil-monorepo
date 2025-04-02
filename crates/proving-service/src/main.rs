@@ -1,6 +1,6 @@
 use aws_config::{BehaviorVersion, defaults};
 use eyre::Result;
-use message_handler::queue::sqs_message_queue::SqsMessageQueue;
+use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
 use proving_service::create_router;
 use std::env;
 use tokio::signal;

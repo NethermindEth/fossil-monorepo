@@ -1,7 +1,7 @@
 use aws_config::{BehaviorVersion, defaults};
 use eyre::Result;
-use message_handler::queue::sqs_message_queue::SqsMessageQueue;
-use message_handler::services::simple_prove_service::ExampleJobProcessor;
+use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
+use message_handlers::services::simple_prove_service::ExampleJobProcessor;
 use std::env;
 use std::sync::{Arc, atomic::AtomicBool};
 use tokio::signal;

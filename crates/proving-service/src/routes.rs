@@ -1,6 +1,6 @@
 use axum::{Router, routing::post};
-use message_handler::queue::sqs_message_queue::SqsMessageQueue;
-use message_handler::services::job_dispatcher::JobDispatcher;
+use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
+use message_handlers::services::job_dispatcher::JobDispatcher;
 use std::sync::Arc;
 use tracing::info;
 
