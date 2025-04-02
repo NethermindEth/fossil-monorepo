@@ -15,11 +15,15 @@ build-debug: ## Build Rust code in debug mode.
 .PHONY: test
 test: ## Run all tests with database dependencies.
 	docker compose -f docker/docker-compose.test.yml up -d &&\
+	echo "Waiting for database to initialize..." && sleep 5 &&\
 	{ cargo test --workspace --all-features; status=$$?; docker compose -f docker/docker-compose.test.yml down -v; exit $$status; }
 
 .PHONY: test-clean
 test-clean: ## Clean up test environment.
 	docker compose -f docker/docker-compose.test.yml down -v
+	@echo "Stopping any remaining PostgreSQL containers..."
+	@docker ps -a --filter "name=fossil-prover-service.*postgres" -q | xargs -r docker rm -f
+	@docker ps -a --filter "name=docker.*postgres" -q | xargs -r docker rm -f
 
 ##@ Coverage
 
@@ -28,9 +32,10 @@ coverage-dir: ## Create coverage directory if it doesn't exist
 	@mkdir -p .coverage
 
 .PHONY: coverage
-coverage: coverage-dir ## Run tests with code coverage and generate HTML report.
+coverage: coverage-dir coverage-clean ## Run tests with code coverage and generate HTML report.
 	@rustup component add llvm-tools-preview
 	docker compose -f docker/docker-compose.test.yml up -d &&\
+	echo "Waiting for database to initialize..." && sleep 5 &&\
 	{ CARGO_INCREMENTAL=0 \
 	RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
 	LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
@@ -43,7 +48,7 @@ coverage: coverage-dir ## Run tests with code coverage and generate HTML report.
 	exit $$status; }
 
 .PHONY: coverage-xml
-coverage-xml: coverage-dir ## Generate code coverage report in XML format for CI.
+coverage-xml: coverage-dir coverage-clean ## Generate code coverage report in XML format for CI.
 	@rustup component add llvm-tools-preview
 	CARGO_INCREMENTAL=0 \
 	RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \

@@ -95,3 +95,22 @@ impl Queue for SqsMessageQueue {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_creates_instance() {
+        // Create a minimal configuration for testing
+        let config = aws_config::SdkConfig::builder()
+            .behavior_version(aws_config::BehaviorVersion::latest())
+            .build();
+        
+        let queue_url = "https://test-queue-url".to_string();
+        let queue = SqsMessageQueue::new(queue_url.clone(), config);
+        
+        assert_eq!(queue.queue_url, queue_url);
+        // We can't easily test the client as it doesn't implement PartialEq
+    }
+}
