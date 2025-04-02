@@ -104,7 +104,7 @@ impl ProofProvider for BonsaiProofProvider {
         let floating_point_tolerance = 0.00001; // 0.00001%
         let reserve_price_tolerance = 5.0; // 5%
 
-        // Making all theses async via tokio spawns
+        // Making all these async via tokio spawns
 
         // Remove seasonality error bound
         let data_clone = data.clone();
