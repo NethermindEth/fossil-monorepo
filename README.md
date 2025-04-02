@@ -49,11 +49,13 @@ For more details on each command, run `make help`.
 
 ## Project Structure
 
-The project is organized into multiple crates:
+The project is organized into multiple crates and supporting directories:
 
 - `message-handler` - Handles message processing from queues
 - `proving-service` - Provides the HTTP API for job submission
 - `db` - Database interface for persisting data
+- `scripts` - Shell scripts for various development tasks
+- `docker` - Docker-related configuration files
 
 ## Development Setup
 
@@ -64,13 +66,13 @@ The service uses AWS SQS for message queuing. For local development, you can use
 1. Start the LocalStack container:
 
    ```bash
-   docker-compose -f docker-compose.sqs.yml up -d
+   docker-compose -f docker/docker-compose.sqs.yml up -d
    ```
 
 2. Set up the SQS queue:
 
    ```bash
-   ./setup-localstack.sh
+   ./scripts/setup-localstack.sh
    ```
 
 3. Verify the queue was created successfully by checking the output of the script.
@@ -235,6 +237,7 @@ The easiest way to set up code coverage tools is to run:
 ```
 
 This script will:
+
 1. Install the LLVM tools component via rustup
 2. Install grcov if not already installed
 3. Create a dedicated `.coverage` directory for all coverage files
@@ -262,6 +265,7 @@ make coverage
 ```
 
 This will:
+
 1. Install LLVM tools component if necessary
 2. Start any required dependencies
 3. Run the test suite with coverage instrumentation
@@ -276,8 +280,9 @@ make coverage-badge
 ```
 
 This command will:
+
 1. Extract the coverage percentage from the HTML report
-2. Generate a badge image in `.coverage/badge/coverage.svg` 
+2. Generate a badge image in `.coverage/badge/coverage.svg`
 3. Print instructions for adding the badge to your README
 
 ### Opening the Report
