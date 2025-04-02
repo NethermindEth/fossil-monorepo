@@ -14,12 +14,12 @@ build-debug: ## Build Rust code in debug mode.
 
 .PHONY: test
 test: ## Run all tests with database dependencies.
-	docker compose -f docker-compose.test.yml up -d &&\
-	cargo test --workspace --all-features
+	docker compose -f docker/docker-compose.test.yml up -d &&\
+	{ cargo test --workspace --all-features; status=$$?; docker compose -f docker/docker-compose.test.yml down -v; exit $$status; }
 
 .PHONY: test-clean
 test-clean: ## Clean up test environment.
-	docker compose -f docker-compose.test.yml down
+	docker compose -f docker/docker-compose.test.yml down -v
 
 ##@ Coverage
 
@@ -30,14 +30,17 @@ coverage-dir: ## Create coverage directory if it doesn't exist
 .PHONY: coverage
 coverage: coverage-dir ## Run tests with code coverage and generate HTML report.
 	@rustup component add llvm-tools-preview
-	docker compose -f docker-compose.test.yml up -d &&\
-	CARGO_INCREMENTAL=0 \
+	docker compose -f docker/docker-compose.test.yml up -d &&\
+	{ CARGO_INCREMENTAL=0 \
 	RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
 	LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
-	cargo test --workspace --all-features &&\
+	cargo test --workspace --all-features; \
+	status=$$?; \
 	grcov . --binary-path ./target/debug/ -s . -t html --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/html &&\
 	grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info &&\
-	echo "Coverage report generated at .coverage/html/index.html"
+	echo "Coverage report generated at .coverage/html/index.html"; \
+	docker compose -f docker/docker-compose.test.yml down -v; \
+	exit $$status; }
 
 .PHONY: coverage-xml
 coverage-xml: coverage-dir ## Generate code coverage report in XML format for CI.
@@ -55,7 +58,7 @@ coverage-clean: ## Clean up coverage artifacts.
 .PHONY: coverage-view
 coverage-view: ## Open coverage report in the default browser (after running make coverage).
 	@if [ -f .coverage/html/index.html ]; then \
-		./open-coverage.sh; \
+		./scripts/open-coverage.sh; \
 	else \
 		echo "Coverage report not found. Run 'make coverage' first."; \
 	fi
@@ -63,7 +66,7 @@ coverage-view: ## Open coverage report in the default browser (after running mak
 .PHONY: coverage-summary
 coverage-summary: ## Display a text summary of the code coverage report.
 	@if [ -f .coverage/html/index.html ]; then \
-		./coverage-summary.sh; \
+		./scripts/coverage-summary.sh; \
 	else \
 		echo "Coverage report not found. Run 'make coverage' first."; \
 	fi
@@ -71,7 +74,7 @@ coverage-summary: ## Display a text summary of the code coverage report.
 .PHONY: coverage-badge
 coverage-badge: ## Generate a coverage badge.
 	@if [ -f .coverage/html/index.html ] && [ -f .coverage/lcov.info ]; then \
-		./generate-badge.sh; \
+		./scripts/generate-badge.sh; \
 	else \
 		echo "Coverage reports not found. Run 'make coverage' first."; \
 	fi
@@ -181,13 +184,13 @@ lint: fmt clippy lint-codespell ## Run all linters.
 
 .PHONY: dev-services
 dev-services: ## Start all development services.
-	docker compose -f docker-compose.test.yml up -d
-	docker compose -f docker-compose.sqs.yml up -d
+	docker compose -f docker/docker-compose.test.yml up -d
+	docker compose -f docker/docker-compose.sqs.yml up -d
 
 .PHONY: dev-services-stop
 dev-services-stop: ## Stop all development services.
-	docker compose -f docker-compose.test.yml down
-	docker compose -f docker-compose.sqs.yml down
+	docker compose -f docker/docker-compose.test.yml down
+	docker compose -f docker/docker-compose.sqs.yml down
 
 ##@ Pull Request
 
@@ -222,13 +225,13 @@ setup-rust: ## Install Rust and necessary toolchains.
 .PHONY: setup-postgres
 setup-postgres: ## Set up PostgreSQL for development.
 	@echo "🔧 Setting up PostgreSQL..."
-	docker compose -f docker-compose.test.yml up -d postgres
+	docker compose -f docker/docker-compose.test.yml up -d postgres
 
 .PHONY: setup-localstack
 setup-localstack: ## Set up LocalStack for AWS services emulation.
 	@echo "🔧 Setting up LocalStack..."
-	docker compose -f docker-compose.sqs.yml up -d
-	./setup-localstack.sh
+	docker compose -f docker/docker-compose.sqs.yml up -d
+	./scripts/setup-localstack.sh
 
 .PHONY: setup-dev-env
 setup-dev-env: ## Set up development environment variables.
@@ -251,7 +254,7 @@ setup-coverage: ## Install coverage tools.
 	else \
 		echo "✅ grcov already installed"; \
 	fi
-	@echo "✅ LLVM tools installed via rustup"
+	@mkdir -p .coverage
 
 ##@ Help
 
