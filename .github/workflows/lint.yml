@@ -18,6 +18,12 @@ jobs:
       uses: dtolnay/rust-toolchain@nightly
       with:
         components: rustfmt, clippy
+
+    - name: Install RISC Zero toolchain
+      run: |
+            curl -L https://risczero.com/install | bash
+            export PATH="$HOME/.risc0/bin:$PATH"
+            rzup install
     
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
