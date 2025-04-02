@@ -1,12 +1,13 @@
 use axum::{Router, routing::post};
-use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
-use message_handlers::services::job_dispatcher::JobDispatcher;
+use message_handlers::{
+    queue::sqs_message_queue::SqsMessageQueue, services::job_dispatcher::JobDispatcher,
+};
 use std::sync::Arc;
 use tracing::info;
 
 use crate::handlers::jobs::handle_job_request;
 
-pub async fn create_router(queue: SqsMessageQueue) -> Router {
+pub async fn create_router(queue: Arc<SqsMessageQueue>) -> Router {
     info!("Setting up HTTP router");
 
     let dispatcher = Arc::new(JobDispatcher::new(queue));
@@ -47,6 +48,10 @@ mod tests {
         async fn receive_messages(&self) -> Result<Vec<QueueMessage>, QueueError> {
             unimplemented!("Not needed for these tests")
         }
+
+        async fn delete_message(&self, _message: &QueueMessage) -> Result<(), QueueError> {
+            unimplemented!("Not needed for these tests")
+        }
     }
 
     // Create a wrapper to make MockQueue compatible with SqsMessageQueue interface
@@ -70,6 +75,10 @@ mod tests {
 
         async fn receive_messages(&self) -> Result<Vec<QueueMessage>, QueueError> {
             self.mock_queue.receive_messages().await
+        }
+
+        async fn delete_message(&self, message: &QueueMessage) -> Result<(), QueueError> {
+            self.mock_queue.delete_message(message).await
         }
     }
 
@@ -95,7 +104,7 @@ mod tests {
         let sqs_queue: SqsMessageQueue = test_queue.into();
 
         // Create the router
-        let _app = create_router(sqs_queue).await;
+        let _app = create_router(Arc::new(sqs_queue)).await;
 
         // Simple assertion that we created a router
         // In a real test, we might want to test the router by making requests

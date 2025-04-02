@@ -5,6 +5,8 @@ pub use routes::create_router;
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
     use aws_config::SdkConfig;
     use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
@@ -15,7 +17,7 @@ mod tests {
         let config = SdkConfig::builder()
             .behavior_version(aws_config::BehaviorVersion::latest())
             .build();
-        let queue = SqsMessageQueue::new("test-queue-url".to_string(), config);
+        let queue = Arc::new(SqsMessageQueue::new("test-queue-url".to_string(), config));
 
         // Ensure the router can be created without errors
         let _router = create_router(queue).await;

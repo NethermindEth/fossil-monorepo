@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use common::convert_felt_to_f64;
+use coprocessor_common::convert_felt_to_f64;
 use starknet::{
     accounts::{Account, SingleOwnerAccount},
     core::types::{BlockId, BlockTag, Call, Felt, FunctionCall, InvokeTransactionResult, U256},
@@ -211,14 +211,12 @@ mod tests {
         // block. Optionally change the target block to pending with the following line:
         account.set_block_id(BlockId::Tag(BlockTag::Pending));
 
-        let hashing = HashingProvider::new(
+        HashingProvider::new(
             provider,
             fossil_light_client_address,
             hash_storage_address,
             account,
-        );
-
-        hashing
+        )
     }
 
     #[ignore = "calling actual rpc node"]

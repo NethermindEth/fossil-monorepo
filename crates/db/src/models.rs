@@ -1,4 +1,4 @@
-use sqlx::{Error, types::BigDecimal};
+use sqlx::Error;
 use std::sync::Arc;
 
 use crate::DbConnection;
@@ -24,29 +24,14 @@ pub struct BlockHeader {
 // which is what we will do in the production code.
 pub async fn get_block_headers_by_time_range(
     db: Arc<DbConnection>,
-    start_timestamp: String,
-    end_timestamp: String,
+    start_timestamp: i64,
+    end_timestamp: i64,
 ) -> Result<Vec<BlockHeader>, Error> {
     tracing::debug!(
         "Getting block headers by time range: {} to {}",
         start_timestamp,
         end_timestamp
     );
-
-    // Parse the strings to i64 before passing to the query
-    let start_ts = start_timestamp
-        .parse::<i64>()
-        .map_err(|e| Error::ColumnDecode {
-            index: String::new(),
-            source: Box::new(e),
-        })?;
-
-    let end_ts = end_timestamp
-        .parse::<i64>()
-        .map_err(|e| Error::ColumnDecode {
-            index: String::new(),
-            source: Box::new(e),
-        })?;
 
     let headers = sqlx::query_as(
         r#"
@@ -66,8 +51,8 @@ pub async fn get_block_headers_by_time_range(
         ORDER BY number ASC
         "#,
     )
-    .bind(start_ts)
-    .bind(end_ts)
+    .bind(start_timestamp)
+    .bind(end_timestamp)
     .fetch_all(&db.pool)
     .await?;
 
@@ -76,40 +61,25 @@ pub async fn get_block_headers_by_time_range(
 
 pub async fn get_block_base_fee_by_time_range(
     db: Arc<DbConnection>,
-    start_timestamp: String,
-    end_timestamp: String,
-) -> Result<Vec<BigDecimal>, Error> {
+    start_timestamp: i64,
+    end_timestamp: i64,
+) -> Result<Vec<String>, Error> {
     tracing::debug!(
         "Getting block headers by time range: {} to {}",
         start_timestamp,
         end_timestamp
     );
 
-    // Parse the strings to i64 before passing to the query
-    let start_ts = start_timestamp
-        .parse::<i64>()
-        .map_err(|e| Error::ColumnDecode {
-            index: String::new(),
-            source: Box::new(e),
-        })?;
-
-    let end_ts = end_timestamp
-        .parse::<i64>()
-        .map_err(|e| Error::ColumnDecode {
-            index: String::new(),
-            source: Box::new(e),
-        })?;
-
     let base_gas_fees = sqlx::query_scalar(
         r#"
-        SELECT CAST(base_fee_per_gas AS NUMERIC)
+        SELECT base_fee_per_gas
         FROM blockheaders
         WHERE CAST(timestamp AS BIGINT) BETWEEN $1 AND $2
         ORDER BY number ASC
         "#,
     )
-    .bind(start_ts)
-    .bind(end_ts)
+    .bind(start_timestamp)
+    .bind(end_timestamp)
     .fetch_all(&db.pool)
     .await?;
 
@@ -130,10 +100,9 @@ mod tests {
     async fn test_should_get_all_block_headers_by_time_range() {
         let db = setup_db().await;
 
-        let headers =
-            get_block_headers_by_time_range(db, "1743249000".to_string(), "1743249120".to_string())
-                .await
-                .unwrap();
+        let headers = get_block_headers_by_time_range(db, 1743249000, 1743249120)
+            .await
+            .unwrap();
 
         assert_eq!(headers.len(), 5);
         assert_eq!(headers[0].number, 8006481);
@@ -147,10 +116,9 @@ mod tests {
     async fn test_should_only_get_partial_block_headers_by_time_range() {
         let db = setup_db().await;
 
-        let headers =
-            get_block_headers_by_time_range(db, "1743249000".to_string(), "1743249100".to_string())
-                .await
-                .unwrap();
+        let headers = get_block_headers_by_time_range(db, 1743249000, 1743249100)
+            .await
+            .unwrap();
 
         assert_eq!(headers.len(), 3);
         assert_eq!(headers[0].number, 8006481);
@@ -162,10 +130,9 @@ mod tests {
     async fn test_should_get_block_headers_by_time_range_with_no_results() {
         let db = setup_db().await;
 
-        let headers =
-            get_block_headers_by_time_range(db, "1743248000".to_string(), "1743249000".to_string())
-                .await
-                .unwrap();
+        let headers = get_block_headers_by_time_range(db, 1743248000, 1743249000)
+            .await
+            .unwrap();
 
         assert_eq!(headers.len(), 0);
     }
@@ -174,75 +141,39 @@ mod tests {
     async fn test_should_get_all_block_base_fee_by_time_range() {
         let db = setup_db().await;
 
-        let base_fees = get_block_base_fee_by_time_range(
-            db,
-            "1743249000".to_string(),
-            "1743249120".to_string(),
-        )
-        .await
-        .unwrap();
+        let base_fees = get_block_base_fee_by_time_range(db, 1743249000, 1743249120)
+            .await
+            .unwrap();
 
         assert_eq!(base_fees.len(), 5);
-        assert_eq!(
-            base_fees[0],
-            BigDecimal::from(u64::from_str_radix("a0ba15", 16).unwrap())
-        );
-        assert_eq!(
-            base_fees[1],
-            BigDecimal::from(u64::from_str_radix("9ed346", 16).unwrap())
-        );
-        assert_eq!(
-            base_fees[2],
-            BigDecimal::from(u64::from_str_radix("a85f1d", 16).unwrap())
-        );
-        assert_eq!(
-            base_fees[3],
-            BigDecimal::from(u64::from_str_radix("9aeae1", 16).unwrap())
-        );
-        assert_eq!(
-            base_fees[4],
-            BigDecimal::from(u64::from_str_radix("9fda11", 16).unwrap())
-        );
+        assert_eq!(base_fees[0], "0xa0ba15");
+        assert_eq!(base_fees[1], "0x9ed346");
+        assert_eq!(base_fees[2], "0xa85f1d");
+        assert_eq!(base_fees[3], "0x9aeae1");
+        assert_eq!(base_fees[4], "0x9fda11");
     }
 
     #[tokio::test]
     async fn test_should_only_get_partial_block_base_fee_by_time_range() {
         let db = setup_db().await;
 
-        let base_fees = get_block_base_fee_by_time_range(
-            db,
-            "1743249000".to_string(),
-            "1743249100".to_string(),
-        )
-        .await
-        .unwrap();
+        let base_fees = get_block_base_fee_by_time_range(db, 1743249000, 1743249100)
+            .await
+            .unwrap();
 
         assert_eq!(base_fees.len(), 3);
-        assert_eq!(
-            base_fees[0],
-            BigDecimal::from(u64::from_str_radix("a0ba15", 16).unwrap())
-        );
-        assert_eq!(
-            base_fees[1],
-            BigDecimal::from(u64::from_str_radix("9ed346", 16).unwrap())
-        );
-        assert_eq!(
-            base_fees[2],
-            BigDecimal::from(u64::from_str_radix("a85f1d", 16).unwrap())
-        );
+        assert_eq!(base_fees[0], "0xa0ba15");
+        assert_eq!(base_fees[1], "0x9ed346");
+        assert_eq!(base_fees[2], "0xa85f1d");
     }
 
     #[tokio::test]
     async fn test_should_get_block_base_fee_by_time_range_with_no_results() {
         let db = setup_db().await;
 
-        let base_fees = get_block_base_fee_by_time_range(
-            db,
-            "1743248000".to_string(),
-            "1743249000".to_string(),
-        )
-        .await
-        .unwrap();
+        let base_fees = get_block_base_fee_by_time_range(db, 1743248000, 1743249000)
+            .await
+            .unwrap();
 
         assert_eq!(base_fees.len(), 0);
     }
