@@ -49,40 +49,12 @@ impl Queue for SqsMessageQueue {
         match receive_res {
             Ok(receive_resp) => {
                 let messages = receive_resp.messages();
-                let mut queue_messages = Vec::new();
-                for message in messages {
-                    queue_messages.push(QueueMessage {
-                        body: message.body().unwrap_or("").to_string(),
-                        id: message.message_id.clone(),
-                    });
-
-                    if let Some(receipt_handle) = message.receipt_handle() {
-                        // Delete the message from the queue after processing
-                        if let Err(e) = self
-                            .client
-                            .delete_message()
-                            .queue_url(self.queue_url.clone())
-                            .receipt_handle(receipt_handle)
-                            .send()
-                            .await
-                        {
-                            warn!("Error deleting message from SQS: {}", e);
-                        }
-                    }
-                    debug!(
-                        "Processed message: {}",
-                        message
-                            .message_id
-                            .clone()
-                            .unwrap_or_else(|| "no message id".to_string())
-                    );
-                }
 
                 let queue_messages = messages
                     .iter()
                     .map(|m| QueueMessage {
                         body: m.body().unwrap_or("").to_string(),
-                        id: m.message_id.clone(),
+                        id: m.receipt_handle.clone(),
                     })
                     .collect();
 
@@ -92,6 +64,33 @@ impl Queue for SqsMessageQueue {
                 warn!("Error receiving messages from SQS: {}", e);
                 Err(QueueError::ReceiveError(e.to_string()))
             }
+        }
+    }
+
+    async fn delete_message(&self, message: &QueueMessage) -> Result<(), QueueError> {
+        if let Some(message_id) = &message.id {
+            match self
+                .client
+                .delete_message()
+                .queue_url(self.queue_url.clone())
+                .receipt_handle(message_id.to_owned())
+                .send()
+                .await
+            {
+                Ok(_) => Ok(()),
+                Err(e) => {
+                    warn!("Error deleting message from SQS: {}", e);
+                    Err(QueueError::DeleteError(e.to_string()))
+                }
+            }
+        } else {
+            debug!(
+                "Processed message: {}",
+                message.id.clone().unwrap_or("no message id".to_string())
+            );
+            // Its okay if the message doesn't have an id, we can't delete it
+            // but we also shouldn't error out.
+            Ok(())
         }
     }
 }

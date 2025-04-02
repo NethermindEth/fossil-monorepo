@@ -3,7 +3,13 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use message_handlers::services::job_dispatcher::{Job, JobDispatcher};
+use message_handlers::{
+    queue::sqs_message_queue::SqsMessageQueue,
+    services::{
+        job_dispatcher::JobDispatcher,
+        jobs::{Job, RequestProof},
+    },
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{error, info};
@@ -30,19 +36,19 @@ pub struct Response {
 }
 
 pub async fn handle_job_request(
-    State(dispatcher): State<Arc<JobDispatcher>>,
+    State(dispatcher): State<Arc<JobDispatcher<SqsMessageQueue>>>,
     Json(request): Json<JobRequest>,
 ) -> impl IntoResponse {
     info!("Received job request for group: {}", request.job_group_id);
     let mut errors = Vec::new();
 
     // Dispatch TWAP job
-    let twap_job = Job {
+    let twap_job = Job::RequestProof(RequestProof {
         job_id: "twap".to_string(),
         start_timestamp: request.twap.start_timestamp,
         end_timestamp: request.twap.end_timestamp,
         job_group_id: Some(request.job_group_id.clone()),
-    };
+    });
     info!("Dispatching TWAP job for group: {}", request.job_group_id);
     if let Err(e) = dispatcher.dispatch_job(twap_job).await {
         error!("Failed to dispatch TWAP job: {}", e);
@@ -50,12 +56,12 @@ pub async fn handle_job_request(
     }
 
     // Dispatch Reserve Price job
-    let reserve_price_job = Job {
+    let reserve_price_job = Job::RequestProof(RequestProof {
         job_id: "reserve_price".to_string(),
         start_timestamp: request.reserve_price.start_timestamp,
         end_timestamp: request.reserve_price.end_timestamp,
         job_group_id: Some(request.job_group_id.clone()),
-    };
+    });
     info!(
         "Dispatching Reserve Price job for group: {}",
         request.job_group_id
@@ -66,12 +72,12 @@ pub async fn handle_job_request(
     }
 
     // Dispatch Max Return job
-    let max_return_job = Job {
+    let max_return_job = Job::RequestProof(RequestProof {
         job_id: "max_return".to_string(),
         start_timestamp: request.max_return.start_timestamp,
         end_timestamp: request.max_return.end_timestamp,
         job_group_id: Some(request.job_group_id.clone()),
-    };
+    });
     info!(
         "Dispatching Max Return job for group: {}",
         request.job_group_id
@@ -117,7 +123,6 @@ mod tests {
     use async_trait::async_trait;
     use axum::http::StatusCode;
     use message_handlers::queue::message_queue::{Queue, QueueError, QueueMessage};
-    use message_handlers::services::job_dispatcher::Job;
     use std::sync::Arc;
 
     // Define a wrapper struct that we can use with JobDispatcher
@@ -146,6 +151,10 @@ mod tests {
         async fn receive_messages(&self) -> Result<Vec<QueueMessage>, QueueError> {
             unimplemented!("Not needed for these tests")
         }
+
+        async fn delete_message(&self, _message: &QueueMessage) -> Result<(), QueueError> {
+            unimplemented!("Not needed for these tests")
+        }
     }
 
     // We need to make our MockQueue usable in place of SqsMessageQueue
@@ -160,10 +169,10 @@ mod tests {
             Self { mock_queue }
         }
 
-        async fn dispatch_job(&self, job: Job) -> Result<String, QueueError> {
+        async fn dispatch_job(&self, job: Job) -> Result<(), QueueError> {
             let message_body = serde_json::to_string(&job).unwrap();
             self.mock_queue.send_message(message_body).await?;
-            Ok(job.job_id)
+            Ok(())
         }
     }
 
@@ -243,36 +252,36 @@ mod tests {
         let mut errors = Vec::new();
 
         // Dispatch TWAP job
-        let twap_job = Job {
+        let twap_job = Job::RequestProof(RequestProof {
             job_id: "twap".to_string(),
             start_timestamp: request.twap.start_timestamp,
             end_timestamp: request.twap.end_timestamp,
             job_group_id: Some(request.job_group_id.clone()),
-        };
+        });
 
         if let Err(e) = dispatcher.dispatch_job(twap_job).await {
             errors.push(format!("TWAP job failed: {}", e));
         }
 
         // Dispatch Reserve Price job
-        let reserve_price_job = Job {
+        let reserve_price_job = Job::RequestProof(RequestProof {
             job_id: "reserve_price".to_string(),
             start_timestamp: request.reserve_price.start_timestamp,
             end_timestamp: request.reserve_price.end_timestamp,
             job_group_id: Some(request.job_group_id.clone()),
-        };
+        });
 
         if let Err(e) = dispatcher.dispatch_job(reserve_price_job).await {
             errors.push(format!("Reserve Price job failed: {}", e));
         }
 
         // Dispatch Max Return job
-        let max_return_job = Job {
+        let max_return_job = Job::RequestProof(RequestProof {
             job_id: "max_return".to_string(),
             start_timestamp: request.max_return.start_timestamp,
             end_timestamp: request.max_return.end_timestamp,
             job_group_id: Some(request.job_group_id.clone()),
-        };
+        });
 
         if let Err(e) = dispatcher.dispatch_job(max_return_job).await {
             errors.push(format!("Max Return job failed: {}", e));

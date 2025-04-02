@@ -1,8 +1,9 @@
+use super::message_queue::{Queue, QueueError, QueueMessage};
 use async_trait::async_trait;
 use std::sync::Arc;
 use tokio::sync::Mutex;
-
-use super::message_queue::{Queue, QueueError, QueueMessage};
+use tracing::warn;
+use uuid::Uuid;
 
 pub struct LocalMessageQueue {
     messages: Arc<Mutex<Vec<QueueMessage>>>,
@@ -27,17 +28,29 @@ impl Queue for LocalMessageQueue {
     async fn send_message(&self, message: String) -> Result<(), QueueError> {
         let mut messages = self.messages.lock().await;
         messages.push(QueueMessage {
-            id: None,
+            id: Some(Uuid::new_v4().to_string()),
             body: message,
         });
         Ok(())
     }
 
     async fn receive_messages(&self) -> Result<Vec<QueueMessage>, QueueError> {
-        let mut messages = self.messages.lock().await;
+        let messages = self.messages.lock().await;
         let result = messages.clone();
-        messages.clear();
         Ok(result)
+    }
+
+    async fn delete_message(&self, message: &QueueMessage) -> Result<(), QueueError> {
+        let mut messages = self.messages.lock().await;
+        let index = match messages.iter().position(|m| m.id == message.id) {
+            Some(index) => index,
+            None => {
+                warn!("Message not found, skipping delete");
+                return Ok(());
+            }
+        };
+        messages.remove(index);
+        Ok(())
     }
 }
 
@@ -78,19 +91,5 @@ mod tests {
         for (i, msg) in messages.iter().enumerate() {
             assert_eq!(received[i].body, *msg);
         }
-    }
-
-    #[tokio::test]
-    async fn test_receive_clears_queue() {
-        let queue = LocalMessageQueue::new();
-        queue.send_message("test".to_string()).await.unwrap();
-
-        // First receive should get the message
-        let first_receive = queue.receive_messages().await.unwrap();
-        assert_eq!(first_receive.len(), 1);
-
-        // Second receive should be empty
-        let second_receive = queue.receive_messages().await.unwrap();
-        assert!(second_receive.is_empty());
     }
 }
