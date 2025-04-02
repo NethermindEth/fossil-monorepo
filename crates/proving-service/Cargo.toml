@@ -28,7 +28,7 @@ aws-sdk-sqs = { workspace = true }
 dotenv = { workspace = true }
 
 # Internal dependencies
-message-handler = { path = "../message-handler" }
+message_handlers = { path = "../message_handlers" }
 
 [dev-dependencies] 
 tokio = { workspace = true, features = ["rt", "macros", "test-util"] } 

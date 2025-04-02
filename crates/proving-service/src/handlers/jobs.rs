@@ -3,7 +3,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use message_handler::services::job_dispatcher::{Job, JobDispatcher};
+use message_handlers::services::job_dispatcher::{Job, JobDispatcher};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{error, info};

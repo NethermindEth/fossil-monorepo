@@ -96,7 +96,7 @@ This will start the HTTP server on <http://127.0.0.1:3000> and connect to the SQ
 Run the message handler service with:
 
 ```bash
-cargo run -p message-handler
+cargo run -p message_handlers
 ```
 
 This will start a service that consumes messages from the SQS queue.

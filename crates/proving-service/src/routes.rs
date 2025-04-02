@@ -20,7 +20,7 @@ pub async fn create_router(queue: SqsMessageQueue) -> Router {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use message_handler::queue::message_queue::{Queue, QueueError, QueueMessage};
+    use message_handlers::queue::message_queue::{Queue, QueueError, QueueMessage};
 
     // Mock queue implementation for testing
     #[derive(Debug, Clone)]
