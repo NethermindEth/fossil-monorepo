@@ -233,7 +233,7 @@ The project includes comprehensive code coverage tracking using LLVM's source-ba
 The easiest way to set up code coverage tools is to run:
 
 ```bash
-./setup-coverage.sh
+./scripts/setup-coverage.sh
 ```
 
 This script will:
@@ -296,7 +296,7 @@ make coverage-view
 Alternatively, you can use the dedicated browser-opening script:
 
 ```bash
-./open-coverage.sh
+./scripts/open-coverage.sh
 ```
 
 This script will attempt to find and use an appropriate browser on your system.

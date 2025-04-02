@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# Function to check if LocalStack is running
+function is_localstack_running() {
+  curl -s http://localhost:4567/_localstack/health | grep -q "\"services\"" && return 0 || return 1
+}
+
+# Function to check if SQS is enabled in LocalStack
+function check_sqs_enabled() {
+  curl -s http://localhost:4567/_localstack/health | grep -q "\"sqs\": \"running\|available\"" && return 0 || return 1
+}
+
 # Set a timeout (in seconds)
 TIMEOUT=30
 COUNT=0
@@ -25,7 +35,7 @@ while [ $COUNT -lt $TIMEOUT ]; do
   else
     echo "LocalStack is not responding properly. Check if the container is running:"
     docker ps | grep localstack || echo "No LocalStack container found."
-    echo "Try starting it with: docker-compose -f docker-compose.sqs.yml up -d"
+    echo "Try starting it with: docker-compose -f docker/docker-compose.sqs.yml up -d"
   fi
   
   COUNT=$((COUNT + 1))
@@ -34,7 +44,7 @@ done
 
 if [ $COUNT -eq $TIMEOUT ]; then
   echo "Timed out waiting for LocalStack. Check if the container is running correctly."
-  echo "Try starting it with: docker-compose -f docker-compose.sqs.yml up -d"
+  echo "Try starting it with: docker-compose -f docker/docker-compose.sqs.yml up -d"
   exit 1
 fi
 
@@ -57,4 +67,17 @@ if [ $? -eq 0 ]; then
 else
   echo "Failed to create queue. Check if AWS CLI is installed and LocalStack is functioning correctly."
   exit 1
+fi
+
+if ! is_localstack_running; then
+    echo "LocalStack is not running!"
+    echo "Try starting it with: docker-compose -f docker/docker-compose.sqs.yml up -d"
+    exit 1
+fi
+
+# Check if SQS is enabled
+if ! check_sqs_enabled; then
+    echo "SQS is not enabled in LocalStack!"
+    echo "Try starting it with: docker-compose -f docker/docker-compose.sqs.yml up -d"
+    exit 1
 fi 
