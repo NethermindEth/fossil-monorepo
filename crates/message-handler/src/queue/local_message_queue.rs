@@ -42,12 +42,11 @@ impl Queue for LocalMessageQueue {
 
     async fn delete_message(&self, message: &QueueMessage) -> Result<(), QueueError> {
         let mut messages = self.messages.lock().await;
-        let index = match messages.iter().position(|m| m.id == message.id) {
-            Some(index) => index,
-            None => {
-                warn!("Message not found, skipping delete");
-                return Ok(());
-            }
+        let index = if let Some(index) = messages.iter().position(|m| m.id == message.id) {
+            index
+        } else {
+            warn!("Message not found, skipping delete");
+            return Ok(());
         };
         messages.remove(index);
         Ok(())

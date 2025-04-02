@@ -44,8 +44,14 @@ pub trait ProofProvider {
 pub struct BonsaiProofProvider;
 
 impl BonsaiProofProvider {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self
+    }
+}
+
+impl Default for BonsaiProofProvider {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -243,9 +249,9 @@ impl ProofProvider for BonsaiProofProvider {
             .add_assumption(result_receipt.2)
             .add_assumption(result_receipt.3)
             .write(&input)
-            .unwrap()
+            .map_err(|e| eyre!("Failed to write input to executor: {}", e))?
             .build()
-            .unwrap();
+            .map_err(|e| eyre!("Failed to build executor environment: {}", e))?;
 
         let prover_opts = ProverOpts::default().with_receipt_kind(ReceiptKind::Groth16);
 

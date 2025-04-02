@@ -15,7 +15,8 @@ async fn main() -> Result<()> {
     dotenv::dotenv().ok();
 
     // This example tests with real sqs, but you can replace this with a local queue.
-    let queue_url = std::env::var("SQS_QUEUE_URL").expect("SQS_QUEUE_URL must be set");
+    let queue_url = std::env::var("SQS_QUEUE_URL")
+        .map_err(|e| eyre::eyre!("SQS_QUEUE_URL environment variable not set: {}", e))?;
 
     // Configure tracing
     tracing_subscriber::fmt().init();
@@ -45,14 +46,20 @@ async fn main() -> Result<()> {
                 .dispatch_job(Job::RequestProof(RequestProof {
                     job_id: i.to_string(),
                     job_group_id: None,
-                    start_timestamp: SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs() as i64,
-                    end_timestamp: SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .unwrap()
-                        .as_secs() as i64,
+                    start_timestamp: match SystemTime::now().duration_since(UNIX_EPOCH) {
+                        Ok(duration) => duration.as_secs() as i64,
+                        Err(e) => {
+                            println!("Failed to get duration: {}", e);
+                            0 // Fallback value
+                        }
+                    },
+                    end_timestamp: match SystemTime::now().duration_since(UNIX_EPOCH) {
+                        Ok(duration) => duration.as_secs() as i64,
+                        Err(e) => {
+                            println!("Failed to get duration: {}", e);
+                            0 // Fallback value
+                        }
+                    },
                 }))
                 .await;
             println!("Job dispatched: {:?}", result);
@@ -64,7 +71,9 @@ async fn main() -> Result<()> {
     // Handle Ctrl+C for graceful shutdown
     let terminator_clone = terminator.clone();
     let terminator_handle = tokio::spawn(async move {
-        tokio::signal::ctrl_c().await.unwrap();
+        if let Err(e) = tokio::signal::ctrl_c().await {
+            debug!("Error waiting for Ctrl+C: {}", e);
+        }
         debug!("Received Ctrl+C, initiating shutdown...");
         terminator_clone.store(true, std::sync::atomic::Ordering::Relaxed);
     });

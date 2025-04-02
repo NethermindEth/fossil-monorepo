@@ -1,4 +1,5 @@
 use std::sync::{Arc, atomic::AtomicBool};
+use std::time::Duration;
 
 use crate::queue::message_queue::Queue;
 use crate::{proof_composition::ProofProvider, services::jobs::ProofGenerated};
@@ -18,6 +19,7 @@ pub struct ProofJobHandler<
     terminator: Arc<AtomicBool>,
     db: Arc<DbConnection>,
     proof_provider: Arc<P>,
+    proof_generation_timeout: Duration,
 }
 
 impl<Q, P> ProofJobHandler<Q, P>
@@ -25,17 +27,19 @@ where
     Q: Queue + Send + Sync + 'static,
     P: ProofProvider + Send + Sync + 'static,
 {
-    pub fn new(
+    pub const fn new(
         queue: Arc<Q>,
         terminator: Arc<AtomicBool>,
         db: Arc<DbConnection>,
         proof_provider: Arc<P>,
+        proof_generation_timeout: Duration,
     ) -> Self {
         Self {
             queue,
             terminator,
             db,
             proof_provider,
+            proof_generation_timeout,
         }
     }
 
@@ -79,6 +83,7 @@ where
                 let db_clone = self.db.clone();
                 let queue_clone = self.queue.clone();
                 let proof_provider = self.proof_provider.clone();
+                let timeout_duration = self.proof_generation_timeout;
 
                 join_set.spawn(async move {
                     debug!("Received & processing job: {:?}", job);
@@ -112,17 +117,19 @@ where
                         return;
                     }
 
-                    // Start the proof generation
-                    let proof_result = proof_provider
-                        .generate_proofs_from_data(
+                    // Start the proof generation with timeout
+                    let proof_result = tokio::time::timeout(
+                        timeout_duration,
+                        proof_provider.generate_proofs_from_data(
                             job.start_timestamp,
                             job.end_timestamp,
                             block_base_fees,
-                        )
-                        .await;
+                        ),
+                    )
+                    .await;
 
                     match proof_result {
-                        Ok(receipt) => {
+                        Ok(Ok(receipt)) => {
                             // If successful, send the proof to the queue
                             let proof_generated = Job::ProofGenerated(Box::new(ProofGenerated {
                                 job_id: job.clone().job_id,
@@ -144,13 +151,25 @@ where
                                 }
                             }
                         }
-                        Err(e) => {
+                        Ok(Err(e)) => {
                             error!("Error generating proofs: {}", e);
 
                             if let Err(e) =
                                 send_job_to_queue(&queue_clone, &Job::RequestProof(job)).await
                             {
                                 error!("Failed to requeue job after proof generation error: {}", e);
+                            }
+                        }
+                        Err(_) => {
+                            error!("Proof generation timed out after {:?}", timeout_duration);
+
+                            if let Err(e) =
+                                send_job_to_queue(&queue_clone, &Job::RequestProof(job)).await
+                            {
+                                error!(
+                                    "Failed to requeue job after proof generation timeout: {}",
+                                    e
+                                );
                             }
                         }
                     };
@@ -299,7 +318,13 @@ mod tests {
             Duration::from_millis(50),
         ));
 
-        let handler = ProofJobHandler::new(queue.clone(), terminator.clone(), db, proof_provider);
+        let handler = ProofJobHandler::new(
+            queue.clone(),
+            terminator.clone(),
+            db,
+            proof_provider,
+            Duration::from_millis(50),
+        );
 
         // Start the handler in a separate task
         let handle = tokio::spawn(async move { handler.receive_job().await });
@@ -344,7 +369,13 @@ mod tests {
             Duration::from_millis(50),
         ));
 
-        let handler = ProofJobHandler::new(queue.clone(), terminator.clone(), db, proof_provider);
+        let handler = ProofJobHandler::new(
+            queue.clone(),
+            terminator.clone(),
+            db,
+            proof_provider,
+            Duration::from_millis(50),
+        );
 
         // Start the handler in a separate task
         let handle = tokio::spawn(async move { handler.receive_job().await });
@@ -397,7 +428,13 @@ mod tests {
             Duration::from_millis(50),
         ));
 
-        let handler = ProofJobHandler::new(queue.clone(), terminator.clone(), db, proof_provider);
+        let handler = ProofJobHandler::new(
+            queue.clone(),
+            terminator.clone(),
+            db,
+            proof_provider,
+            Duration::from_millis(50),
+        );
 
         // Start the handler in a separate task
         let handle = tokio::spawn(async move { handler.receive_job().await });
@@ -442,7 +479,13 @@ mod tests {
             Duration::from_millis(50),
         ));
 
-        let handler = ProofJobHandler::new(queue.clone(), terminator.clone(), db, proof_provider);
+        let handler = ProofJobHandler::new(
+            queue.clone(),
+            terminator.clone(),
+            db,
+            proof_provider,
+            Duration::from_millis(50),
+        );
 
         // Start the handler in a separate task
         let handle = tokio::spawn(async move { handler.receive_job().await });
@@ -505,7 +548,13 @@ mod tests {
             Duration::from_millis(50),
         ));
 
-        let handler = ProofJobHandler::new(queue.clone(), terminator.clone(), db, proof_provider);
+        let handler = ProofJobHandler::new(
+            queue.clone(),
+            terminator.clone(),
+            db,
+            proof_provider,
+            Duration::from_millis(50),
+        );
 
         // Start the handler in a separate task
         let handle = tokio::spawn(async move { handler.receive_job().await });
