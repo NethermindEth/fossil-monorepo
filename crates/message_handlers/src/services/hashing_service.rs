@@ -293,10 +293,7 @@ mod tests {
 
     fn setup() -> HashingService<MockHashingProvider> {
         let hashing_service = MockHashingProvider::new();
-        let service =
-            HashingService::new(hashing_service, REQUIRED_AVG_FEES_LENGTH, HASH_BATCH_SIZE);
-
-        service
+        HashingService::new(hashing_service, REQUIRED_AVG_FEES_LENGTH, HASH_BATCH_SIZE)
     }
 
     #[tokio::test]
@@ -304,10 +301,7 @@ mod tests {
         let process = setup();
 
         let res = process.check_avg_fees_availability(0, 0).await;
-        assert!(
-            res.err().unwrap()
-                == "avg_fees_len is not equal to required_avg_fees_length".to_string()
-        );
+        assert!(res.err().unwrap() == *"avg_fees_len is not equal to required_avg_fees_length");
     }
 
     #[tokio::test]
@@ -336,7 +330,7 @@ mod tests {
         let process = setup();
 
         let res = process.is_batch_hash_avg_fees_available(0).await;
-        assert!(res.unwrap() == false);
+        assert!(res.unwrap());
     }
 
     #[tokio::test]
