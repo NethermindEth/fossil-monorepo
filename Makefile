@@ -36,6 +36,7 @@ coverage: coverage-dir ## Run tests with code coverage and generate HTML report.
 	LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
 	cargo test --workspace --all-features &&\
 	grcov . --binary-path ./target/debug/ -s . -t html --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/html &&\
+	grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info &&\
 	echo "Coverage report generated at .coverage/html/index.html"
 
 .PHONY: coverage-xml
@@ -65,6 +66,14 @@ coverage-summary: ## Display a text summary of the code coverage report.
 		./coverage-summary.sh; \
 	else \
 		echo "Coverage report not found. Run 'make coverage' first."; \
+	fi
+
+.PHONY: coverage-badge
+coverage-badge: ## Generate a coverage badge.
+	@if [ -f .coverage/html/index.html ] && [ -f .coverage/lcov.info ]; then \
+		./generate-badge.sh; \
+	else \
+		echo "Coverage reports not found. Run 'make coverage' first."; \
 	fi
 
 ##@ Linting
