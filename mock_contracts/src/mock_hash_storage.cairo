@@ -40,7 +40,9 @@ mod MockHashStorage {
 
 
         // hashing 180 avg fees
-        fn hash_avg_fees_and_store(ref self: ContractState, start_timestamp: u64) {}
+        fn hash_avg_fees_and_store(ref self: ContractState, start_timestamp: u64) {
+            self.hash_stored_avg_fees.entry(start_timestamp).write([1; 8]);
+        }
 
         fn get_hash_stored_avg_fees(self: @ContractState, timestamp: u64) -> [u32; 8] {
             self.hash_stored_avg_fees.entry(timestamp).read()

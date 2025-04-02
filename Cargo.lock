@@ -2076,6 +2076,7 @@ dependencies = [
  "serde",
  "serde_json",
  "starknet",
+ "test_components",
  "testcontainers-modules",
  "tokio",
  "tracing",
@@ -3551,6 +3552,14 @@ dependencies = [
  "once_cell",
  "rustix 1.0.3",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "test_components"
+version = "0.1.0"
+dependencies = [
+ "reqwest 0.12.15",
+ "starknet",
 ]
 
 [[package]]

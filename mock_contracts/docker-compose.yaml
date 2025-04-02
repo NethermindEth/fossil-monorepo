@@ -33,6 +33,7 @@ services:
     depends_on:
       starknet-devnet:
         condition: service_healthy
-    command: [ "sh", "-c", "chmod +x scripts/deploy-mock-hash-storage.sh && ./scripts/deploy-mock-hash-storage.sh" ]
+    command: [ "sh", "-c", "chmod +x scripts/deploy-mock-hash-storage.sh && ./scripts/deploy-mock-hash-storage.sh && tail -f /dev/null" ]
+    # command: [ "sh", "-c", "chmod +x scripts/deploy-mock-hash-storage.sh && ./scripts/deploy-mock-hash-storage.sh" ]
 networks:
   starknet-network:

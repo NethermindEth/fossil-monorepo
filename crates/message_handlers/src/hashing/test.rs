@@ -11,9 +11,8 @@ mod tests {
     };
 
     use crate::hashing::{HashingProvider, HashingProviderTrait};
-    use core::time;
     use dotenv::dotenv;
-    use std::{env, thread};
+    use std::env;
 
     fn setup() -> HashingProvider {
         dotenv().ok();
@@ -52,47 +51,6 @@ mod tests {
         );
 
         hashing
-    }
-
-    async fn start_docker_compose() {
-        // TODO: to not need to hardcode the path to the docker-compose.yaml file
-        let up_status = std::process::Command::new("docker-compose")
-            .args(&[
-                "-f",
-                "../../mock_contracts/docker-compose.yaml",
-                "up",
-                "-d",
-                "--build",
-            ])
-            .status()
-            .expect("Failed to start docker-compose");
-
-        let status = up_status.success();
-
-        assert!(status, "Docker compose failed to start");
-
-        let max_retries = 10;
-        let delay = 5;
-        let url = "http://127.0.0.1:5050/is_alive";
-        let mut docker_compose_started = false;
-        for _ in 0..max_retries {
-            if let Ok(response) = reqwest::get(url).await {
-                if response.status().is_success() {
-                    docker_compose_started = true;
-                    break;
-                }
-            }
-            thread::sleep(time::Duration::from_secs(delay));
-        }
-
-        assert!(docker_compose_started, "starknet-devnet failed to start");
-    }
-
-    fn stop_docker_compose() {
-        let down_status = std::process::Command::new("docker-compose")
-            .args(&["-f", "../../mock_contracts/docker-compose.yaml", "down"])
-            .status()
-            .expect("Failed to stop docker-compose");
     }
 
     #[ignore = "calling actual rpc node"]
@@ -145,7 +103,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_docker_compose() {
-        start_docker_compose().await;
+        // start_docker_compose().await;
+        let docker_compose_started =
+            test_components::StartDockerCompose::start_docker_compose().await;
+        assert!(docker_compose_started, "starknet-devnet failed to start");
         let provider = setup();
     }
 }

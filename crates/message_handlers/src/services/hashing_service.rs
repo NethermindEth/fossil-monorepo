@@ -187,12 +187,22 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
+    use reqwest::Url;
     use starknet::{
-        core::types::{Felt, InvokeTransactionResult},
+        accounts::{ExecutionEncoding, SingleOwnerAccount},
+        core::{
+            chain_id,
+            types::{Felt, InvokeTransactionResult},
+        },
         providers::{JsonRpcClient, ProviderError, jsonrpc::HttpTransport},
+        signers::{LocalWallet, SigningKey},
+    };
+    use test_components::{
+        LOCALHOST_FOSSIL_LIGHT_CLIENT_ADDRESS, LOCALHOST_HASH_STORAGE_ADDRESS, LOCALHOST_RPC_URL,
+        LOCALHOST_STARKNET_ACCOUNT_ADDRESS, LOCALHOST_STARKNET_PRIVATE_KEY, StartDockerCompose,
     };
 
-    use crate::hashing::HashingProviderTrait;
+    use crate::hashing::{HashingProvider, HashingProviderTrait};
 
     use super::HashingService;
 
@@ -276,17 +286,19 @@ mod tests {
     const REQUIRED_AVG_FEES_LENGTH: usize = 10;
     const HASH_BATCH_SIZE: usize = 10;
 
-    fn setup() -> HashingService<MockHashingProvider> {
-        let hashing_service = MockHashingProvider::new();
+    fn setup<T: HashingProviderTrait + Sync + Send + 'static>(
+        hashing_provider: T,
+    ) -> HashingService<T> {
         let service =
-            HashingService::new(hashing_service, REQUIRED_AVG_FEES_LENGTH, HASH_BATCH_SIZE);
+            HashingService::new(hashing_provider, REQUIRED_AVG_FEES_LENGTH, HASH_BATCH_SIZE);
 
         service
     }
 
     #[tokio::test]
     async fn should_fail_if_check_avg_fees_availability_not_equals_to_required_avg_fees_length() {
-        let process = setup();
+        let hashing_provider = MockHashingProvider::new();
+        let process = setup(hashing_provider);
 
         let res = process.check_avg_fees_availability(0, 0).await;
         assert!(
@@ -297,7 +309,8 @@ mod tests {
 
     #[tokio::test]
     async fn should_return_ok_if_check_avg_fees_availability_equals_to_required_avg_fees_length() {
-        let mut process = setup();
+        let hashing_provider = MockHashingProvider::new();
+        let mut process = setup(hashing_provider);
 
         Arc::get_mut(&mut process.hashing_provider)
             .unwrap()
@@ -308,7 +321,8 @@ mod tests {
 
     #[tokio::test]
     async fn should_get_unavailable_batch_timestamp_hashes() {
-        let process = setup();
+        let hashing_provider = MockHashingProvider::new();
+        let process = setup(hashing_provider);
 
         let res = process
             .get_unavailable_batch_timestamp_hashes(0, (2 * 3600 * HASH_BATCH_SIZE as u64) - 1) //first and second batch
@@ -318,7 +332,8 @@ mod tests {
 
     #[tokio::test]
     async fn should_return_false_if_batch_hash_avg_fees_is_not_available() {
-        let process = setup();
+        let hashing_provider = MockHashingProvider::new();
+        let process = setup(hashing_provider);
 
         let res = process.is_batch_hash_avg_fees_available(0).await;
         assert!(res.unwrap() == false);
@@ -326,7 +341,8 @@ mod tests {
 
     #[tokio::test]
     async fn should_return_true_if_batch_hash_avg_fees_is_available() {
-        let mut process = setup();
+        let hashing_provider = MockHashingProvider::new();
+        let mut process = setup(hashing_provider);
 
         Arc::get_mut(&mut process.hashing_provider)
             .unwrap()
@@ -334,5 +350,56 @@ mod tests {
 
         let res = process.is_batch_hash_avg_fees_available(0).await;
         assert!(res.unwrap());
+    }
+
+    #[tokio::test]
+    async fn should_hash_and_store_avg_fees_onchain() {
+        // let docker_compose_started = StartDockerCompose::start_docker_compose().await;
+        // assert!(docker_compose_started);
+
+        // let provider =
+        //     JsonRpcClient::new(HttpTransport::new(Url::parse(LOCALHOST_RPC_URL).unwrap()));
+        // let private_key = LOCALHOST_STARKNET_PRIVATE_KEY;
+        // let account_address = LOCALHOST_STARKNET_ACCOUNT_ADDRESS;
+        let provider =
+        JsonRpcClient::new(HttpTransport::new(Url::parse("https://starknet-sepolia.public.blastapi.io").unwrap()));
+        let private_key = "0x065212981820d81714ae3f49ffee54363290eab7a411df1f20d29709a7dbb031";
+        let account_address = "0x6307443811a38f62d6eb0908b51f150c91a6c110d8b3a555907f26fbab50d";
+        let signer = LocalWallet::from(SigningKey::from_secret_scalar(
+            Felt::from_hex(&private_key).unwrap(),
+        ));
+        let signer_address = Felt::from_hex(&account_address).unwrap();
+        let account = SingleOwnerAccount::new(
+            provider.clone(),
+            signer,
+            signer_address,
+            // Felt::from_hex("0x534e5f5345504f4c4941").unwrap(),
+            chain_id::SEPOLIA,
+            ExecutionEncoding::New,
+        );
+        let fossil_light_client_address =
+            Felt::from_hex(LOCALHOST_FOSSIL_LIGHT_CLIENT_ADDRESS).unwrap();
+        let hash_storage_address = Felt::from_hex("0x05b0f3088aa18e506d1b42e606e22bb25bdbfeef48f7821108fecfabd5c3d4a5").unwrap();
+        // let hash_storage_address = Felt::from_hex(LOCALHOST_HASH_STORAGE_ADDRESS).unwrap();
+
+        let hashing_provider = HashingProvider::new(
+            provider,
+            fossil_light_client_address,
+            hash_storage_address,
+            account,
+        );
+
+        let process = setup(hashing_provider);
+
+        // let res = process.check_avg_fees_availability(0, 3600).await;
+        // println!("res: {:?}", res);
+        let res = process
+            .hash_and_store_avg_fees_onchain(vec![0 as u64]) // for test, this doesnt matter
+            .await;
+        println!("res: {:?}", res);
+        assert!(res.is_ok());
+
+        let stop_docker = StartDockerCompose::stop_docker_compose();
+        assert!(stop_docker);
     }
 }

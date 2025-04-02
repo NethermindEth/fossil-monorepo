@@ -155,10 +155,12 @@ impl HashingProviderTrait for HashingProvider {
                 calldata: vec![Felt::from(start_timestamp)],
             }])
             .send()
-            .await
-            .map_err(|_| "Error".to_string());
+            .await;
 
-        result
+        match result {
+            Ok(receipt) => Ok(receipt),
+            Err(e) => Err(e.to_string()),
+        }
     }
 
     async fn hash_batched_avg_fees(
