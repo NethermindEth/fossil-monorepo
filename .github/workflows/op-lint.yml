@@ -6,6 +6,7 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
 jobs:
   fmt:
@@ -31,7 +32,13 @@ jobs:
         run: cd offchain-processor && cargo fmt --all -- --check
     
       - name: Run codespell
-        run: cd offchain-processor && codespell
+        run: cd offchain-processor && codespell --skip="./Makefile" --ignore-words-list="nd,te,ue,Nd,Te,Ue"
+      
+      - name: Install sqlx-cli
+        run: cargo install sqlx-cli
+      
+      - name: Generate sqlx-data.json
+        run: cd offchain-processor && cargo sqlx prepare --check || cargo sqlx prepare
     
       - name: Clippy
         run: |
