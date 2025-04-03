@@ -1,32 +1,23 @@
-use db_access::{IndexerDbConnection, OffchainProcessorDbConnection};
+use db_access::OffchainProcessorDbConnection;
 use dotenv::dotenv;
 use std::env;
 use std::sync::Arc;
 
+use crate::types::PitchLakeJobRequestParams;
 use crate::types::{JobResponse, PitchLakeJobRequest};
 use crate::AppState;
-use crate::{
-    pricing_data::{
-        reserve_price::calculate_reserve_price, twap::calculate_twap,
-        volatility::calculate_volatility,
-    },
-    types::PitchLakeJobRequestParams,
-};
 use axum::{
     extract::{Json, State},
     http::StatusCode,
 };
 use db_access::{
     models::JobStatus,
-    queries::{
-        create_job_request, get_block_headers_by_time_range, get_job_request, update_job_status,
-    },
+    queries::{create_job_request, get_job_request, update_job_status},
 };
 use eyre::{eyre, Result};
-use starknet::core::types::U256;
-use starknet_crypto::{poseidon_hash_single, Felt};
-use starknet_handler::{FossilStarknetAccount, JobRequest, PitchLakeResult, PITCH_LAKE_V1};
-use tokio::{join, runtime::Handle, time::Instant};
+use reqwest::Client;
+use serde_json::json;
+use tokio::runtime::Handle;
 
 // Main handler function
 pub async fn get_pricing_data(
@@ -52,7 +43,6 @@ pub async fn get_pricing_data(
         return (status, Json(response));
     }
 
-    let starknet_account = FossilStarknetAccount::default();
     let job_id = generate_job_id(&payload.identifiers, &payload.params);
 
     tracing::info!("Generated job_id: {}. {}", job_id, context);
@@ -64,18 +54,11 @@ pub async fn get_pricing_data(
                 job_request.status,
                 context
             );
-            handle_existing_job(
-                &state,
-                job_request.status,
-                job_id,
-                payload,
-                starknet_account,
-            )
-            .await
+            handle_existing_job(&state, job_request.status, job_id, payload).await
         }
         Ok(None) => {
             tracing::info!("Creating new job request. {}", context);
-            handle_new_job_request(&state, job_id, payload, starknet_account).await
+            handle_new_job_request(&state, job_id, payload).await
         }
         Err(e) => {
             tracing::error!("Database error: {}. {}", e, context);
@@ -114,6 +97,7 @@ fn generate_job_id(identifiers: &[String], params: &PitchLakeJobRequestParams) -
         params.reserve_price.1
     ));
 
+    use starknet_crypto::{poseidon_hash_single, Felt};
     poseidon_hash_single(Felt::from_bytes_be_slice(input.as_bytes())).to_string()
 }
 
@@ -123,7 +107,6 @@ async fn handle_existing_job(
     status: JobStatus,
     job_id: String,
     payload: PitchLakeJobRequest,
-    starknet_account: FossilStarknetAccount,
 ) -> (StatusCode, Json<JobResponse>) {
     match status {
         JobStatus::Pending => job_response(
@@ -136,7 +119,7 @@ async fn handle_existing_job(
             job_id,
             "Job has already been completed. No further processing required.",
         ),
-        JobStatus::Failed => reprocess_failed_job(state, job_id, payload, starknet_account).await,
+        JobStatus::Failed => reprocess_failed_job(state, job_id, payload).await,
     }
 }
 
@@ -145,7 +128,6 @@ async fn handle_new_job_request(
     state: &AppState,
     job_id: String,
     payload: PitchLakeJobRequest,
-    starknet_account: FossilStarknetAccount,
 ) -> (StatusCode, Json<JobResponse>) {
     match create_job_request(
         state.offchain_processor_db.clone(),
@@ -157,17 +139,14 @@ async fn handle_new_job_request(
         Ok(_) => {
             tracing::info!("New job request registered and processing initiated.");
             let offchain_processor_db_clone = state.offchain_processor_db.clone();
-            let indexer_db_clone = state.indexer_db.clone();
             let job_id_clone = job_id.clone();
             let handle = Handle::current();
 
             tokio::task::spawn_blocking(move || {
                 handle.block_on(process_job(
                     offchain_processor_db_clone,
-                    indexer_db_clone,
                     job_id_clone,
                     payload,
-                    starknet_account,
                 ));
             });
 
@@ -191,7 +170,6 @@ async fn reprocess_failed_job(
     state: &AppState,
     job_id: String,
     payload: PitchLakeJobRequest,
-    starknet_account: FossilStarknetAccount,
 ) -> (StatusCode, Json<JobResponse>) {
     if let Err(e) = update_job_status(
         state.offchain_processor_db.clone(),
@@ -204,17 +182,14 @@ async fn reprocess_failed_job(
         return internal_server_error(e, job_id);
     }
     let offchain_processor_db_clone = state.offchain_processor_db.clone();
-    let indexer_db_clone = state.indexer_db.clone();
     let job_id_clone = job_id.clone();
     let handle = Handle::current();
 
     tokio::task::spawn_blocking(move || {
         handle.block_on(process_job(
             offchain_processor_db_clone,
-            indexer_db_clone,
             job_id_clone,
             payload,
-            starknet_account,
         ));
     });
 
@@ -251,13 +226,11 @@ fn internal_server_error(error: sqlx::Error, job_id: String) -> (StatusCode, Jso
     )
 }
 
-// Process the job and trigger the Starknet callback
+// Process the job and trigger request to the proving service
 async fn process_job(
     offchain_processor_db: Arc<OffchainProcessorDbConnection>,
-    indexer_db: Arc<IndexerDbConnection>,
     job_id: String,
     payload: PitchLakeJobRequest,
-    starknet_account: FossilStarknetAccount,
 ) {
     let context = format!(
         "job_id={}, identifiers=[{}], twap=({},{}), volatility=({},{}), reserve_price=({},{}), client_address={:#064x}, vault_address={:#064x}",
@@ -273,28 +246,15 @@ async fn process_job(
     tracing::info!("Starting job processing. {}", context);
     tracing::debug!("Payload received: {:?}. {}", payload, context);
 
-    let job_result = match fetch_headers(indexer_db.clone(), &payload).await {
-        Ok(Some((twap, volatility, reserve_price))) => {
-            tracing::info!(
-                "Fetched block headers. Calculated values: TWAP = {}, Volatility = {}, Reserve Price = {}. {}",
-                twap, volatility, reserve_price, context
-            );
-
-            let result = PitchLakeResult {
-                twap: U256::from(twap as u128),
-                volatility: volatility as u128,
-                reserve_price: U256::from(reserve_price as u128),
-            };
+    let job_result = match call_proving_service(&job_id, &payload).await {
+        Ok(result) => {
+            tracing::info!("Proving service response received. {}", context);
 
             if let Err(e) = update_job_status(
                 offchain_processor_db.clone(),
                 &job_id,
                 JobStatus::Completed,
-                Some(serde_json::json!({
-                    "twap": twap,
-                    "volatility": volatility,
-                    "reserve_price": reserve_price,
-                })),
+                Some(result.clone()),
             )
             .await
             {
@@ -302,85 +262,11 @@ async fn process_job(
                 return;
             }
 
-            tracing::info!(
-                "Job completed. Initiating Starknet callback to contract at address: {}. {}",
-                payload.client_info.client_address,
-                context
-            );
-
-            let program_id = match Felt::from_hex(PITCH_LAKE_V1) {
-                Ok(id) => id,
-                Err(e) => {
-                    let error_msg = format!("Failed to parse program ID: {:?}", e);
-                    tracing::error!("{}. {}", error_msg, context);
-                    let _ = update_job_status(
-                        offchain_processor_db.clone(),
-                        &job_id,
-                        JobStatus::Failed,
-                        Some(serde_json::json!({
-                            "error": error_msg
-                        })),
-                    )
-                    .await;
-                    return;
-                }
-            };
-
-            let job_request = JobRequest {
-                vault_address: payload.client_info.vault_address,
-                timestamp: payload.client_info.timestamp.to_string(),
-                program_id,
-            };
-
-            tracing::debug!(
-                "Starknet callback calldata: Client Address = {:?}, Vault Address = {:?}, Timestamp = {}, Program ID = {}. {}",
-                payload.client_info.client_address,
-                payload.client_info.vault_address,
-                job_request.timestamp,
-                PITCH_LAKE_V1,
-                context
-            );
-
-            match starknet_account
-                .callback_to_contract(payload.client_info.client_address, &job_request, &result)
-                .await
-            {
-                Ok(_) => {
-                    tracing::info!("Job processing finished successfully. {}", context);
-                    true
-                }
-                Err(e) => {
-                    let error_msg = format!("Starknet callback failed. Error: {:?}", e);
-                    tracing::error!("{}. {}", error_msg, context);
-                    let _ = update_job_status(
-                        offchain_processor_db.clone(),
-                        &job_id,
-                        JobStatus::Failed,
-                        Some(serde_json::json!({
-                            "error": error_msg
-                        })),
-                    )
-                    .await;
-                    false
-                }
-            }
-        }
-        Ok(None) => {
-            let error_msg = "Failed to fetch headers or calculate pricing data";
-            tracing::error!("{}. {}", error_msg, context);
-            let _ = update_job_status(
-                offchain_processor_db.clone(),
-                &job_id,
-                JobStatus::Failed,
-                Some(serde_json::json!({
-                    "error": error_msg
-                })),
-            )
-            .await;
-            false
+            tracing::info!("Job completed successfully. {}", context);
+            true
         }
         Err(e) => {
-            let error_msg = format!("Error fetching headers: {:?}", e);
+            let error_msg = format!("Error calling proving service: {:?}", e);
             tracing::error!("{}. {}", error_msg, context);
             let _ = update_job_status(
                 offchain_processor_db.clone(),
@@ -405,65 +291,60 @@ async fn process_job(
     }
 }
 
-// Helper to fetch block headers in parallel
-async fn fetch_headers(
-    db: Arc<IndexerDbConnection>,
+// Call the proving service API
+async fn call_proving_service(
+    job_id: &str,
     payload: &PitchLakeJobRequest,
-) -> Result<Option<(f64, f64, f64)>, eyre::Error> {
-    tracing::debug!("Fetching block headers for calculations.");
-
+) -> Result<serde_json::Value, eyre::Error> {
     dotenv().ok();
-    let use_mock_pricing_data = env::var("USE_MOCK_PRICING_DATA")
-        .map_err(|_| eyre!("USE_MOCK_PRICING_DATA should be provided as env vars."))?;
 
-    if use_mock_pricing_data.to_lowercase() == "true" {
-        tracing::info!("Using mock pricing data");
-        return Ok(Some((14732102267.474916, 440.0, 2597499408.638207)));
-    }
+    // Get proving service URL from environment variables, with a default value
+    let proving_service_url =
+        env::var("PROVING_SERVICE_URL").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string());
 
-    let (twap_headers, volatility_headers, reserve_price_headers) = join!(
-        get_block_headers_by_time_range(
-            db.clone(),
-            payload.params.twap.0.to_string(),
-            payload.params.twap.1.to_string()
-        ),
-        get_block_headers_by_time_range(
-            db.clone(),
-            payload.params.volatility.0.to_string(),
-            payload.params.volatility.1.to_string()
-        ),
-        get_block_headers_by_time_range(
-            db.clone(),
-            payload.params.reserve_price.0.to_string(),
-            payload.params.reserve_price.1.to_string()
-        )
-    );
+    let client = Client::new();
 
-    match (twap_headers, volatility_headers, reserve_price_headers) {
-        (Ok(twap), Ok(volatility), Ok(reserve)) => {
-            tracing::debug!("Block headers fetched successfully.");
-
-            let now = Instant::now();
-            tracing::info!("Started processing...");
-
-            let results = join!(
-                calculate_twap(twap),
-                calculate_volatility(volatility),
-                calculate_reserve_price(reserve)
-            );
-
-            let elapsed = now.elapsed();
-            tracing::info!("Elapsed: {:.2?}", elapsed);
-
-            match results {
-                (Ok(twap), Ok(volatility), Ok(reserve_price)) => {
-                    Ok(Some((twap, volatility, reserve_price)))
-                }
-                _ => Ok(None),
-            }
+    let api_payload = json!({
+        "job_group_id": job_id,
+        "twap": {
+            "start_timestamp": payload.params.twap.0,
+            "end_timestamp": payload.params.twap.1
+        },
+        "reserve_price": {
+            "start_timestamp": payload.params.reserve_price.0,
+            "end_timestamp": payload.params.reserve_price.1
+        },
+        "max_return": {
+            "start_timestamp": payload.params.volatility.0,
+            "end_timestamp": payload.params.volatility.1
         }
-        _ => Ok(None),
+    });
+
+    tracing::debug!("Sending request to proving service: {:?}", api_payload);
+
+    let response = client
+        .post(format!("{}/api/job", proving_service_url))
+        .json(&api_payload)
+        .send()
+        .await
+        .map_err(|e| eyre!("Failed to send request to proving service: {}", e))?;
+
+    if !response.status().is_success() {
+        let error_text = response
+            .text()
+            .await
+            .unwrap_or_else(|_| "Failed to get error response text".to_string());
+        return Err(eyre!("Proving service returned error: {}", error_text));
     }
+
+    let result = response
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| eyre!("Failed to parse response from proving service: {}", e))?;
+
+    tracing::debug!("Received response from proving service: {:?}", result);
+
+    Ok(result)
 }
 
 // Validate the provided time ranges
