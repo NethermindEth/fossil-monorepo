@@ -1,13 +1,53 @@
-.DS_Store
-/target
-.env
-localstack/
+# Rust build artifacts
+target/
+**/target/
+**/**/target/
+**/**/**/target/
+**/**/**/**/target/
+**/*.rs.bk
+Cargo.lock
+**/Cargo.lock
 
-# Coverage files
+# IDE files
+.vscode/
+.idea/
+*.iml
+*.swp
+*~
+
+# Environment files
+.env
+*/.env
+**/.env
+
+# Build artifacts
+debug/
+release/
 *.profraw
 *.profdata
-coverage/
-lcov.info
-/target/coverage/
-/target/lcov.info
 .coverage/
+coverage/
+
+# OS specific
+.DS_Store
+.directory
+Thumbs.db
+
+# Project specific
+proving-service/target/
+offchain-processor/target/
+
+# Common system files
+.DS_Store
+**/.DS_Store
+
+# Local development
+localstack/
+**/localstack/
+
+# Project specific
+data.csv
+crates/mmr-accumulator/db-instances/
+zkvm/.bonsai-env
+zkvm/.bonsay-env
+changes.diff 
