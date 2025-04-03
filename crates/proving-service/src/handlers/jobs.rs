@@ -3,7 +3,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
-use message_handlers::{
+use message_handler::{
     queue::sqs_message_queue::SqsMessageQueue,
     services::{
         job_dispatcher::JobDispatcher,
@@ -122,7 +122,7 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use axum::http::StatusCode;
-    use message_handlers::queue::message_queue::{Queue, QueueError, QueueMessage};
+    use message_handler::queue::message_queue::{Queue, QueueError, QueueMessage};
     use std::sync::Arc;
 
     // Define a wrapper struct that we can use with JobDispatcher

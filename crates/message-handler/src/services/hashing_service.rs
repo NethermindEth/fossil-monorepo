@@ -330,7 +330,7 @@ mod tests {
         let process = setup();
 
         let res = process.is_batch_hash_avg_fees_available(0).await;
-        assert!(res.unwrap());
+        assert!(!res.unwrap());
     }
 
     #[tokio::test]

@@ -10,7 +10,7 @@ pub struct JobDispatcher<Q: Queue> {
 }
 
 impl<Q: Queue> JobDispatcher<Q> {
-    pub fn new(queue: Arc<Q>) -> Self {
+    pub const fn new(queue: Arc<Q>) -> Self {
         Self { queue }
     }
 

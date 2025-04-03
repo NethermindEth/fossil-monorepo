@@ -86,7 +86,10 @@ impl Queue for SqsMessageQueue {
         } else {
             debug!(
                 "Processed message: {}",
-                message.id.clone().unwrap_or("no message id".to_string())
+                message
+                    .id
+                    .clone()
+                    .unwrap_or_else(|| "no message id".to_string())
             );
             // Its okay if the message doesn't have an id, we can't delete it
             // but we also shouldn't error out.

@@ -21,7 +21,7 @@ WORKDIR /usr/app
 
 RUN apt-get update && apt-get install -y libssl-dev ca-certificates && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /usr/app/target/release/message_handlers .
+COPY --from=builder /usr/app/target/release/message_handler .
 
 # Set the startup command
-CMD ["/usr/app/message_handlers"]
+CMD ["/usr/app/message_handler"]

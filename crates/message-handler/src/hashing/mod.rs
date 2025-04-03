@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+#[cfg(feature = "proof-composition")]
 use coprocessor_common::convert_felt_to_f64;
 use starknet::{
     accounts::{Account, SingleOwnerAccount},
@@ -7,6 +8,15 @@ use starknet::{
     providers::{JsonRpcClient, Provider, ProviderError, jsonrpc::HttpTransport},
     signers::LocalWallet,
 };
+
+#[cfg(not(feature = "proof-composition"))]
+pub fn convert_felt_to_f64(felt: Felt) -> f64 {
+    // Simple fallback implementation when proof-composition is disabled
+    let u256_value = U256::from(felt);
+    let high_bits = (u256_value.high() as f64) * 2_f64.powi(128);
+    let low_bits = u256_value.low() as f64;
+    high_bits + low_bits
+}
 
 pub struct HashingProvider {
     provider: JsonRpcClient<HttpTransport>,

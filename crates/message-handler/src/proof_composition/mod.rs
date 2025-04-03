@@ -1,31 +1,43 @@
+#[cfg(feature = "proof-composition")]
 use add_twap_7d_error_bound_floating::add_twap_7d_error_bound;
+#[cfg(feature = "proof-composition")]
+use calculate_pt_pt1_error_bound_floating::calculate_pt_pt1_error_bound_floating;
+#[cfg(feature = "proof-composition")]
 use coprocessor_common::{
     floating_point,
     original::{self, convert_array1_to_dvec},
     tests::mock::convert_data_to_vec_of_tuples,
 };
+#[cfg(feature = "proof-composition")]
 use coprocessor_core::{
     AddTwap7dErrorBoundFloatingInput, CalculatePtPt1ErrorBoundFloatingInput, HashingFeltInput,
     MaxReturnInput, ProofCompositionInput, RemoveSeasonalityErrorBoundFloatingInput,
     SimulatePriceVerifyPositionInput, TwapErrorBoundInput,
 };
 use eyre::{Result, eyre};
+#[cfg(feature = "proof-composition")]
+use hashing_felts::hash_felts;
+#[cfg(feature = "proof-composition")]
 use max_return_floating::max_return;
+#[cfg(feature = "proof-composition")]
 use proof_composition_twap_maxreturn_reserveprice_floating_hashing_methods::{
     PROOF_COMPOSITION_TWAP_MAXRETURN_RESERVEPRICE_FLOATING_HASHING_GUEST_ELF,
     PROOF_COMPOSITION_TWAP_MAXRETURN_RESERVEPRICE_FLOATING_HASHING_GUEST_ID,
 };
+#[cfg(feature = "proof-composition")]
 use remove_seasonality_error_bound_floating::remove_seasonality_error_bound;
+#[cfg(not(feature = "proof-composition"))]
+use risc0_zkvm::Receipt;
+#[cfg(feature = "proof-composition")]
 use risc0_zkvm::{ExecutorEnv, ProverOpts, Receipt, ReceiptKind, default_prover};
+#[cfg(feature = "proof-composition")]
 use simulate_price_verify_position_floating::simulate_price_verify_position;
-
+#[cfg(feature = "proof-composition")]
 use starknet::core::types::Felt;
+#[cfg(feature = "proof-composition")]
 use tokio::{task, try_join};
+#[cfg(feature = "proof-composition")]
 use twap_error_bound_floating::calculate_twap;
-
-use calculate_pt_pt1_error_bound_floating::calculate_pt_pt1_error_bound_floating;
-
-use hashing_felts::hash_felts;
 
 #[async_trait::async_trait]
 pub trait ProofProvider {
@@ -44,7 +56,7 @@ pub trait ProofProvider {
 pub struct BonsaiProofProvider;
 
 impl BonsaiProofProvider {
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self
     }
 }
@@ -57,6 +69,7 @@ impl Default for BonsaiProofProvider {
 
 #[async_trait::async_trait]
 impl ProofProvider for BonsaiProofProvider {
+    #[cfg(feature = "proof-composition")]
     async fn generate_proofs_from_data(
         &self,
         start_timestamp: i64,
@@ -249,9 +262,9 @@ impl ProofProvider for BonsaiProofProvider {
             .add_assumption(result_receipt.2)
             .add_assumption(result_receipt.3)
             .write(&input)
-            .unwrap()
+            .map_err(|e| eyre!("Failed to write input to executor: {}", e))?
             .build()
-            .unwrap();
+            .map_err(|e| eyre!("Failed to build executor environment: {}", e))?;
 
         let prover_opts = ProverOpts::default().with_receipt_kind(ReceiptKind::Groth16);
 
@@ -269,5 +282,17 @@ impl ProofProvider for BonsaiProofProvider {
             .map_err(|e| eyre!("Failed to verify proof: {}", e))?;
 
         Ok(receipt)
+    }
+
+    #[cfg(not(feature = "proof-composition"))]
+    async fn generate_proofs_from_data(
+        &self,
+        _start_timestamp: i64,
+        _end_timestamp: i64,
+        _raw_input: Vec<String>,
+    ) -> Result<Receipt> {
+        Err(eyre!(
+            "Proof composition is disabled. Enable the 'proof-composition' feature to use this functionality."
+        ))
     }
 }

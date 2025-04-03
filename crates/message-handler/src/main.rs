@@ -1,9 +1,9 @@
 use aws_config::{BehaviorVersion, defaults};
 use db::DbConnection;
 use eyre::Result;
-use message_handlers::proof_composition::BonsaiProofProvider;
-use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
-use message_handlers::services::proof_job_handler::ProofJobHandler;
+use message_handler::proof_composition::BonsaiProofProvider;
+use message_handler::queue::sqs_message_queue::SqsMessageQueue;
+use message_handler::services::proof_job_handler::ProofJobHandler;
 use std::sync::{Arc, atomic::AtomicBool};
 use tokio::signal;
 use tracing::{Level, debug, info};
@@ -24,8 +24,10 @@ async fn main() -> Result<()> {
     dotenv::dotenv().ok();
 
     // Get the queue URL from environment variable
-    let queue_url = std::env::var("SQS_QUEUE_URL").expect("SQS_QUEUE_URL must be set");
-    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let queue_url = std::env::var("SQS_QUEUE_URL")
+        .map_err(|e| eyre::eyre!("SQS_QUEUE_URL environment variable not set: {}", e))?;
+    let database_url = std::env::var("DATABASE_URL")
+        .map_err(|e| eyre::eyre!("DATABASE_URL environment variable not set: {}", e))?;
     info!("Using SQS Queue URL: {}", queue_url);
 
     // Load AWS SDK config from environment variables
@@ -45,6 +47,7 @@ async fn main() -> Result<()> {
         terminator.clone(),
         db.clone(),
         proof_provider,
+        std::time::Duration::from_secs(300), // 5 minutes timeout for proof generation
     );
 
     // Start the job processor in a separate task
