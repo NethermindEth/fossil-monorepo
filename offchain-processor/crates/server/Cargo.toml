@@ -20,34 +20,18 @@ chrono = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 eyre = { workspace = true }
-starknet-crypto = { workspace = true }
-starknet = { workspace = true }
-# Removing dependencies that were only needed for pricing calculations
-# linfa = { workspace = true }
-# linfa-linear = { workspace = true }
-# ndarray = { workspace = true }
-# ndarray-linalg = { workspace = true }
-# polars = { workspace = true }
-# statrs = { workspace = true }
-# rand = { workspace = true }
-# rand_distr = { workspace = true }
-# ndarray-rand = { workspace = true }
 
 # Add reqwest for HTTP API calls
 reqwest = { version = "0.11", features = ["json"] }
 
 # Server-specific dependencies
 axum = { version = "0.8", features = ["http1", "http2", "json", "macros"] }
-# tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace", "auth"] }
 tracing-subscriber = { version = "0.3", features = ["registry", "env-filter", "fmt", "time"] }
-# time = "0.3"
-# optimization = "0.2.0"
+
 uuid = { version = "1.10.0", features = ["v4"] }
 
 [dev-dependencies]
-# mockall = "0.13"
 testcontainers = "0.14"
 lazy_static = "1.4"
 axum-test = "17"
-# sqlx-database-tester = { version = "0.4.2", features = ["runtime-tokio"] }

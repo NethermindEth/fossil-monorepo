@@ -1,6 +1,5 @@
 use db_access::models::JobStatus;
 use serde::{Deserialize, Serialize};
-use starknet_crypto::Felt;
 
 // timestamp ranges for each sub-job calculation
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -19,8 +18,8 @@ pub struct PitchLakeJobRequest {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ClientInfo {
-    pub client_address: Felt,
-    pub vault_address: Felt,
+    pub client_address: String,
+    pub vault_address: String,
     pub timestamp: i64,
 }
 

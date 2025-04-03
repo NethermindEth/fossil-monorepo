@@ -18,6 +18,7 @@ use eyre::{eyre, Result};
 use reqwest::Client;
 use serde_json::json;
 use tokio::runtime::Handle;
+use uuid::Uuid;
 
 // Main handler function
 pub async fn get_pricing_data(
@@ -26,7 +27,7 @@ pub async fn get_pricing_data(
 ) -> (StatusCode, Json<JobResponse>) {
     let identifiers = payload.identifiers.join(",");
     let context = format!(
-        "identifiers=[{}], timestamp={}, twap-range=({},{}), volatility-range=({},{}), reserve_price-range=({},{}), client_address={:#064x}, vault_address={:#064x}",
+        "identifiers=[{}], timestamp={}, twap-range=({},{}), volatility-range=({},{}), reserve_price-range=({},{}), client_address={}, vault_address={}",
         identifiers,
         payload.client_info.timestamp,
         payload.params.twap.0, payload.params.twap.1,
@@ -83,22 +84,9 @@ fn validate_request(payload: &PitchLakeJobRequest) -> Result<(), (StatusCode, Jo
 }
 
 // Helper to generate a job ID
-fn generate_job_id(identifiers: &[String], params: &PitchLakeJobRequestParams) -> String {
-    let mut input = identifiers.join("");
-
-    // Concatenate all time ranges as part of the job ID generation
-    input.push_str(&format!(
-        "{}{}{}{}{}{}",
-        params.twap.0,
-        params.twap.1,
-        params.volatility.0,
-        params.volatility.1,
-        params.reserve_price.0,
-        params.reserve_price.1
-    ));
-
-    use starknet_crypto::{poseidon_hash_single, Felt};
-    poseidon_hash_single(Felt::from_bytes_be_slice(input.as_bytes())).to_string()
+fn generate_job_id(_identifiers: &[String], _params: &PitchLakeJobRequestParams) -> String {
+    // Generate a UUID v4 (random)
+    Uuid::new_v4().to_string()
 }
 
 // Handle existing jobs based on status
@@ -233,7 +221,7 @@ async fn process_job(
     payload: PitchLakeJobRequest,
 ) {
     let context = format!(
-        "job_id={}, identifiers=[{}], twap=({},{}), volatility=({},{}), reserve_price=({},{}), client_address={:#064x}, vault_address={:#064x}",
+        "job_id={}, identifiers=[{}], twap=({},{}), volatility=({},{}), reserve_price=({},{}), client_address={}, vault_address={}",
         job_id,
         payload.identifiers.join(","),
         payload.params.twap.0, payload.params.twap.1,
@@ -378,7 +366,6 @@ mod tests {
     use crate::handlers::fixtures::TestContext;
     use crate::types::{ClientInfo, PitchLakeJobRequest, PitchLakeJobRequestParams};
     use axum::http::StatusCode;
-    use starknet::core::types::Felt;
 
     #[tokio::test]
     async fn test_get_pricing_data_new_job() {
@@ -392,8 +379,8 @@ mod tests {
                 reserve_price: (0, 100),
             },
             client_info: ClientInfo {
-                client_address: Felt::from_hex("0x123").unwrap(),
-                vault_address: Felt::from_hex("0x456").unwrap(),
+                client_address: "0x123".to_string(),
+                vault_address: "0x456".to_string(),
                 timestamp: 0,
             },
         };
@@ -420,8 +407,8 @@ mod tests {
                 reserve_price: (0, 100),
             },
             client_info: ClientInfo {
-                client_address: Felt::from_hex("0x123").unwrap(),
-                vault_address: Felt::from_hex("0x456").unwrap(),
+                client_address: "0x123".to_string(),
+                vault_address: "0x456".to_string(),
                 timestamp: 0,
             },
         };
@@ -451,8 +438,8 @@ mod tests {
                 reserve_price: (0, 100),
             },
             client_info: ClientInfo {
-                client_address: Felt::from_hex("0x123").unwrap(),
-                vault_address: Felt::from_hex("0x456").unwrap(),
+                client_address: "0x123".to_string(),
+                vault_address: "0x456".to_string(),
                 timestamp: 0,
             },
         };
@@ -482,8 +469,8 @@ mod tests {
                 reserve_price: (0, 100),
             },
             client_info: ClientInfo {
-                client_address: Felt::from_hex("0x123").unwrap(),
-                vault_address: Felt::from_hex("0x456").unwrap(),
+                client_address: "0x123".to_string(),
+                vault_address: "0x456".to_string(),
                 timestamp: 0,
             },
         };
@@ -513,8 +500,8 @@ mod tests {
                 reserve_price: (0, 100),
             },
             client_info: ClientInfo {
-                client_address: Felt::from_hex("0x123").unwrap(),
-                vault_address: Felt::from_hex("0x456").unwrap(),
+                client_address: "0x123".to_string(),
+                vault_address: "0x456".to_string(),
                 timestamp: 0,
             },
         };

@@ -1,6 +1,5 @@
 #![deny(unused_crate_dependencies)]
 use chrono as _;
-use starknet as _;
 use tracing_subscriber as _;
 
 pub mod handlers;

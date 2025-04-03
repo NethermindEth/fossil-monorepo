@@ -68,6 +68,8 @@ setup-platform: ## Set up platform dependencies
 		echo "On macOS, you may need to run the following command manually:"; \
 		echo "brew install protobuf postgresql"; \
 	fi
+	@echo "Installing codespell..."
+	@python3 -m pip install codespell || { echo "⚠️ Failed to install codespell automatically. You may need to run: pip install codespell manually."; }
 
 .PHONY: init-repo
 init-repo: ## Initialize repository (git hooks, etc.)
