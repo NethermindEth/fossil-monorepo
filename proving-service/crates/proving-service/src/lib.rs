@@ -1,3 +1,11 @@
+#![deny(unused_crate_dependencies)]
+use aws_config as _;
+use aws_sdk_sqs as _;
+use dotenv as _;
+use eyre as _;
+use tokio as _;
+use tracing_subscriber as _;
+
 mod handlers;
 mod routes;
 

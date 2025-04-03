@@ -12,23 +12,21 @@ path = "src/main.rs"
 eyre = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
-serde_json = { workspace = true }
-async-trait = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-
-# Web framework
-axum = { workspace = true }
+dotenv = { workspace = true }
 
 # AWS
 aws-config = { workspace = true }
 aws-sdk-sqs = { workspace = true }
 
-# Utilities
-dotenv = { workspace = true }
+# Web framework
+axum = { workspace = true }
 
 # Internal dependencies
 message-handler = { path = "../message-handler" }
 
 [dev-dependencies] 
 tokio = { workspace = true, features = ["rt", "macros", "test-util"] } 
+async-trait = { workspace = true }
+serde_json = { workspace = true }

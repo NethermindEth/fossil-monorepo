@@ -10,13 +10,11 @@ path = "src/scripts/create_api_key.rs"
 
 [dependencies]
 db-access = { path = "../db-access" }
-# Removing starknet-handler dependency as we're now using HTTP API directly
 
 tokio = { workspace = true }
 tracing = { workspace = true }
 sqlx = { workspace = true }
 dotenv = { workspace = true }
-chrono = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 eyre = { workspace = true }

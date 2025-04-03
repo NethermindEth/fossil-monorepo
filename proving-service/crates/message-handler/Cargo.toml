@@ -20,6 +20,7 @@ proof-composition = [
 
 [dependencies]
 # Core dependencies
+dotenv = { workspace = true }
 eyre = { workspace = true }
 tokio = { workspace = true }
 serde = { workspace = true }
@@ -32,15 +33,9 @@ tracing-subscriber = { workspace = true }
 aws-config = { workspace = true }
 aws-sdk-sqs = { workspace = true }
 
-# Web framework
-axum = { workspace = true }
-
 # Starknet
 starknet = { workspace = true }
 starknet-crypto = { workspace = true }
-
-# Utilities
-dotenv = { workspace = true }
 
 db = { path = "../db" }
 
@@ -61,7 +56,6 @@ risc0-zkvm = { version = "2.0.1" }
 uuid = { version = "1.16.0", features = ["v4"] }
 
 [dev-dependencies]
-testcontainers-modules = { workspace = true }
 url = { workspace = true }
 
 [[bin]]
