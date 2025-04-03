@@ -19,7 +19,7 @@ pub struct ExampleMessageHandler<Q: Queue + Send + Sync + 'static> {
 }
 
 impl<Q: Queue + Send + Sync + 'static> ExampleMessageHandler<Q> {
-    pub fn new(queue: Arc<Q>, terminator: Arc<AtomicBool>) -> Self {
+    pub const fn new(queue: Arc<Q>, terminator: Arc<AtomicBool>) -> Self {
         Self { queue, terminator }
     }
 
@@ -53,7 +53,9 @@ impl<Q: Queue + Send + Sync + 'static> ExampleMessageHandler<Q> {
                         task::spawn(async move {
                             let message_clone = message.clone();
                             println!("Received & processing job: {:?}", job);
-                            queue_clone.delete_message(&message_clone).await.unwrap();
+                            if let Err(e) = queue_clone.delete_message(&message_clone).await {
+                                eprintln!("Failed to delete message: {}", e);
+                            }
                         });
                     }
                 }

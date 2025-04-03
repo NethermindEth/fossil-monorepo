@@ -9,7 +9,7 @@ mod tests {
 
     use super::*;
     use aws_config::SdkConfig;
-    use message_handlers::queue::sqs_message_queue::SqsMessageQueue;
+    use message_handler::queue::sqs_message_queue::SqsMessageQueue;
 
     #[tokio::test]
     async fn test_create_router_from_lib() {

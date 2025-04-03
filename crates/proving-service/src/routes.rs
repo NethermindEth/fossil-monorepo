@@ -1,5 +1,5 @@
 use axum::{Router, routing::post};
-use message_handlers::{
+use message_handler::{
     queue::sqs_message_queue::SqsMessageQueue, services::job_dispatcher::JobDispatcher,
 };
 use std::sync::Arc;
@@ -21,7 +21,7 @@ pub async fn create_router(queue: Arc<SqsMessageQueue>) -> Router {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use message_handlers::queue::message_queue::{Queue, QueueError, QueueMessage};
+    use message_handler::queue::message_queue::{Queue, QueueError, QueueMessage};
 
     // Mock queue implementation for testing
     #[derive(Debug, Clone)]
