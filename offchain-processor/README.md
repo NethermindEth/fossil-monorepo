@@ -13,9 +13,6 @@ make setup-rust         # Install Rust and toolchains
 make setup-postgres     # Set up PostgreSQL for development
 make setup-localstack   # Set up LocalStack for AWS services
 make setup-coverage     # Install code coverage tools
-make setup-foundry      # Set up Foundry
-make setup-risc0        # Set up RISC0
-make setup-starknet     # Set up Starknet
 make setup-platform     # Set up platform dependencies
 make init-repo          # Initialize repository (git hooks, etc.)
 

@@ -1,5 +1,4 @@
 #![deny(unused_crate_dependencies)]
-use tokio as _;
 
 pub mod auth;
 pub mod models;
