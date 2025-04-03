@@ -4,7 +4,7 @@
 
 .PHONY: setup setup-rust setup-postgres setup-localstack setup-coverage setup-foundry setup-risc0 setup-starknet setup-platform init-repo
 
-setup: setup-rust setup-postgres setup-localstack setup-coverage setup-foundry setup-risc0 setup-starknet setup-platform init-repo ## Install all dependencies
+setup: setup-rust setup-postgres setup-coverage setup-platform init-repo ## Install all dependencies
 	@echo "✅ All dependencies installed successfully!"
 
 .PHONY: setup-rust
@@ -26,11 +26,11 @@ setup-rust: ## Install Rust and toolchains
 
 .PHONY: setup-postgres
 setup-postgres: ## Set up PostgreSQL for development
-	docker compose -f docker-compose.test.yml up -d postgres
+	docker compose -f docker-compose.test.yml up -d offchain_processor_db
 
 .PHONY: setup-localstack
 setup-localstack: ## Set up LocalStack for AWS services
-	docker compose -f docker-compose.test.yml up -d localstack
+	@echo "LocalStack not needed for offchain-processor"
 
 .PHONY: setup-coverage
 setup-coverage: ## Install code coverage tools
@@ -38,38 +38,26 @@ setup-coverage: ## Install code coverage tools
 
 .PHONY: setup-foundry
 setup-foundry: ## Set up Foundry
-	@echo "🔧 Checking Foundry installation..."
-	@if ! command -v forge &> /dev/null; then \
-		echo "Installing Foundry..."; \
-		curl -L https://foundry.paradigm.xyz | bash; \
-		$$HOME/.foundry/bin/foundryup; \
-	else \
-		echo "✅ Foundry already installed"; \
-	fi
+	@echo "Foundry not needed for offchain-processor"
 
 .PHONY: setup-risc0
 setup-risc0: ## Set up RISC0
-	@echo "🔧 Setting up RISC0..."
-	@cargo install cargo-risczero
-	@cargo risczero install
+	@echo "RISC0 not needed for offchain-processor"
 
 .PHONY: setup-starknet
 setup-starknet: ## Set up Starknet
-	@echo "🔧 Setting up Starknet dependencies..."
-	@if ! command -v scarb &> /dev/null; then \
-		echo "Installing Scarb..."; \
-		curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh; \
-	else \
-		echo "✅ Scarb already installed"; \
-	fi
+	@echo "Starknet/Scarb not needed for offchain-processor"
 
 .PHONY: setup-platform
 setup-platform: ## Set up platform dependencies
 	@echo "🔧 Setting up platform dependencies..."
+	@echo "⚠️ Note: Some dependencies may require sudo permissions"
 	@if [ "$(shell uname)" = "Linux" ]; then \
-		apt-get update && apt-get install -y protobuf-compiler libpq-dev pkg-config; \
+		echo "On Linux, you may need to run the following command manually with sudo:"; \
+		echo "sudo apt-get update && sudo apt-get install -y protobuf-compiler libpq-dev pkg-config"; \
 	elif [ "$(shell uname)" = "Darwin" ]; then \
-		brew install protobuf postgresql; \
+		echo "On macOS, you may need to run the following command manually:"; \
+		echo "brew install protobuf postgresql"; \
 	fi
 
 .PHONY: init-repo
