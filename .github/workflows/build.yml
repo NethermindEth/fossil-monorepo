@@ -17,14 +17,27 @@ jobs:
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@nightly
     
+    - name: Cache RISC Zero toolchain
+      id: cache-risc0
+      uses: actions/cache@v3
+      with:
+        path: ~/.risc0
+        key: ${{ runner.os }}-risc0-${{ hashFiles('**/Cargo.lock') }}
+    
     - name: Install RISC Zero toolchain
+      if: steps.cache-risc0.outputs.cache-hit != 'true'
       run: |
           curl -L https://risczero.com/install | bash
           export PATH="$HOME/.risc0/bin:$PATH"
           rzup install
     
+    - name: Add RISC Zero to PATH
+      run: echo "$HOME/.risc0/bin" >> $GITHUB_PATH
+    
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: true
     
-    - name: Build
-      run: cargo build --verbose 
+    - name: Build with parallel jobs
+      run: cargo build --verbose --jobs $(nproc) 

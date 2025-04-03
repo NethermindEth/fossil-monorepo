@@ -1,23 +1,19 @@
-name: Test
+name: Coverage
 
 on:
-  workflow_call:
+  # Run coverage only on main branch pushes or manually
+  push:
+    branches: [ main ]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  test:
-    name: Test with Coverage
+  coverage:
+    name: Generate Coverage Report
     runs-on: ubuntu-latest
-    # Use a higher resource class for more CPU/memory
-    strategy:
-      matrix:
-        # Split tests into multiple groups
-        test-group: [proving, db, other]
-      # Don't fail fast so all test groups complete even if one fails
-      fail-fast: false
-      
+
     steps:
     - uses: actions/checkout@v4
     
@@ -26,36 +22,35 @@ jobs:
       with:
         components: llvm-tools-preview
     
+    - name: Cache RISC Zero toolchain
+      id: cache-risc0
+      uses: actions/cache@v3
+      with:
+        path: ~/.risc0
+        key: ${{ runner.os }}-risc0-${{ hashFiles('**/Cargo.lock') }}
+    
     - name: Install RISC Zero toolchain
+      if: steps.cache-risc0.outputs.cache-hit != 'true'
       run: |
-        # Only run this step for proving tests
-        if [ "${{ matrix.test-group }}" = "proving" ]; then
           curl -L https://risczero.com/install | bash
           export PATH="$HOME/.risc0/bin:$PATH"
           rzup install
-        fi
+    
+    - name: Add RISC Zero to PATH
+      run: echo "$HOME/.risc0/bin" >> $GITHUB_PATH
     
     - name: Cache dependencies
       uses: Swatinem/rust-cache@v2
       with:
-        # Cache more aggressively
         cache-on-failure: true
-        # Customize cache key based on test group
-        key: ${{ matrix.test-group }}
     
     - name: Install grcov
-      # Only install for proving tests where we collect coverage
-      if: matrix.test-group == 'proving'
       run: cargo install grcov
       
     - name: Start PostgreSQL
-      # Only needed for DB tests
-      if: matrix.test-group == 'db'
       run: docker compose -f docker/docker-compose.test.yml up -d postgres
     
     - name: Wait for PostgreSQL to be ready
-      # Only needed for DB tests
-      if: matrix.test-group == 'db'
       run: |
         for i in {1..30}; do
           if docker exec $(docker ps -q -f name=postgres) pg_isready -U postgres; then
@@ -64,34 +59,25 @@ jobs:
           sleep 1
         done
     
-    - name: Run proving tests
-      if: matrix.test-group == 'proving'
+    - name: Run tests with coverage
       run: |
         mkdir -p .coverage
         CARGO_INCREMENTAL=0 \
         RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
         LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
-        cargo test --package message-handler -- proof_composition::
-      
-    - name: Run database tests
-      if: matrix.test-group == 'db'
-      run: |
-        # Run only db-related tests
-        cargo test --package db
-        
-    - name: Run other tests
-      if: matrix.test-group == 'other'
-      run: |
-        # Run remaining tests, excluding proving and db
-        cargo test --workspace --exclude message-handler --exclude db
+        cargo test --workspace
       
     - name: Generate coverage report
-      if: matrix.test-group == 'proving'
       run: |
         grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info
         
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: .coverage/lcov.info
+        fail_ci_if_error: false
+        
     - name: Generate coverage badge
-      if: matrix.test-group == 'proving'
       run: |
         # Extract coverage percentage from lcov info
         COVERAGE_PCT=$(grep -m 1 "LF:" .coverage/lcov.info | awk '{print $2}')
@@ -120,5 +106,5 @@ jobs:
         fi
 
     - name: Stop PostgreSQL
-      if: always() && matrix.test-group == 'db'
+      if: always()
       run: docker compose -f docker/docker-compose.test.yml down 
