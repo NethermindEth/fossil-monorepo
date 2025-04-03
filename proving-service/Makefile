@@ -1,5 +1,33 @@
 .DEFAULT_GOAL := help
 
+##@ Setup
+
+.PHONY: setup
+setup: ## Install all dependencies
+	make setup-rust
+	make setup-postgres
+	make setup-localstack
+	make setup-coverage
+
+.PHONY: setup-rust
+setup-rust: ## Install Rust and toolchains
+	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+	rustup component add rustfmt clippy
+	rustup toolchain install nightly
+	rustup component add rustfmt clippy --toolchain nightly
+
+.PHONY: setup-postgres
+setup-postgres: ## Set up PostgreSQL for development
+	docker compose -f docker/docker-compose.test.yml up -d postgres
+
+.PHONY: setup-localstack
+setup-localstack: ## Set up LocalStack for AWS services
+	docker compose -f docker/docker-compose.sqs.yml up -d
+
+.PHONY: setup-coverage
+setup-coverage: ## Install code coverage tools
+	cargo install cargo-tarpaulin
+
 ##@ Build
 
 .PHONY: build
@@ -10,11 +38,55 @@ build: ## Build the project in release mode.
 build-debug: ## Build the project in debug mode.
 	cargo build
 
+##@ Development
+
+.PHONY: dev-services
+dev-services: ## Start all development services.
+	docker compose -f docker/docker-compose.test.yml up -d
+	docker compose -f docker/docker-compose.sqs.yml up -d
+
+.PHONY: dev-services-stop
+dev-services-stop: ## Stop all development services.
+	docker compose -f docker/docker-compose.test.yml down
+	docker compose -f docker/docker-compose.sqs.yml down
+
 ##@ Test
 
 .PHONY: test
-test: ## Run all tests.
+test: ## Run all tests with database dependencies.
 	cargo test --workspace --all-features
+
+.PHONY: test-clean
+test-clean: ## Clean up test environment.
+	docker compose -f docker/docker-compose.test.yml down -v
+	docker compose -f docker/docker-compose.sqs.yml down -v
+
+##@ Code Coverage
+
+.PHONY: coverage
+coverage: ## Run tests with coverage and generate HTML report.
+	cargo tarpaulin --workspace --out html
+
+.PHONY: coverage-view
+coverage-view: ## Open the coverage report in a browser.
+	xdg-open tarpaulin-report.html
+
+.PHONY: coverage-xml
+coverage-xml: ## Generate code coverage report in XML format for CI.
+	cargo tarpaulin --workspace --out xml
+
+.PHONY: coverage-clean
+coverage-clean: ## Clean up coverage artifacts.
+	rm -f tarpaulin-report.html cobertura.xml
+
+.PHONY: coverage-summary
+coverage-summary: ## Display a text summary of the coverage report.
+	cargo tarpaulin --workspace --out stdout
+
+.PHONY: coverage-badge
+coverage-badge: ## Generate a badge for the README.
+	cargo tarpaulin --workspace --out json
+	python3 -c "import json; data = json.load(open('tarpaulin-report.json')); print(f'Coverage: {data[\"files\"][\"total\"][\"coverage\"]}%')"
 
 ##@ Linting
 

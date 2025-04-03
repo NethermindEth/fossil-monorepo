@@ -1,5 +1,82 @@
 .DEFAULT_GOAL := help
 
+##@ Setup
+
+.PHONY: setup setup-rust setup-postgres setup-localstack setup-coverage setup-foundry setup-risc0 setup-starknet setup-platform init-repo
+
+setup: setup-rust setup-postgres setup-localstack setup-coverage setup-foundry setup-risc0 setup-starknet setup-platform init-repo ## Install all dependencies
+	@echo "✅ All dependencies installed successfully!"
+
+.PHONY: setup-rust
+setup-rust: ## Install Rust and toolchains
+	@echo "🔧 Checking Rust installation..."
+	@if ! command -v rustup &> /dev/null; then \
+		echo "Installing Rust..."; \
+		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; \
+	else \
+		echo "✅ Rust already installed"; \
+	fi
+	@if ! rustup toolchain list | grep -q "nightly"; then \
+		echo "Installing Rust nightly..."; \
+		rustup toolchain install nightly; \
+		rustup default nightly; \
+	else \
+		echo "✅ Rust nightly already installed"; \
+	fi
+
+.PHONY: setup-postgres
+setup-postgres: ## Set up PostgreSQL for development
+	docker compose -f docker-compose.test.yml up -d postgres
+
+.PHONY: setup-localstack
+setup-localstack: ## Set up LocalStack for AWS services
+	docker compose -f docker-compose.test.yml up -d localstack
+
+.PHONY: setup-coverage
+setup-coverage: ## Install code coverage tools
+	cargo install cargo-tarpaulin
+
+.PHONY: setup-foundry
+setup-foundry: ## Set up Foundry
+	@echo "🔧 Checking Foundry installation..."
+	@if ! command -v forge &> /dev/null; then \
+		echo "Installing Foundry..."; \
+		curl -L https://foundry.paradigm.xyz | bash; \
+		$$HOME/.foundry/bin/foundryup; \
+	else \
+		echo "✅ Foundry already installed"; \
+	fi
+
+.PHONY: setup-risc0
+setup-risc0: ## Set up RISC0
+	@echo "🔧 Setting up RISC0..."
+	@cargo install cargo-risczero
+	@cargo risczero install
+
+.PHONY: setup-starknet
+setup-starknet: ## Set up Starknet
+	@echo "🔧 Setting up Starknet dependencies..."
+	@if ! command -v scarb &> /dev/null; then \
+		echo "Installing Scarb..."; \
+		curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh; \
+	else \
+		echo "✅ Scarb already installed"; \
+	fi
+
+.PHONY: setup-platform
+setup-platform: ## Set up platform dependencies
+	@echo "🔧 Setting up platform dependencies..."
+	@if [ "$(shell uname)" = "Linux" ]; then \
+		apt-get update && apt-get install -y protobuf-compiler libpq-dev pkg-config; \
+	elif [ "$(shell uname)" = "Darwin" ]; then \
+		brew install protobuf postgresql; \
+	fi
+
+.PHONY: init-repo
+init-repo: ## Initialize repository (git hooks, etc.)
+	@echo "🔧 Initializing repository..."
+	# Add any repo initialization steps here
+
 ##@ Build
 
 .PHONY: build
@@ -13,8 +90,39 @@ build-debug: ## Build the project in debug mode.
 ##@ Test
 
 .PHONY: test
-test: ## Run all tests.
+test: ## Run all tests with database dependencies.
 	cargo test --workspace --all-features
+
+.PHONY: test-clean
+test-clean: ## Clean up test environment.
+	docker compose -f docker-compose.test.yml down -v
+
+##@ Code Coverage
+
+.PHONY: coverage
+coverage: ## Run tests with coverage and generate HTML report.
+	cargo tarpaulin --workspace --out html
+
+.PHONY: coverage-view
+coverage-view: ## Open the coverage report in a browser.
+	xdg-open tarpaulin-report.html
+
+.PHONY: coverage-xml
+coverage-xml: ## Generate code coverage report in XML format for CI.
+	cargo tarpaulin --workspace --out xml
+
+.PHONY: coverage-clean
+coverage-clean: ## Clean up coverage artifacts.
+	rm -f tarpaulin-report.html cobertura.xml
+
+.PHONY: coverage-summary
+coverage-summary: ## Display a text summary of the coverage report.
+	cargo tarpaulin --workspace --out stdout
+
+.PHONY: coverage-badge
+coverage-badge: ## Generate a badge for the README.
+	cargo tarpaulin --workspace --out json
+	python3 -c "import json; data = json.load(open('tarpaulin-report.json')); print(f'Coverage: {data[\"files\"][\"total\"][\"coverage\"]}%')"
 
 ##@ Linting
 
@@ -113,23 +221,16 @@ pr: ## Prepare code for a pull request.
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
-.PHONY: setup setup-rust setup-foundry setup-risc0 setup-starknet setup-platform init-repo
+.PHONY: dev-services
+dev-services: ## Start all development services.
+	docker compose -f docker-compose.test.yml up -d
 
-setup: setup-rust setup-foundry setup-risc0 setup-starknet setup-platform init-repo
-	@echo "✅ All dependencies installed successfully!"
+.PHONY: dev-services-stop
+dev-services-stop: ## Stop all development services.
+	docker compose -f docker-compose.test.yml down
 
-setup-rust:
-	@echo "🔧 Checking Rust installation..."
-	@if ! command -v rustup &> /dev/null; then \
-		echo "Installing Rust..."; \
-		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; \
-	else \
-		echo "✅ Rust already installed"; \
-	fi
-	@if ! rustup toolchain list | grep -q "nightly"; then \
-		echo "Installing Rust nightly..."; \
-		rustup toolchain install nightly; \
-		rustup default nightly; \
-	else \
-		echo "✅ Rust nightly already installed"; \
-	fi
+##@ Clean
+
+.PHONY: clean
+clean: ## Clean project build artifacts.
+	cargo clean
