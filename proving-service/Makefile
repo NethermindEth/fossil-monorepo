@@ -25,8 +25,17 @@ setup-localstack: ## Set up LocalStack for AWS services
 	docker compose -f docker/docker-compose.sqs.yml up -d
 
 .PHONY: setup-coverage
-setup-coverage: ## Install code coverage tools
-	cargo install cargo-tarpaulin
+setup-coverage: ## Install coverage tools.
+	@echo "🔧 Setting up code coverage tools..."
+	@rustup component add llvm-tools-preview
+	@if ! command -v grcov &> /dev/null; then \
+		echo "Installing grcov..."; \
+		cargo install grcov; \
+		echo "✅ grcov installed"; \
+	else \
+		echo "✅ grcov already installed"; \
+	fi
+	@mkdir -p .coverage
 
 ##@ Build
 
@@ -61,32 +70,65 @@ test-clean: ## Clean up test environment.
 	docker compose -f docker/docker-compose.test.yml down -v
 	docker compose -f docker/docker-compose.sqs.yml down -v
 
-##@ Code Coverage
+##@ Coverage
+
+.PHONY: coverage-dir
+coverage-dir: ## Create coverage directory if it doesn't exist
+	@mkdir -p .coverage
 
 .PHONY: coverage
-coverage: ## Run tests with coverage and generate HTML report.
-	cargo tarpaulin --workspace --out html
-
-.PHONY: coverage-view
-coverage-view: ## Open the coverage report in a browser.
-	xdg-open tarpaulin-report.html
+coverage: coverage-dir ## Run tests with code coverage and generate HTML report.
+	@rustup component add llvm-tools-preview
+	docker compose -f docker/docker-compose.test.yml up -d &&\
+	docker compose -f docker/docker-compose.sqs.yml up -d &&\
+	{ CARGO_INCREMENTAL=0 \
+	RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
+	LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
+	cargo test --workspace --all-features; \
+	status=$$?; \
+	grcov . --binary-path ./target/debug/ -s . -t html --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/html &&\
+	grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info &&\
+	echo "Coverage report generated at .coverage/html/index.html"; \
+	docker compose -f docker/docker-compose.test.yml down -v; \
+	docker compose -f docker/docker-compose.sqs.yml down -v; \
+	exit $$status; }
 
 .PHONY: coverage-xml
-coverage-xml: ## Generate code coverage report in XML format for CI.
-	cargo tarpaulin --workspace --out xml
+coverage-xml: coverage-dir ## Generate code coverage report in XML format for CI.
+	@rustup component add llvm-tools-preview
+	CARGO_INCREMENTAL=0 \
+	RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
+	LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
+	cargo test --workspace --all-features &&\
+	grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info
 
 .PHONY: coverage-clean
 coverage-clean: ## Clean up coverage artifacts.
-	rm -f tarpaulin-report.html cobertura.xml
+	rm -rf .coverage
+
+.PHONY: coverage-view
+coverage-view: ## Open coverage report in the default browser (after running make coverage).
+	@if [ -f .coverage/html/index.html ]; then \
+		./scripts/open-coverage.sh; \
+	else \
+		echo "Coverage report not found. Run 'make coverage' first."; \
+	fi
 
 .PHONY: coverage-summary
-coverage-summary: ## Display a text summary of the coverage report.
-	cargo tarpaulin --workspace --out stdout
+coverage-summary: ## Display a text summary of the code coverage report.
+	@if [ -f .coverage/html/index.html ]; then \
+		./scripts/coverage-summary.sh; \
+	else \
+		echo "Coverage report not found. Run 'make coverage' first."; \
+	fi
 
 .PHONY: coverage-badge
-coverage-badge: ## Generate a badge for the README.
-	cargo tarpaulin --workspace --out json
-	python3 -c "import json; data = json.load(open('tarpaulin-report.json')); print(f'Coverage: {data[\"files\"][\"total\"][\"coverage\"]}%')"
+coverage-badge: ## Generate a coverage badge.
+	@if [ -f .coverage/html/index.html ] && [ -f .coverage/lcov.info ]; then \
+		./scripts/generate-badge.sh; \
+	else \
+		echo "Coverage reports not found. Run 'make coverage' first."; \
+	fi
 
 ##@ Linting
 

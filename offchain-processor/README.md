@@ -11,7 +11,6 @@ This project includes a comprehensive Makefile to simplify common development ta
 make setup              # Install all dependencies
 make setup-rust         # Install Rust and toolchains
 make setup-postgres     # Set up PostgreSQL for development
-make setup-localstack   # Set up LocalStack for AWS services
 make setup-coverage     # Install code coverage tools
 make setup-platform     # Set up platform dependencies
 make init-repo          # Initialize repository (git hooks, etc.)
