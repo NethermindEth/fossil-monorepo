@@ -57,6 +57,24 @@ The project is organized into multiple crates and supporting directories:
 - `scripts` - Shell scripts for various development tasks
 - `docker` - Docker-related configuration files
 
+## Feature Flags
+
+The project uses Cargo feature flags to enable optional functionality:
+
+### Proof Composition
+
+The `proof-composition` feature flag controls whether to compile the proof composition system. This is useful for development environments where you don't need the full proving system.
+
+To build without proof composition (faster compilation, reduced dependencies):
+```bash
+cargo build
+```
+
+To build with proof composition enabled:
+```bash
+cargo build --features "message-handler/proof-composition"
+```
+
 ## Development Setup
 
 ### LocalStack SQS Setup
@@ -100,6 +118,12 @@ cargo run -p message-handler
 ```
 
 This will start a service that consumes messages from the SQS queue.
+
+To run with proof composition enabled:
+
+```bash
+cargo run -p message-handler --features "proof-composition"
+```
 
 ## HTTP API
 
