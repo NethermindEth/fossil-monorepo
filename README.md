@@ -5,6 +5,30 @@ This monorepo contains two separate projects:
 1. **Proving Service**: A service that handles proof generation and verification
 2. **Offchain Processor**: A service that processes offchain data and prepares it for proof generation
 
+## Getting Started
+
+### One-Command Setup
+
+To set up the complete development environment:
+
+```bash
+make setup
+```
+
+This will:
+- Install Rust and required toolchains
+- Set up PostgreSQL databases for both projects
+- Configure LocalStack for AWS services
+- Install code coverage tools
+- Set up project-specific dependencies
+
+You can also set up individual components:
+```bash
+make setup-ps    # Set up Proving Service only
+make setup-op    # Set up Offchain Processor only
+make setup-rust  # Set up Rust only
+```
+
 ## Development Workflow
 
 > **IMPORTANT:** Always run `make pr` before submitting your changes!
@@ -27,6 +51,11 @@ fossil-monorepo/
 The root Makefile provides convenience commands for working across both projects:
 
 ```bash
+# Setup
+make setup            # Set up complete development environment
+make setup-ps         # Set up Proving Service only
+make setup-op         # Set up Offchain Processor only
+
 # Building
 make build-all         # Build all projects in release mode
 make build-all-debug   # Build all projects in debug mode

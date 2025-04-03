@@ -2,17 +2,48 @@
 
 ##@ Setup
 .PHONY: setup
-setup: ## Install all dependencies
+setup: setup-shared setup-ps setup-op ## Set up the complete development environment for all projects
+	@echo "✅ Complete development environment set up successfully!"
+
+.PHONY: setup-shared
+setup-shared: ## Install shared dependencies
+	@echo "🔧 Setting up shared dependencies..."
 	make setup-rust
+	make setup-coverage
+	@echo "✅ Shared dependencies installed"
+
+.PHONY: setup-ps
+setup-ps: ## Set up Proving Service
+	@echo "🔧 Setting up Proving Service environment..."
 	make setup-postgres
 	make setup-localstack
-	make setup-coverage
+	cd proving-service && make setup-dev-env
+	@echo "✅ Proving Service environment set up"
+
+.PHONY: setup-op
+setup-op: ## Set up Offchain Processor
+	@echo "🔧 Setting up Offchain Processor environment..."
+	docker compose -f offchain-processor/docker-compose.test.yml up -d offchain_processor_db
+	cd offchain-processor && make setup-platform
+	@echo "✅ Offchain Processor environment set up"
 
 .PHONY: setup-rust
 setup-rust: ## Install Rust and toolchains
-	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+	@echo "🔧 Checking Rust installation..."
+	@if ! command -v rustup &> /dev/null; then \
+		echo "Installing Rust..."; \
+		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; \
+	else \
+		echo "✅ Rust already installed"; \
+	fi
+	@if ! rustup toolchain list | grep -q "nightly"; then \
+		echo "Installing Rust nightly..."; \
+		rustup toolchain install nightly; \
+		rustup default nightly; \
+	else \
+		echo "✅ Rust nightly already installed"; \
+	fi
 	rustup component add rustfmt clippy
-	rustup toolchain install nightly
 	rustup component add rustfmt clippy --toolchain nightly
 
 .PHONY: setup-postgres
@@ -22,10 +53,19 @@ setup-postgres: ## Set up PostgreSQL for development
 .PHONY: setup-localstack
 setup-localstack: ## Set up LocalStack for AWS services
 	docker compose -f proving-service/docker/docker-compose.sqs.yml up -d
+	./proving-service/scripts/setup-localstack.sh
 
 .PHONY: setup-coverage
 setup-coverage: ## Install code coverage tools
+	@echo "🔧 Setting up code coverage tools..."
 	cargo install cargo-tarpaulin
+	@rustup component add llvm-tools-preview
+	@if ! command -v grcov &> /dev/null; then \
+		echo "Installing grcov..."; \
+		cargo install grcov; \
+	else \
+		echo "✅ grcov already installed"; \
+	fi
 
 ##@ Monorepo Management
 
