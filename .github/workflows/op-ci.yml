@@ -7,61 +7,10 @@ on:
   pull_request:
     branches:
       - main
-  workflow_call: # Allow this workflow to be called from other workflows
-
-env:
-  CARGO_TERM_COLOR: always
-  DATABASE_URL: ${{ secrets.DATABASE_URL }} # Ensure DATABASE_URL is globally available
-  STARKNET_RPC_URL: http://127.0.0.1:5050
-  STARKNET_PRIVATE_KEY: 0x1
-  STARKNET_ACCOUNT_ADDRESS: 0x1
-  NETWORK: SEPOLIA
 
 jobs:
-  build-and-test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        toolchain: [nightly] # Only using nightly toolchain
-    steps:
-      - name: Install required dependencies
-        run: sudo apt update && sudo apt install -y libomp-dev libopenblas-dev
-      - uses: actions/checkout@v4
+  lint:
+    uses: ./.github/workflows/op-lint.yml
 
-      - name: Install Rust toolchain and components
-        run: |
-          rustup install ${{ matrix.toolchain }}
-          rustup component add --toolchain ${{ matrix.toolchain }} rustfmt clippy
-
-      - name: Install sqlx-cli
-        run: |
-          cargo install sqlx-cli
-          sqlx --version
-
-      - name: Check that sqlx queries metadata is up to date
-        run: cd offchain-processor && cargo sqlx prepare --workspace --check
-
-      - name: Build
-        run: cd offchain-processor && cargo build --workspace --all-targets
-
-      - name: Test
-        run: cd offchain-processor && cargo test --workspace --all-targets
-
-  lint-rust:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install required dependencies
-        run: sudo apt update && sudo apt install -y libomp-dev libopenblas-dev python3-pip
-
-      - name: Install codespell
-        run: |
-          pip install codespell
-          echo "PATH=$PATH:$HOME/.local/bin" >> $GITHUB_ENV
-
-      - name: Setup environment
-        run: cd offchain-processor && make setup
-
-      - name: Run linting with fmt and clippy only
-        run: cd offchain-processor && make fmt && make clippy
+  test:
+    uses: ./.github/workflows/op-test.yml

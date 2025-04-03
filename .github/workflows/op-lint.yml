@@ -1,7 +1,8 @@
-name: PS Lint
+name: OP Lint
 
 on:
   workflow_call:
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -13,27 +14,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Install required dependencies
+        run: sudo apt update && sudo apt install -y libomp-dev libopenblas-dev python3-pip
+      
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt, clippy
       
       - name: Setup codespell
-        run: pip install codespell
+        run: |
+          pip install codespell
+          echo "PATH=$PATH:$HOME/.local/bin" >> $GITHUB_ENV
     
       - name: Check formatting
-        run: cd proving-service && cargo fmt --all -- --check
+        run: cd offchain-processor && cargo fmt --all -- --check
     
       - name: Run codespell
-        run: cd proving-service && codespell
+        run: cd offchain-processor && codespell
     
       - name: Clippy
         run: |
-          cd proving-service && cargo +nightly clippy \
+          cd offchain-processor && cargo +nightly clippy \
           --no-deps \
-          -p db \
-          -p message-handler \
-          -p proving-service \
+          --workspace \
           -- \
           -W clippy::branches_sharing_code \
           -W clippy::clear_with_drain \
@@ -92,4 +96,7 @@ jobs:
           -W clippy::match_bool \
           -D clippy::needless_bool \
           -W clippy::unwrap_used \
-          -W clippy::expect_used 
+          -W clippy::expect_used
+          
+      - name: Check that sqlx queries metadata is up to date
+        run: cd offchain-processor && cargo sqlx prepare --workspace --check 
