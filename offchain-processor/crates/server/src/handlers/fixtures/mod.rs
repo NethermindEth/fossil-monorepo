@@ -1,24 +1,18 @@
 use std::sync::Arc;
 
 use crate::{
-    types::{
-        GetJobStatusResponseEnum, GetLatestBlockResponseEnum, JobResponse, PitchLakeJobRequest,
-    },
+    types::{GetJobStatusResponseEnum, JobResponse, PitchLakeJobRequest},
     AppState,
 };
 use axum::{extract::State, http::StatusCode, Json};
 use db_access::{
-    models::JobStatus, queries::create_job_request, DbConnection, IndexerDbConnection,
-    OffchainProcessorDbConnection,
+    models::JobStatus, queries::create_job_request, DbConnection, OffchainProcessorDbConnection,
 };
 use lazy_static::lazy_static;
 use sqlx::postgres::PgPoolOptions;
 use testcontainers::{clients::Cli, images::postgres::Postgres as PostgresImage, Container};
 
-use super::{
-    get_pricing_data::get_pricing_data, job_status::get_job_status,
-    latest_block::get_latest_block_number,
-};
+use super::{get_pricing_data::get_pricing_data, job_status::get_job_status};
 
 lazy_static! {
     static ref DOCKER: Cli = Cli::default();
@@ -27,7 +21,6 @@ lazy_static! {
 pub struct TestContext {
     pub app_state: AppState,
     pub offchain_processor_db: Arc<OffchainProcessorDbConnection>,
-    pub indexer_db: Arc<IndexerDbConnection>,
     pub _container: Container<'static, PostgresImage>,
 }
 
@@ -59,37 +52,15 @@ impl TestContext {
         .await
         .expect("Failed to create job_requests table");
 
-        // Create the blockheaders table
-        sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS blockheaders (
-                number BIGINT PRIMARY KEY,
-                timestamp VARCHAR(66),
-                base_fee_per_gas VARCHAR(66),
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )
-            "#,
-        )
-        .execute(&pool)
-        .await
-        .expect("Failed to create blockheaders table");
-
         // Create a single db connection for use by both involved db
         let db = Arc::new(DbConnection { pool: pool.clone() });
-        let indexer_db = Arc::new(IndexerDbConnection::new(db.clone()).await.unwrap());
-        let offchain_processor_db = Arc::new(
-            OffchainProcessorDbConnection::new(db.clone())
-                .await
-                .unwrap(),
-        );
+        let offchain_processor_db = Arc::new(OffchainProcessorDbConnection::new(db).await.unwrap());
         let app_state = AppState {
-            indexer_db: indexer_db.clone(),
             offchain_processor_db: offchain_processor_db.clone(),
         };
 
         Self {
             app_state,
-            indexer_db,
             offchain_processor_db,
             _container: container,
         }
@@ -139,24 +110,5 @@ impl TestContext {
         .execute(&self.offchain_processor_db.db_connection().pool)
         .await
         .expect("Failed to create job request with result");
-    }
-
-    pub async fn get_latest_block(&self) -> (StatusCode, Json<GetLatestBlockResponseEnum>) {
-        get_latest_block_number(State(self.app_state.clone())).await
-    }
-
-    pub async fn create_block(&self, block_number: i64, timestamp: String, base_fee_per_gas: i64) {
-        sqlx::query(
-            r#"
-            INSERT INTO blockheaders (number, timestamp, base_fee_per_gas)
-            VALUES ($1, $2, $3)
-            "#,
-        )
-        .bind(block_number)
-        .bind(timestamp)
-        .bind(base_fee_per_gas.to_string())
-        .execute(&self.offchain_processor_db.db_connection().pool)
-        .await
-        .expect("Failed to create block");
     }
 }

@@ -9,12 +9,7 @@ edition = { workspace = true }
 eyre = { workspace = true }
 sqlx = { workspace = true }
 tokio = { workspace = true }
-dotenv = { workspace = true }
 tracing = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-
-# DB-specific dependencies
-reqwest = { version = "0.12", features = ["json"] }
-eth-rlp-types = { git = "https://github.com/NethermindEth/eth-rlp-verify.git", package = "eth-rlp-types" }

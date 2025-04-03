@@ -14,7 +14,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use db_access::{IndexerDbConnection, OffchainProcessorDbConnection};
+use db_access::OffchainProcessorDbConnection;
 use std::sync::Arc;
 use std::time::Duration;
 use tower_http::{
@@ -25,16 +25,11 @@ use tower_http::{
 #[derive(Clone)]
 pub struct AppState {
     pub offchain_processor_db: Arc<OffchainProcessorDbConnection>,
-    pub indexer_db: Arc<IndexerDbConnection>,
 }
 
-pub async fn create_app(
-    offchain_processor_db: Arc<OffchainProcessorDbConnection>,
-    indexer_db: Arc<IndexerDbConnection>,
-) -> Router {
+pub async fn create_app(offchain_processor_db: Arc<OffchainProcessorDbConnection>) -> Router {
     let app_state = AppState {
         offchain_processor_db,
-        indexer_db,
     };
 
     // Define the CORS layer
@@ -65,10 +60,6 @@ pub async fn create_app(
         .route(
             "/job_status/{job_id}",
             get(handlers::job_status::get_job_status),
-        )
-        .route(
-            "/latest_block",
-            get(handlers::latest_block::get_latest_block_number),
         )
         .layer(CorsLayer::permissive());
     //.layer(cors_layer.clone());

@@ -1,4 +1,4 @@
-use db_access::{IndexerDbConnection, OffchainProcessorDbConnection};
+use db_access::OffchainProcessorDbConnection;
 use dotenv::dotenv;
 use server::create_app;
 use std::{error::Error, sync::Arc};
@@ -10,12 +10,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
     dotenv().ok();
 
     let offchain_processor_db = Arc::new(OffchainProcessorDbConnection::from_env().await?);
-    let indexer_db = Arc::new(IndexerDbConnection::from_env().await?);
 
     // Perform db migrations
     offchain_processor_db.migrate().await?;
 
-    let app = create_app(offchain_processor_db, indexer_db).await;
+    let app = create_app(offchain_processor_db).await;
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await?;
 
     let fmt_layer = fmt::layer()
