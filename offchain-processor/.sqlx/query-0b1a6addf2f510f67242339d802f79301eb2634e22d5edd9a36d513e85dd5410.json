@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT \n            job_id, \n            status as \"status: JobStatus\", \n            created_at, \n            result\n        FROM job_requests \n        WHERE job_id = $1\n        ",
+  "query": "\n        SELECT \n            job_id,\n            status as \"status: JobStatus\",\n            created_at,\n            result\n        FROM job_requests\n        WHERE job_id = $1\n        ",
   "describe": {
     "columns": [
       {
@@ -36,5 +36,5 @@
       true
     ]
   },
-  "hash": "dd8a739a8ff8434226d21dfa8661338b93e34bf70cb0b1a3559b174b6608774e"
+  "hash": "0b1a6addf2f510f67242339d802f79301eb2634e22d5edd9a36d513e85dd5410"
 }
