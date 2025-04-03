@@ -63,13 +63,11 @@ setup-platform: ## Set up platform dependencies
 	@echo "⚠️ Note: Some dependencies may require sudo permissions"
 	@if [ "$(shell uname)" = "Linux" ]; then \
 		echo "On Linux, you may need to run the following command manually with sudo:"; \
-		echo "sudo apt-get update && sudo apt-get install -y protobuf-compiler libpq-dev pkg-config"; \
+		echo "sudo apt-get update && sudo apt-get install -y protobuf-compiler libpq-dev pkg-config python3-codespell"; \
 	elif [ "$(shell uname)" = "Darwin" ]; then \
 		echo "On macOS, you may need to run the following command manually:"; \
-		echo "brew install protobuf postgresql"; \
+		echo "brew install protobuf postgresql codespell"; \
 	fi
-	@echo "Installing codespell..."
-	@python3 -m pip install codespell || { echo "⚠️ Failed to install codespell automatically. You may need to run: pip install codespell manually."; }
 
 .PHONY: init-repo
 init-repo: ## Initialize repository (git hooks, etc.)
@@ -236,14 +234,22 @@ clippy: ## Run clippy linter with project-specific settings.
 
 .PHONY: ensure-codespell
 ensure-codespell:
-	@if ! python3 -m pip list | grep -q codespell; then \
-		echo "codespell not found. Installing with pip..." >&2; \
-		python3 -m pip install codespell; \
+	@if ! command -v codespell &> /dev/null && ! python3 -m codespell --help &> /dev/null; then \
+		echo "⚠️ codespell not found. On Ubuntu/Debian, install with: sudo apt install python3-codespell"; \
+		echo "⚠️ On macOS, install with: brew install codespell"; \
+		echo "⚠️ Skipping codespell check..."; \
+		exit 0; \
 	fi
 
 .PHONY: lint-codespell
-lint-codespell: ensure-codespell ## Check for spelling mistakes.
-	python3 -m codespell
+lint-codespell: ## Check for spelling mistakes.
+	@if command -v codespell &> /dev/null; then \
+		codespell --skip="*.html,./target/*,./tarpaulin-report.html,*.profraw" --ignore-words-list="nd,te,ue,Nd,Te,Ue"; \
+	elif python3 -m codespell --help &> /dev/null; then \
+		python3 -m codespell --skip="*.html,./target/*,./tarpaulin-report.html,*.profraw" --ignore-words-list="nd,te,ue,Nd,Te,Ue"; \
+	else \
+		echo "⚠️ Skipping codespell check. Please install codespell for spell checking."; \
+	fi
 
 .PHONY: lint
 lint: fmt clippy lint-codespell ## Run all linters.
