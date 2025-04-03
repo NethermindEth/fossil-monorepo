@@ -47,6 +47,23 @@ make help               # Display all available commands
 
 For more details on each command, run `make help`.
 
+## Contributing and Pull Requests
+
+**IMPORTANT:** Before submitting a pull request, always run:
+
+```bash
+make pr
+```
+
+This command:
+
+1. Formats all code consistently
+2. Runs clippy to catch common issues
+3. Runs tests to verify your changes
+4. Ensures your PR will pass CI checks
+
+Running `make pr` locally saves time by catching issues early rather than waiting for CI failures after submission.
+
 ## Project Structure
 
 The project is organized into multiple crates and supporting directories:
@@ -66,11 +83,13 @@ The project uses Cargo feature flags to enable optional functionality:
 The `proof-composition` feature flag controls whether to compile the proof composition system. This is useful for development environments where you don't need the full proving system.
 
 To build without proof composition (faster compilation, reduced dependencies):
+
 ```bash
 cargo build
 ```
 
 To build with proof composition enabled:
+
 ```bash
 cargo build --features "message-handler/proof-composition"
 ```
