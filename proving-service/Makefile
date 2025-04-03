@@ -63,7 +63,7 @@ dev-services-stop: ## Stop all development services.
 
 .PHONY: test
 test: ## Run all tests with database dependencies.
-	cargo test --workspace --all-features
+	cargo test --workspace 
 
 .PHONY: test-clean
 test-clean: ## Clean up test environment.

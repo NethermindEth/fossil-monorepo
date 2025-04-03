@@ -20,4 +20,5 @@ sqlx = { workspace = true }
 dotenv = { workspace = true }
 
 [dev-dependencies]
-testcontainers-modules = { workspace = true }
+testcontainers = { version = "0.14" }
+lazy_static = { workspace = true }

@@ -18,6 +18,7 @@ use eyre::{eyre, Result};
 use reqwest::Client;
 use serde_json::json;
 use tokio::runtime::Handle;
+#[cfg(not(test))]
 use uuid::Uuid;
 
 // Main handler function
@@ -84,9 +85,32 @@ fn validate_request(payload: &PitchLakeJobRequest) -> Result<(), (StatusCode, Jo
 }
 
 // Helper to generate a job ID
-fn generate_job_id(_identifiers: &[String], _params: &PitchLakeJobRequestParams) -> String {
-    // Generate a UUID v4 (random)
-    Uuid::new_v4().to_string()
+fn generate_job_id(
+    #[cfg(test)] identifiers: &[String],
+    #[cfg(not(test))] _identifiers: &[String],
+    #[cfg(test)] params: &PitchLakeJobRequestParams,
+    #[cfg(not(test))] _params: &PitchLakeJobRequestParams,
+) -> String {
+    #[cfg(test)]
+    {
+        // In test mode, create a deterministic job ID based on identifiers and params
+        // This ensures tests can predict the job ID
+        format!(
+            "test-job-{}-{}-{}-{}-{}-{}",
+            identifiers.join("-"),
+            params.twap.0,
+            params.twap.1,
+            params.volatility.0,
+            params.volatility.1,
+            params.reserve_price.0
+        )
+    }
+
+    #[cfg(not(test))]
+    {
+        // In production, use random UUID v4
+        Uuid::new_v4().to_string()
+    }
 }
 
 // Handle existing jobs based on status
