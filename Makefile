@@ -49,6 +49,10 @@ lint-all: ## Run linters for all projects.
 	cd proving-service && make lint
 	cd offchain-processor && make lint
 
+.PHONY: pr
+pr: lint-all test-all ## Prepare all projects for a pull request.
+	@echo "✅ All projects prepared for PR"
+
 .PHONY: clean-all
 clean-all: ## Clean all projects.
 	make ps-clean

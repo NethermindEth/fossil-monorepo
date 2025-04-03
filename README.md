@@ -5,6 +5,15 @@ This monorepo contains two separate projects:
 1. **Proving Service**: A service that handles proof generation and verification
 2. **Offchain Processor**: A service that processes offchain data and prepares it for proof generation
 
+## Development Workflow
+
+> **IMPORTANT:** Always run `make pr` before submitting your changes!
+> 
+> This ensures your code:
+> - Passes all linters (formatting and static analysis)
+> - Passes all tests in both projects
+> - Is ready for review without CI pipeline failures
+
 ## Monorepo Structure
 
 ```text
@@ -28,6 +37,10 @@ make op-build          # Build Offchain Processor only
 make test-all          # Test all projects
 make ps-test           # Test Proving Service only
 make op-test           # Test Offchain Processor only
+
+# Linting and PR Preparation
+make lint-all          # Run linters on all projects
+make pr                # Run linters and tests to prepare for a pull request
 
 # Development Services
 make dev-services      # Start all development services

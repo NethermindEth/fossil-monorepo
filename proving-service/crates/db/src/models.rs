@@ -90,7 +90,7 @@ pub async fn get_block_base_fee_by_time_range(
 mod tests {
     use super::*;
     use lazy_static::lazy_static;
-    use testcontainers::{clients::Cli, images::postgres::Postgres, Container};
+    use testcontainers::{Container, clients::Cli, images::postgres::Postgres};
 
     lazy_static! {
         static ref DOCKER: Cli = Cli::default();
@@ -151,7 +151,7 @@ mod tests {
         .expect("Failed to insert sample data");
 
         let db = Arc::new(DbConnection { pool });
-        
+
         TestDb {
             db,
             _container: container,
