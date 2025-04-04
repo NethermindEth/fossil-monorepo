@@ -29,6 +29,9 @@ jobs:
         run: |
           cargo install sqlx-cli
           sqlx --version
+
+      - name: Sqlx prepare
+        run: cd offchain-processor && cargo sqlx prepare --workspace --check || cargo sqlx prepare
       
       - name: Build
         run: cd offchain-processor && cargo build --workspace --all-targets
