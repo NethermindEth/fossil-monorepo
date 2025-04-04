@@ -100,15 +100,44 @@ cargo build --features "message-handler/proof-composition"
 
 Before running any of the applications, make sure the required services are running:
 
+<<<<<<< HEAD
+1. **Start all development services:**
+
+   ```bash
+   # Start both PostgreSQL and LocalStack services
+   make dev-services
+=======
 1. **Start the Postgres database:**
 
    ```bash
    # Start the Postgres container
    docker-compose -f docker/docker-compose.test.yml up -d postgres
+>>>>>>> main
    ```
 
    Verify that the database is running and accessible on port 5432.
 
+<<<<<<< HEAD
+2. **Stop all services when done:**
+
+   ```bash
+   # Stop all development services
+   make dev-services-stop
+   ```
+
+3. **Clean up when needed:**
+
+   ```bash
+   # Clean all artifacts
+   make clean
+   ```
+
+### LocalStack SQS Setup
+
+The service uses AWS SQS for message queuing. The `make dev-services` command already sets this up for you, but if you need to manage it separately:
+
+1. Set up the SQS queue manually if needed:
+=======
 2. **Start the LocalStack SQS service:**
 
    ```bash
@@ -117,11 +146,15 @@ Before running any of the applications, make sure the required services are runn
    ```
 
    Then set up the SQS queue:
+>>>>>>> main
 
    ```bash
    ./scripts/setup-localstack.sh
    ```
 
+<<<<<<< HEAD
+2. Verify the queue was created successfully by checking the output of the script.
+=======
 You can start both services together using:
 
 ```bash
@@ -145,6 +178,7 @@ The service uses AWS SQS for message queuing. For local development, you can use
    ```
 
 3. Verify the queue was created successfully by checking the output of the script.
+>>>>>>> main
 
 ### Running the Application
 
