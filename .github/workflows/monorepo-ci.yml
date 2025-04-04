@@ -81,24 +81,44 @@ jobs:
           # Show what artifacts we have
           echo "Listing downloaded artifact contents:"
           ls -la .coverage-ps || echo "PS coverage directory not found"
-          find .coverage-ps -type f -name "*badge*" || echo "No PS badge files found"
-          ls -la .coverage-op || echo "OP coverage directory not found"
-          find .coverage-op -type f -name "*badge*" || echo "No OP badge files found"
+          find .coverage-ps -type f | echo "PS files found: $(wc -l)"
+          ls -la .coverage-op || echo "OP coverage directory not found" 
+          find .coverage-op -type f | echo "OP files found: $(wc -l)"
           
           # Function to update badge in README
           update_badge() {
             local component=$1
             local readme_path=$2
             local badge_url_file=""
+            local badge_url=""
             
+            # Try to find badge files in various locations
             if [ "$component" == "ps" ]; then
-              badge_url_file=".coverage-ps/ps_badge_url.txt"
+              for file in $(find .coverage-ps -type f -name "*badge*" -o -name "*ps_badge*"); do
+                echo "Found PS badge file: $file"
+                badge_url_file="$file"
+                break
+              done
             else
-              badge_url_file=".coverage-op/op_badge_url.txt"
+              for file in $(find .coverage-op -type f -name "*badge*" -o -name "*op_badge*"); do
+                echo "Found OP badge file: $file"
+                badge_url_file="$file"
+                break
+              done
+            fi
+            
+            if [ -z "$badge_url_file" ]; then
+              echo "No badge file found for $component. Trying other locations..."
+              # Try alternative locations
+              if [ "$component" == "ps" ]; then
+                badge_url_file=".coverage-ps/ps_badge_url.txt"
+              else
+                badge_url_file=".coverage-op/op_badge_url.txt"
+              fi
             fi
             
             if [ -f "$badge_url_file" ]; then
-              local badge_url=$(cat "$badge_url_file")
+              badge_url=$(cat "$badge_url_file")
               echo "Adding coverage badge for $component: $badge_url"
               
               # Check if badge already exists and update it
@@ -117,13 +137,22 @@ jobs:
             fi
           }
           
+          # Update the main README.md
+          if [ -f "README.md" ]; then
+            echo "Updating main README.md"
+            update_badge "ps" "README.md"
+            update_badge "op" "README.md"
+          fi
+          
           # Update proving-service README if it exists
           if [ -f "proving-service/README.md" ]; then
+            echo "Updating proving-service README.md"
             update_badge "ps" "proving-service/README.md"
           fi
           
           # Update offchain-processor README if it exists
           if [ -f "offchain-processor/README.md" ]; then
+            echo "Updating offchain-processor README.md"
             update_badge "op" "offchain-processor/README.md"
           fi
       
@@ -140,6 +169,6 @@ jobs:
             exit 0
           fi
           
-          git add proving-service/README.md offchain-processor/README.md
+          git add README.md proving-service/README.md offchain-processor/README.md
           git commit -m "Update coverage badges [skip ci]"
           git push 
