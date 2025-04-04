@@ -62,6 +62,12 @@ jobs:
         run: sudo apt update && sudo apt install -y libomp-dev libopenblas-dev
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@nightly
+      - name: Install sqlx-cli
+        run: |
+          cargo install sqlx-cli
+          sqlx --version
+      - name: Check that sqlx queries metadata is up to date
+        run: cargo sqlx prepare --workspace --check
       - name: Build
         run: cd offchain-processor && cargo build --verbose
       - name: Test
