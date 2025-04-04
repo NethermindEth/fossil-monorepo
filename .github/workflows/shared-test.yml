@@ -55,14 +55,12 @@ jobs:
           if [ -f proving-service/tests/init.sql ]; then
             PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -f proving-service/tests/init.sql
           fi
-      
-      # Build step
-      - name: Build
+
+      # Sqlx prepare
+      - name: Sqlx prepare
         run: |
-          if [ "${{ inputs.component }}" == "ps" ]; then
-            cd proving-service && cargo build --verbose
-          else
-            cd offchain-processor && cargo build --verbose
+          if [ "${{ inputs.component }}" == "op" ]; then
+            cd offchain-processor && cargo sqlx prepare --workspace --check
           fi
           
       # Test step
