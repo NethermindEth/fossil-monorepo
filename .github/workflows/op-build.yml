@@ -1,11 +1,11 @@
-name: PS Build
+name: OP Build
 
 on:
   workflow_call:
   workflow_dispatch:
 
 jobs:
-  ps-build:
+  op-build:
     uses: ./.github/workflows/shared-build.yml
     with:
-      component: 'ps' 
+      component: 'op' 

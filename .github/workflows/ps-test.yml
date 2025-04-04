@@ -2,61 +2,24 @@ name: PS Test
 
 on:
   workflow_call:
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
   DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
 jobs:
-  test:
-    name: Test with Coverage
+  test-proving:
+    name: Test with Coverage (proving)
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        test-group: [proving, db, other]
-      fail-fast: false
-      
     steps:
     - uses: actions/checkout@v4
-    
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@nightly
-      with:
-        components: llvm-tools-preview
-    
-    - name: Cache dependencies
-      uses: Swatinem/rust-cache@v2
-      with:
-        cache-on-failure: true
-        key: ${{ matrix.test-group }}
+    - uses: ./.github/workflows/composite/ps-test-setup
     
     - name: Install grcov
-      if: matrix.test-group == 'proving'
       run: cargo install grcov
       
-    - name: Start PostgreSQL
-      if: matrix.test-group == 'db' || matrix.test-group == 'proving'
-      run: docker compose -f proving-service/docker/docker-compose.test.yml up -d postgres
-    
-    - name: Wait for PostgreSQL to be ready
-      if: matrix.test-group == 'db' || matrix.test-group == 'proving'
-      run: |
-        for i in {1..30}; do
-          if docker exec $(docker ps -q -f name=postgres) pg_isready -U postgres; then
-            break
-          fi
-          sleep 1
-        done
-        
-    - name: Initialize database
-      if: matrix.test-group == 'db' || matrix.test-group == 'proving'
-      run: |
-        if [ -f proving-service/tests/init.sql ]; then
-          PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -f proving-service/tests/init.sql
-        fi
-    
     - name: Run proving tests
-      if: matrix.test-group == 'proving'
       run: |
         cd proving-service
         mkdir -p .coverage
@@ -65,26 +28,12 @@ jobs:
         LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
         cargo test --package message-handler
       
-    - name: Run database tests
-      if: matrix.test-group == 'db'
-      run: |
-        cd proving-service
-        cargo test --package db
-        
-    - name: Run other tests
-      if: matrix.test-group == 'other'
-      run: |
-        cd proving-service
-        cargo test --workspace --exclude message-handler --exclude db
-      
     - name: Generate coverage report
-      if: matrix.test-group == 'proving'
       run: |
         cd proving-service
         grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info
         
     - name: Generate coverage badge
-      if: matrix.test-group == 'proving'
       run: |
         cd proving-service
         # Extract coverage percentage from lcov info
@@ -114,5 +63,29 @@ jobs:
         fi
 
     - name: Stop PostgreSQL
-      if: always() && (matrix.test-group == 'db' || matrix.test-group == 'proving')
-      run: docker compose -f proving-service/docker/docker-compose.test.yml down 
+      if: always()
+      run: docker compose -f proving-service/docker/docker-compose.test.yml down
+
+  test-db:
+    name: Test with Coverage (db)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/workflows/composite/ps-test-setup
+    
+    - name: Run database tests
+      run: cd proving-service && cargo test --package db
+        
+    - name: Stop PostgreSQL
+      if: always()
+      run: docker compose -f proving-service/docker/docker-compose.test.yml down
+        
+  test-other:
+    name: Test with Coverage (other)
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: ./.github/workflows/composite/ps-test-setup
+    
+    - name: Run other tests
+      run: cd proving-service && cargo test --workspace --exclude message-handler --exclude db 

@@ -1,0 +1,80 @@
+name: Standard Test
+
+on:
+  workflow_call:
+    inputs:
+      component:
+        required: true
+        type: string
+        description: 'Component to test (ps or op)'
+    
+env:
+  CARGO_TERM_COLOR: always
+  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  STARKNET_RPC_URL: http://127.0.0.1:5050
+  STARKNET_PRIVATE_KEY: 0x1
+  STARKNET_ACCOUNT_ADDRESS: 0x1
+  NETWORK: SEPOLIA
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@nightly
+      
+      # OP-specific setup
+      - name: Install OP dependencies
+        if: inputs.component == 'op'
+        run: sudo apt update && sudo apt install -y libomp-dev libopenblas-dev
+      
+      - name: Install sqlx-cli for OP
+        if: inputs.component == 'op'
+        run: |
+          cargo install sqlx-cli
+          sqlx --version
+      
+      # PS-specific setup for DB testing when needed
+      - name: Start PostgreSQL for PS
+        if: inputs.component == 'ps'
+        run: |
+          docker compose -f proving-service/docker/docker-compose.test.yml up -d postgres
+          
+          # Wait for PostgreSQL to be ready
+          for i in {1..30}; do
+            if docker exec $(docker ps -q -f name=postgres) pg_isready -U postgres; then
+              break
+            fi
+            sleep 1
+          done
+          
+          # Initialize database
+          if [ -f proving-service/tests/init.sql ]; then
+            PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -f proving-service/tests/init.sql
+          fi
+      
+      # Build step
+      - name: Build
+        run: |
+          if [ "${{ inputs.component }}" == "ps" ]; then
+            cd proving-service && cargo build --verbose
+          else
+            cd offchain-processor && cargo build --verbose
+          fi
+          
+      # Test step
+      - name: Test
+        run: |
+          if [ "${{ inputs.component }}" == "ps" ]; then
+            cd proving-service && cargo test --workspace
+          else
+            cd offchain-processor && cargo test --workspace
+          fi
+      
+      # Clean up for PS
+      - name: Stop PostgreSQL for PS
+        if: always() && inputs.component == 'ps'
+        run: docker compose -f proving-service/docker/docker-compose.test.yml down 
