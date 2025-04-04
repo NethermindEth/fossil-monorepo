@@ -149,12 +149,3 @@ jobs:
       - name: Stop PostgreSQL for PS
         if: always() && inputs.component == 'ps'
         run: docker compose -f proving-service/docker/docker-compose.test.yml down
-      
-      # Upload coverage data as an artifact
-      - name: Upload coverage data
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ inputs.component }}-coverage
-          path: |
-            ${{ (inputs.component == 'ps') && 'proving-service/.coverage/' || 'offchain-processor/.coverage/' }}
-          retention-days: 7 
