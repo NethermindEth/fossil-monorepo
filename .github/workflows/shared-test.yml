@@ -159,19 +159,25 @@ jobs:
         if: always() && inputs.component == 'ps'
         run: docker compose -f proving-service/docker/docker-compose.test.yml down
         
-      # Upload coverage artifact (original structure)
+      # Make sure the badge file is accessible regardless of component
+      - name: Prepare coverage artifact 
+        run: |
+          # Create a simplified directory structure for the artifact
+          mkdir -p /tmp/coverage-artifacts/
+          
+          if [ "${{ inputs.component }}" == "ps" ]; then
+            cp -r proving-service/.coverage/* /tmp/coverage-artifacts/
+          else
+            cp -r offchain-processor/.coverage/* /tmp/coverage-artifacts/
+          fi
+          
+          # List contents to confirm
+          ls -la /tmp/coverage-artifacts/
+          
+      # Upload coverage artifact
       - name: Upload coverage artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.component }}-coverage
-          path: |
-            ${{ inputs.component == 'ps' && 'proving-service/.coverage/' || 'offchain-processor/.coverage/' }}
-          retention-days: 7
-          
-      # Upload simplified coverage artifact
-      - name: Upload simplified coverage artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ inputs.component }}-coverage-simple
           path: /tmp/coverage-artifacts/
           retention-days: 7

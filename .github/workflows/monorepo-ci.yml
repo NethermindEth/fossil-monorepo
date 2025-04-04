@@ -66,13 +66,13 @@ jobs:
       - name: Download PS coverage
         uses: actions/download-artifact@v4
         with:
-          name: ps-coverage-simple
+          name: ps-coverage
           path: .coverage-ps
           
       - name: Download OP coverage
         uses: actions/download-artifact@v4
         with:
-          name: op-coverage-simple
+          name: op-coverage
           path: .coverage-op
       
       # Update README badges
