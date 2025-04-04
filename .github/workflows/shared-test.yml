@@ -55,20 +55,87 @@ jobs:
       - name: Sqlx prepare
         run: |
           if [ "${{ inputs.component }}" == "op" ]; then
-            echo "DATABASE_URL=${DATABASE_URL}"
             cd offchain-processor && cargo sqlx prepare --workspace --check
           fi
           
-      # Test step
-      - name: Test
+      # Install grcov for coverage
+      - name: Install grcov
+        run: cargo install grcov
+          
+      # Test with coverage
+      - name: Test with coverage
         run: |
           if [ "${{ inputs.component }}" == "ps" ]; then
-            cd proving-service && cargo test --workspace
+            cd proving-service
+            mkdir -p .coverage
+            CARGO_INCREMENTAL=0 \
+            RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
+            LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
+            cargo test --workspace
           else
-            cd offchain-processor && cargo test --workspace
+            cd offchain-processor
+            mkdir -p .coverage
+            CARGO_INCREMENTAL=0 \
+            RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
+            LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
+            cargo test --workspace
+          fi
+      
+      # Generate coverage report
+      - name: Generate coverage report
+        run: |
+          if [ "${{ inputs.component }}" == "ps" ]; then
+            cd proving-service
+          else
+            cd offchain-processor
+          fi
+          grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info
+      
+      # Generate coverage badge
+      - name: Generate coverage badge
+        run: |
+          if [ "${{ inputs.component }}" == "ps" ]; then
+            cd proving-service
+          else
+            cd offchain-processor
+          fi
+          
+          # Extract coverage percentage from lcov info
+          COVERAGE_PCT=$(grep -m 1 "LF:" .coverage/lcov.info | awk '{print $2}')
+          COVERAGE_HIT=$(grep -m 1 "LH:" .coverage/lcov.info | awk '{print $2}')
+          
+          if [ -n "$COVERAGE_PCT" ] && [ -n "$COVERAGE_HIT" ] && [ "$COVERAGE_PCT" -gt 0 ]; then
+            COVERAGE=$(awk "BEGIN { printf \"%.1f\", ($COVERAGE_HIT / $COVERAGE_PCT) * 100 }")
+            echo "Coverage percentage: $COVERAGE%"
+            
+            # Determine badge color based on coverage
+            if (( $(echo "$COVERAGE < 50" | bc -l) )); then
+              COLOR="red"
+            elif (( $(echo "$COVERAGE < 70" | bc -l) )); then
+              COLOR="yellow"
+            elif (( $(echo "$COVERAGE < 90" | bc -l) )); then
+              COLOR="green"
+            else
+              COLOR="brightgreen"
+            fi
+            
+            # Save badge URL to a file
+            mkdir -p ../../.coverage
+            echo "https://img.shields.io/badge/coverage-$COVERAGE%25-$COLOR" > ../../.coverage/${{ inputs.component }}_badge_url.txt
+            echo "Coverage badge URL saved for ${{ inputs.component }}"
+          else
+            echo "Could not determine coverage percentage"
           fi
       
       # Clean up for PS
       - name: Stop PostgreSQL for PS
         if: always() && inputs.component == 'ps'
-        run: docker compose -f proving-service/docker/docker-compose.test.yml down 
+        run: docker compose -f proving-service/docker/docker-compose.test.yml down
+      
+      # Upload coverage data as an artifact
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ inputs.component }}-coverage
+          path: .coverage/
+          retention-days: 7 
