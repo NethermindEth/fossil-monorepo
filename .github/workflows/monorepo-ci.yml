@@ -66,18 +66,25 @@ jobs:
       - name: Download PS coverage
         uses: actions/download-artifact@v4
         with:
-          name: ps-coverage
+          name: ps-coverage-simple
           path: .coverage-ps
           
       - name: Download OP coverage
         uses: actions/download-artifact@v4
         with:
-          name: op-coverage
+          name: op-coverage-simple
           path: .coverage-op
       
       # Update README badges
       - name: Update README badges
         run: |
+          # Show what artifacts we have
+          echo "Listing downloaded artifact contents:"
+          ls -la .coverage-ps || echo "PS coverage directory not found"
+          find .coverage-ps -type f -name "*badge*" || echo "No PS badge files found"
+          ls -la .coverage-op || echo "OP coverage directory not found"
+          find .coverage-op -type f -name "*badge*" || echo "No OP badge files found"
+          
           # Function to update badge in README
           update_badge() {
             local component=$1
@@ -85,9 +92,9 @@ jobs:
             local badge_url_file=""
             
             if [ "$component" == "ps" ]; then
-              badge_url_file=".coverage-ps/proving-service/.coverage/ps_badge_url.txt"
+              badge_url_file=".coverage-ps/ps_badge_url.txt"
             else
-              badge_url_file=".coverage-op/offchain-processor/.coverage/op_badge_url.txt"
+              badge_url_file=".coverage-op/op_badge_url.txt"
             fi
             
             if [ -f "$badge_url_file" ]; then

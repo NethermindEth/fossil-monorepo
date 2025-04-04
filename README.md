@@ -1,8 +1,12 @@
 # Fossil Monorepo
 
+<div align="center">
+
 [![CI Status](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/monorepo-ci.yml/badge.svg)](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/monorepo-ci.yml)
 ![PS Coverage][ps-coverage-badge]
 ![OP Coverage][op-coverage-badge]
+
+</div>
 
 This monorepo contains two separate projects:
 
