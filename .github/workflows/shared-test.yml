@@ -140,7 +140,16 @@ jobs:
             
             # Save badge URL to a file
             echo "https://img.shields.io/badge/coverage-$COVERAGE%25-$COLOR" > .coverage/${{ inputs.component }}_badge_url.txt
-            echo "Coverage badge URL saved for ${{ inputs.component }}"
+            # Also save at root level for easier access
+            if [ "${{ inputs.component }}" == "ps" ]; then
+              mkdir -p /tmp/coverage-artifacts/
+              echo "https://img.shields.io/badge/coverage-$COVERAGE%25-$COLOR" > /tmp/coverage-artifacts/ps_badge_url.txt
+              cp .coverage/lcov.info /tmp/coverage-artifacts/ps_lcov.info
+            else
+              mkdir -p /tmp/coverage-artifacts/
+              echo "https://img.shields.io/badge/coverage-$COVERAGE%25-$COLOR" > /tmp/coverage-artifacts/op_badge_url.txt
+              cp .coverage/lcov.info /tmp/coverage-artifacts/op_lcov.info
+            fi
           else
             echo "Could not determine coverage percentage"
           fi
@@ -149,3 +158,20 @@ jobs:
       - name: Stop PostgreSQL for PS
         if: always() && inputs.component == 'ps'
         run: docker compose -f proving-service/docker/docker-compose.test.yml down
+        
+      # Upload coverage artifact (original structure)
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.component }}-coverage
+          path: |
+            ${{ inputs.component == 'ps' && 'proving-service/.coverage/' || 'offchain-processor/.coverage/' }}
+          retention-days: 7
+          
+      # Upload simplified coverage artifact
+      - name: Upload simplified coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ inputs.component }}-coverage-simple
+          path: /tmp/coverage-artifacts/
+          retention-days: 7
