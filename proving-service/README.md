@@ -96,6 +96,38 @@ cargo build --features "message-handler/proof-composition"
 
 ## Development Setup
 
+### Required Services
+
+Before running any of the applications, make sure the required services are running:
+
+1. **Start the Postgres database:**
+
+   ```bash
+   # Start the Postgres container
+   docker-compose -f docker/docker-compose.test.yml up -d postgres
+   ```
+
+   Verify that the database is running and accessible on port 5432.
+
+2. **Start the LocalStack SQS service:**
+
+   ```bash
+   # Start the LocalStack container
+   docker-compose -f docker/docker-compose.sqs.yml up -d
+   ```
+
+   Then set up the SQS queue:
+
+   ```bash
+   ./scripts/setup-localstack.sh
+   ```
+
+You can start both services together using:
+
+```bash
+make dev-services
+```
+
 ### LocalStack SQS Setup
 
 The service uses AWS SQS for message queuing. For local development, you can use LocalStack to create a local SQS service:
@@ -126,7 +158,7 @@ Run the HTTP API service with:
 cargo run -p proving-service
 ```
 
-This will start the HTTP server on <http://127.0.0.1:3000> and connect to the SQS queue.
+This will start the HTTP server on <http://127.0.0.1:3001> and connect to the SQS queue.
 
 #### Message Handler Service
 
@@ -141,7 +173,7 @@ This will start a service that consumes messages from the SQS queue.
 To run with proof composition enabled:
 
 ```bash
-cargo run -p message-handler --features "proof-composition"
+cargo run -p message-handler --bin message-handler --features "proof-composition"
 ```
 
 ## HTTP API

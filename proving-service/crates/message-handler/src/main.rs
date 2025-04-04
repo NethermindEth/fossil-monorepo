@@ -6,8 +6,12 @@ use message_handler::queue::sqs_message_queue::SqsMessageQueue;
 use message_handler::services::proof_job_handler::ProofJobHandler;
 use std::sync::{Arc, atomic::AtomicBool};
 use tokio::signal;
-use tracing::{Level, debug, info};
+use tokio::time::{Duration, sleep};
+use tracing::{Level, debug, error, info, warn};
 use tracing_subscriber::FmtSubscriber;
+
+const MAX_DB_RETRY_ATTEMPTS: u32 = 5;
+const DB_RETRY_DELAY_MS: u64 = 2000;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -29,6 +33,7 @@ async fn main() -> Result<()> {
     let database_url = std::env::var("DATABASE_URL")
         .map_err(|e| eyre::eyre!("DATABASE_URL environment variable not set: {}", e))?;
     info!("Using SQS Queue URL: {}", queue_url);
+    info!("Using database URL: {}", database_url);
 
     // Load AWS SDK config from environment variables
     // This will respect AWS_ENDPOINT_URL from the .env file
@@ -36,7 +41,8 @@ async fn main() -> Result<()> {
     info!("AWS configuration loaded");
     let queue = Arc::new(SqsMessageQueue::new(queue_url, config));
 
-    let db = DbConnection::new(&database_url).await?;
+    // Attempt database connection with retries
+    let db = connect_to_database_with_retry(&database_url, MAX_DB_RETRY_ATTEMPTS).await?;
 
     let terminator = Arc::new(AtomicBool::new(false));
 
@@ -72,4 +78,41 @@ async fn main() -> Result<()> {
 
     info!("Shutdown complete");
     Ok(())
+}
+
+/// Attempts to connect to the database with retry logic
+async fn connect_to_database_with_retry(
+    database_url: &str,
+    max_attempts: u32,
+) -> Result<Arc<DbConnection>> {
+    let mut attempt = 1;
+
+    loop {
+        info!(
+            "Attempting database connection (attempt {}/{})",
+            attempt, max_attempts
+        );
+
+        match DbConnection::new(database_url).await {
+            Ok(conn) => {
+                info!("Successfully connected to the database");
+                return Ok(conn);
+            }
+            Err(e) => {
+                if attempt >= max_attempts {
+                    error!(
+                        "Failed to connect to database after {} attempts: {}",
+                        max_attempts, e
+                    );
+                    return Err(e);
+                }
+
+                warn!("Database connection attempt {} failed: {}", attempt, e);
+                warn!("Retrying in {} ms...", DB_RETRY_DELAY_MS);
+
+                sleep(Duration::from_millis(DB_RETRY_DELAY_MS)).await;
+                attempt += 1;
+            }
+        }
+    }
 }

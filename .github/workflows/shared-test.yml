@@ -152,7 +152,7 @@ jobs:
       
       # Upload coverage data as an artifact
       - name: Upload coverage data
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.component }}-coverage
           path: |

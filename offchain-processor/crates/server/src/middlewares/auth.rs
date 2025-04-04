@@ -16,10 +16,6 @@ pub async fn simple_apikey_auth(
     request: Request<axum::body::Body>,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    let response_data = ErrorResponse {
-        error: "Unauthenticated".to_string(),
-    };
-
     // Extract the API key from headers.
     if let Some(incoming_api_key) = headers.get("x-api-key") {
         if let Ok(api_key_str) = incoming_api_key.to_str() {
@@ -29,7 +25,7 @@ pub async fn simple_apikey_auth(
             let matching_api_key =
                 find_api_key(state.offchain_processor_db, api_key_str.to_string()).await;
 
-            return match matching_api_key {
+            match matching_api_key {
                 Ok(_) => {
                     tracing::info!("Authentication successful");
                     tracing::debug!("API key authenticated successfully");
@@ -38,17 +34,37 @@ pub async fn simple_apikey_auth(
                 Err(err) => {
                     tracing::warn!("Authentication failed: Invalid API key");
                     tracing::debug!("Authentication failed: {:?}", err);
+
+                    // Create a more informative error response
+                    let error_detail = match err {
+                        sqlx::Error::RowNotFound => "API key not found",
+                        _ => "Database error occurred while validating API key",
+                    };
+
+                    let response_data = ErrorResponse {
+                        error: format!("Authentication failed: {}", error_detail),
+                    };
+
                     Ok((StatusCode::UNAUTHORIZED, Json(response_data)).into_response())
                 }
-            };
+            }
         } else {
             tracing::warn!("Authentication failed: Invalid API key format");
+
+            let response_data = ErrorResponse {
+                error: "Authentication failed: Invalid API key format".to_string(),
+            };
+
+            Ok((StatusCode::UNAUTHORIZED, Json(response_data)).into_response())
         }
     } else {
         tracing::warn!("Authentication failed: No API key provided");
         tracing::debug!("No API key found in headers");
-    }
 
-    // If no valid API key was found, return unauthorized response.
-    Ok((StatusCode::UNAUTHORIZED, Json(response_data)).into_response())
+        let response_data = ErrorResponse {
+            error: "Authentication failed: No API key provided in headers".to_string(),
+        };
+
+        Ok((StatusCode::UNAUTHORIZED, Json(response_data)).into_response())
+    }
 }

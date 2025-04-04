@@ -312,7 +312,7 @@ async fn call_proving_service(
 
     // Get proving service URL from environment variables, with a default value
     let proving_service_url =
-        env::var("PROVING_SERVICE_URL").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string());
+        env::var("PROVING_SERVICE_URL").unwrap_or_else(|_| "http://127.0.0.1:3001".to_string());
 
     let client = Client::new();
 

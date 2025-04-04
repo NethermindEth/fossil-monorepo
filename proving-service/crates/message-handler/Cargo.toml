@@ -18,6 +18,10 @@ proof-composition = [
     "proof_composition_twap_maxreturn_reserveprice_floating_hashing_methods"
 ]
 
+[[bin]]
+name = "message-handler"
+path = "src/main.rs"
+
 [dependencies]
 # Core dependencies
 dotenv = { workspace = true }
@@ -57,10 +61,6 @@ uuid = { version = "1.16.0", features = ["v4"] }
 
 [dev-dependencies]
 url = { workspace = true }
-
-[[bin]]
-name = "message-handler"
-path = "src/main.rs"
 
 [[bin]]
 name = "example-message-handler"

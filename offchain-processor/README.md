@@ -78,7 +78,7 @@ cargo run --bin server
 ```bash
 curl -X POST http://localhost:3000/pricing_data \
   -H "Content-Type: application/json" \
-  -H "X-API-Key: c4ba7033-46a3-4ce7-b39c-ddfe4a1af8bb" \
+  -H "X-API-Key: 724a0c8d-9fea-4c7c-97a0-1aea894a283e" \
   -d '{
     "identifiers": ["0x50495443485f4c414b455f5631"],
     "params": {
@@ -128,6 +128,36 @@ Send a POST request with a JSON body in the following format:
 
 - `Content-Type: application/json` - Required
 - `X-API-Key: <your-api-key>` - Required for authentication
+
+## Generating an API Key
+
+You need an API key to authenticate requests to the service. There are two ways to generate an API key:
+
+### Using the HTTP API
+
+```bash
+curl -X POST http://localhost:3000/api_key \
+  -H "Content-Type: application/json" \
+  -d '{"name": "my_api_key"}'
+```
+
+The response will contain your new API key:
+
+```json
+{
+  "api_key": "uuid-formatted-api-key"
+}
+```
+
+### Using the Command Line Tool
+
+Alternatively, you can use the provided command line tool:
+
+```bash
+cargo run --bin create_api_key "my_api_key"
+```
+
+This will output the generated API key to the console.
 
 ## Development Setup
 
