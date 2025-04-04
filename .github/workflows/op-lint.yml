@@ -6,7 +6,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  DATABASE_URL: ${{ secrets.DATABASE_URL }}
+  DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+  SQLX_OFFLINE: true
 
 jobs:
   fmt:
