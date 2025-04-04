@@ -34,7 +34,9 @@ jobs:
       
       - name: Check sqlx metadata for OP
         if: inputs.component == 'op'
-        run: cd offchain-processor && cargo sqlx prepare --workspace --check
+        run: |
+          echo "DATABASE_URL=${DATABASE_URL}" 
+          cd offchain-processor && cargo sqlx prepare --workspace --check
       
       # Build step
       - name: Build
