@@ -1,0 +1,11 @@
+name: OP Build
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  op-build:
+    uses: ./.github/workflows/shared-build.yml
+    with:
+      component: 'op' 

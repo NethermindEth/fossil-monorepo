@@ -1,0 +1,11 @@
+name: PS Lint
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  ps-lint:
+    uses: ./.github/workflows/shared-lint.yml
+    with:
+      component: 'ps' 

@@ -1,0 +1,11 @@
+name: OP Lint
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  op-lint:
+    uses: ./.github/workflows/shared-lint.yml
+    with:
+      component: 'op' 

@@ -1,0 +1,40 @@
+services:
+  app:
+    platform: linux/amd64
+    build:
+      context: ../..
+      dockerfile: crates/server/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - STARKNET_RPC_URL=${STARKNET_RPC_URL}
+      - STARKNET_ACCOUNT_ADDRESS=${STARKNET_ACCOUNT_ADDRESS}
+      - STARKNET_PRIVATE_KEY=${STARKNET_PRIVATE_KEY}
+      - ETH_RPC_URL=${ETH_RPC_URL}
+      - USE_MOCK_PRICING_DATA=${USE_MOCK_PRICING_DATA}
+      - NETWORK=${NETWORK}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+# Using volumes here to allow db reuse. Remove if you want new states every time.
+volumes:
+  postgres_data:

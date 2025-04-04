@@ -1,0 +1,138 @@
+name: Monorepo CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Master job that depends on all others
+  complete:
+    name: CI Complete
+    runs-on: ubuntu-latest
+    needs: [ps-build, ps-test, ps-lint, op-build, op-test, op-lint, update-badges]
+    steps:
+      - name: CI Passed
+        run: echo "All CI checks have passed!"
+        
+  # Proving Service jobs
+  ps-build:
+    name: PS Build
+    uses: ./.github/workflows/ps-build.yml
+
+  ps-test:
+    name: PS Test
+    uses: ./.github/workflows/shared-test.yml
+    with:
+      component: 'ps'
+    needs: [ps-build]
+
+  ps-lint:
+    name: PS Lint
+    uses: ./.github/workflows/ps-lint.yml
+        
+  # Offchain Processor jobs
+  op-build:
+    name: OP Build
+    uses: ./.github/workflows/op-build.yml
+
+  op-test:
+    name: OP Test
+    uses: ./.github/workflows/shared-test.yml
+    with:
+      component: 'op'
+    needs: [op-build]
+
+  op-lint:
+    name: OP Lint
+    uses: ./.github/workflows/op-lint.yml 
+
+  # Coverage badge update job
+  update-badges:
+    name: Update Coverage Badges
+    runs-on: ubuntu-latest
+    needs: [ps-test, op-test]
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      # Download coverage artifacts
+      - name: Download PS coverage
+        uses: actions/download-artifact@v3
+        with:
+          name: ps-coverage
+          path: .coverage-ps
+          
+      - name: Download OP coverage
+        uses: actions/download-artifact@v3
+        with:
+          name: op-coverage
+          path: .coverage-op
+      
+      # Update README badges
+      - name: Update README badges
+        run: |
+          # Function to update badge in README
+          update_badge() {
+            local component=$1
+            local readme_path=$2
+            local badge_url_file=""
+            
+            if [ "$component" == "ps" ]; then
+              badge_url_file=".coverage-ps/proving-service/.coverage/ps_badge_url.txt"
+            else
+              badge_url_file=".coverage-op/offchain-processor/.coverage/op_badge_url.txt"
+            fi
+            
+            if [ -f "$badge_url_file" ]; then
+              local badge_url=$(cat "$badge_url_file")
+              echo "Adding coverage badge for $component: $badge_url"
+              
+              # Check if badge already exists and update it
+              if grep -q "!\[Coverage\]\[${component}-coverage-badge\]" "$readme_path"; then
+                sed -i "s|!\[Coverage\]\[${component}-coverage-badge\].*|![Coverage][${component}-coverage-badge]|g" "$readme_path"
+                sed -i "s|\[${component}-coverage-badge\]:.*|\[${component}-coverage-badge\]: $badge_url|g" "$readme_path"
+              else
+                # If badge doesn't exist, add it to the top of the README
+                sed -i "1s/^/![Coverage][${component}-coverage-badge]\n\n/" "$readme_path"
+                echo -e "\n[${component}-coverage-badge]: $badge_url" >> "$readme_path"
+              fi
+            else
+              echo "Coverage badge URL file not found for $component: $badge_url_file"
+              # List contents of the directory for debugging
+              find .coverage-${component} -type f | sort
+            fi
+          }
+          
+          # Update proving-service README if it exists
+          if [ -f "proving-service/README.md" ]; then
+            update_badge "ps" "proving-service/README.md"
+          fi
+          
+          # Update offchain-processor README if it exists
+          if [ -f "offchain-processor/README.md" ]; then
+            update_badge "op" "offchain-processor/README.md"
+          fi
+      
+      # Commit and push changes if badges were updated
+      - name: Commit and push badge updates
+        if: success()
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Check if there are changes to commit
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          
+          git add proving-service/README.md offchain-processor/README.md
+          git commit -m "Update coverage badges [skip ci]"
+          git push 

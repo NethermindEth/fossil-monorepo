@@ -1,212 +1,34 @@
 .DEFAULT_GOAL := help
 
-##@ Build
-
-.PHONY: build
-build: ## Build Rust code in release mode.
-	cargo build --release 
-
-.PHONY: build-debug
-build-debug: ## Build Rust code in debug mode.
-	cargo build
-
-##@ Test
-
-.PHONY: test
-test: ## Run all tests with database dependencies.
-	docker compose -f docker/docker-compose.test.yml up -d &&\
-	{ cargo test --workspace --all-features; status=$$?; docker compose -f docker/docker-compose.test.yml down -v; exit $$status; }
-
-.PHONY: test-clean
-test-clean: ## Clean up test environment.
-	docker compose -f docker/docker-compose.test.yml down -v
-
-##@ Coverage
-
-.PHONY: coverage-dir
-coverage-dir: ## Create coverage directory if it doesn't exist
-	@mkdir -p .coverage
-
-.PHONY: coverage
-coverage: coverage-dir ## Run tests with code coverage and generate HTML report.
-	@rustup component add llvm-tools-preview
-	docker compose -f docker/docker-compose.test.yml up -d &&\
-	{ CARGO_INCREMENTAL=0 \
-	RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
-	LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
-	cargo test --workspace --all-features; \
-	status=$$?; \
-	grcov . --binary-path ./target/debug/ -s . -t html --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/html &&\
-	grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info &&\
-	echo "Coverage report generated at .coverage/html/index.html"; \
-	docker compose -f docker/docker-compose.test.yml down -v; \
-	exit $$status; }
-
-.PHONY: coverage-xml
-coverage-xml: coverage-dir ## Generate code coverage report in XML format for CI.
-	@rustup component add llvm-tools-preview
-	CARGO_INCREMENTAL=0 \
-	RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
-	LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
-	cargo test --workspace --all-features &&\
-	grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info
-
-.PHONY: coverage-clean
-coverage-clean: ## Clean up coverage artifacts.
-	rm -rf .coverage
-
-.PHONY: coverage-view
-coverage-view: ## Open coverage report in the default browser (after running make coverage).
-	@if [ -f .coverage/html/index.html ]; then \
-		./scripts/open-coverage.sh; \
-	else \
-		echo "Coverage report not found. Run 'make coverage' first."; \
-	fi
-
-.PHONY: coverage-summary
-coverage-summary: ## Display a text summary of the code coverage report.
-	@if [ -f .coverage/html/index.html ]; then \
-		./scripts/coverage-summary.sh; \
-	else \
-		echo "Coverage report not found. Run 'make coverage' first."; \
-	fi
-
-.PHONY: coverage-badge
-coverage-badge: ## Generate a coverage badge.
-	@if [ -f .coverage/html/index.html ] && [ -f .coverage/lcov.info ]; then \
-		./scripts/generate-badge.sh; \
-	else \
-		echo "Coverage reports not found. Run 'make coverage' first."; \
-	fi
-
-##@ Linting
-
-.PHONY: fmt
-fmt: ## Format code with rustfmt.
-	cargo +nightly fmt
-
-.PHONY: clippy
-clippy: ## Run clippy linter with project-specific settings.
-	cargo +nightly clippy \
-		--no-deps \
-		-p db \
-		-p message-handler \
-		-p proving-service \
-		-- \
-		-W clippy::branches_sharing_code \
-		-W clippy::clear_with_drain \
-		-W clippy::derive_partial_eq_without_eq \
-		-W clippy::empty_line_after_outer_attr \
-		-W clippy::equatable_if_let \
-		-W clippy::imprecise_flops \
-		-W clippy::iter_on_empty_collections \
-		-W clippy::iter_with_drain \
-		-W clippy::large_stack_frames \
-		-W clippy::manual_clamp \
-		-W clippy::mutex_integer \
-		-W clippy::needless_pass_by_ref_mut \
-		-W clippy::nonstandard_macro_braces \
-		-W clippy::or_fun_call \
-		-W clippy::path_buf_push_overwrite \
-		-W clippy::read_zero_byte_vec \
-		-W clippy::redundant_clone \
-		-W clippy::suboptimal_flops \
-		-W clippy::suspicious_operation_groupings \
-		-W clippy::trailing_empty_array \
-		-W clippy::trait_duplication_in_bounds \
-		-W clippy::transmute_undefined_repr \
-		-W clippy::trivial_regex \
-		-W clippy::tuple_array_conversions \
-		-W clippy::uninhabited_references \
-		-W clippy::unused_peekable \
-		-W clippy::unused_rounding \
-		-W clippy::useless_let_if_seq \
-		-W clippy::use_self \
-		-W clippy::missing_const_for_fn \
-		-W clippy::empty_line_after_doc_comments \
-		-W clippy::iter_on_single_items \
-		-W clippy::match_same_arms \
-		-W clippy::doc_markdown \
-		-W clippy::unnecessary_struct_initialization \
-		-W clippy::string_lit_as_bytes \
-		-W clippy::explicit_into_iter_loop \
-		-W clippy::explicit_iter_loop \
-		-W clippy::manual_string_new \
-		-W clippy::naive_bytecount \
-		-W clippy::needless_bitwise_bool \
-		-W clippy::zero_sized_map_values \
-		-W clippy::single_char_pattern \
-		-W clippy::needless_continue \
-		-W clippy::single_match \
-		-W clippy::single_match_else \
-		-W clippy::needless_match \
-		-W clippy::needless_late_init \
-		-W clippy::redundant_pattern_matching \
-		-W clippy::redundant_pattern \
-		-W clippy::redundant_guards \
-		-W clippy::collapsible_match \
-		-W clippy::match_single_binding \
-		-W clippy::match_ref_pats \
-		-W clippy::match_bool \
-		-D clippy::needless_bool \
-		-W clippy::unwrap_used \
-		-W clippy::expect_used
-
-.PHONY: lint-codespell
-lint-codespell: ensure-codespell ## Check for spelling mistakes.
-	codespell
-
-.PHONY: ensure-codespell
-ensure-codespell:
-	@if ! which codespell >/dev/null 2>&1; then \
-		echo "codespell not found. Installing codespell..."; \
-		if [ "$$(uname)" = "Darwin" ]; then \
-			pip install codespell; \
-		else \
-			if command -v apt &> /dev/null; then \
-				sudo apt-get update && (sudo apt-get install -y codespell || python3 -m pip install --user codespell); \
-			elif command -v dnf &> /dev/null; then \
-				sudo dnf install -y codespell || python3 -m pip install --user codespell; \
-			elif command -v pacman &> /dev/null; then \
-				sudo pacman -S --noconfirm codespell || python3 -m pip install --user codespell; \
-			else \
-				python3 -m pip install --user codespell; \
-			fi; \
-		fi; \
-	else \
-		echo "✅ codespell already installed"; \
-	fi
-
-.PHONY: lint
-lint: fmt clippy lint-codespell ## Run all linters.
-
-##@ Local Development
-
-.PHONY: dev-services
-dev-services: ## Start all development services.
-	docker compose -f docker/docker-compose.test.yml up -d
-	docker compose -f docker/docker-compose.sqs.yml up -d
-
-.PHONY: dev-services-stop
-dev-services-stop: ## Stop all development services.
-	docker compose -f docker/docker-compose.test.yml down
-	docker compose -f docker/docker-compose.sqs.yml down
-
-##@ Pull Request
-
-.PHONY: pr
-pr: ## Prepare code for a pull request.
-	make lint && \
-	make test
-
 ##@ Setup
-
 .PHONY: setup
-setup: setup-rust setup-postgres setup-localstack setup-dev-env setup-coverage ## Install all dependencies.
-	@echo "✅ All dependencies installed successfully!"
+setup: setup-shared setup-ps setup-op ## Set up the complete development environment for all projects
+	@echo "✅ Complete development environment set up successfully!"
+
+.PHONY: setup-shared
+setup-shared: ## Install shared dependencies
+	@echo "🔧 Setting up shared dependencies..."
+	make setup-rust
+	make setup-coverage
+	@echo "✅ Shared dependencies installed"
+
+.PHONY: setup-ps
+setup-ps: ## Set up Proving Service
+	@echo "🔧 Setting up Proving Service environment..."
+	make setup-postgres
+	make setup-localstack
+	cd proving-service && make setup-dev-env
+	@echo "✅ Proving Service environment set up"
+
+.PHONY: setup-op
+setup-op: ## Set up Offchain Processor
+	@echo "🔧 Setting up Offchain Processor environment..."
+	docker compose -f offchain-processor/docker-compose.test.yml up -d offchain_processor_db
+	cd offchain-processor && make setup-platform
+	@echo "✅ Offchain Processor environment set up"
 
 .PHONY: setup-rust
-setup-rust: ## Install Rust and necessary toolchains.
+setup-rust: ## Install Rust and toolchains
 	@echo "🔧 Checking Rust installation..."
 	@if ! command -v rustup &> /dev/null; then \
 		echo "Installing Rust..."; \
@@ -221,43 +43,154 @@ setup-rust: ## Install Rust and necessary toolchains.
 	else \
 		echo "✅ Rust nightly already installed"; \
 	fi
+	rustup component add rustfmt clippy
+	rustup component add rustfmt clippy --toolchain nightly
 
 .PHONY: setup-postgres
-setup-postgres: ## Set up PostgreSQL for development.
-	@echo "🔧 Setting up PostgreSQL..."
-	docker compose -f docker/docker-compose.test.yml up -d postgres
+setup-postgres: ## Set up PostgreSQL for development
+	docker compose -f proving-service/docker/docker-compose.test.yml up -d postgres
 
 .PHONY: setup-localstack
-setup-localstack: ## Set up LocalStack for AWS services emulation.
-	@echo "🔧 Setting up LocalStack..."
-	docker compose -f docker/docker-compose.sqs.yml up -d
-	./scripts/setup-localstack.sh
-
-.PHONY: setup-dev-env
-setup-dev-env: ## Set up development environment variables.
-	@echo "🔧 Setting up development environment..."
-	@if [ ! -f .env ]; then \
-		cp .env.example .env; \
-		echo "Created .env file from .env.example"; \
-	else \
-		echo "✅ .env file already exists"; \
-	fi
+setup-localstack: ## Set up LocalStack for AWS services
+	docker compose -f proving-service/docker/docker-compose.sqs.yml up -d
+	./proving-service/scripts/setup-localstack.sh
 
 .PHONY: setup-coverage
-setup-coverage: ## Install coverage tools.
+setup-coverage: ## Install code coverage tools
 	@echo "🔧 Setting up code coverage tools..."
+	cargo install cargo-tarpaulin
 	@rustup component add llvm-tools-preview
 	@if ! command -v grcov &> /dev/null; then \
 		echo "Installing grcov..."; \
 		cargo install grcov; \
-		echo "✅ grcov installed"; \
 	else \
 		echo "✅ grcov already installed"; \
 	fi
-	@mkdir -p .coverage
+
+##@ Monorepo Management
+
+.PHONY: build-all
+build-all: ## Build all projects in release mode.
+	make ps-build
+	make op-build
+
+.PHONY: build-all-debug
+build-all-debug: ## Build all projects in debug mode.
+	cd proving-service && cargo build
+	cd offchain-processor && cargo build
+
+.PHONY: test-all
+test-all: ## Run tests for all projects.
+	make ps-test
+	make op-test
+
+.PHONY: lint-all
+lint-all: ## Run linters for all projects.
+	cd proving-service && make lint
+	cd offchain-processor && make lint
+
+.PHONY: pr
+pr: lint-all test-all ## Prepare all projects for a pull request.
+	@echo "✅ All projects prepared for PR"
+
+.PHONY: clean-all
+clean-all: ## Clean all projects.
+	make ps-clean
+	make op-clean
+
+##@ Proving Service
+
+.PHONY: ps-build
+ps-build: ## Build Proving Service in release mode.
+	cd proving-service && cargo build --release
+
+.PHONY: ps-test
+ps-test: ## Run tests for Proving Service.
+	cd proving-service && make test
+
+.PHONY: ps-run
+ps-run: ## Run Proving Service.
+	cd proving-service && cargo run
+
+.PHONY: ps-clean
+ps-clean: ## Clean Proving Service build artifacts.
+	cd proving-service && cargo clean
+	rm -rf proving-service/target
+
+##@ Offchain Processor
+
+.PHONY: op-build
+op-build: ## Build Offchain Processor in release mode.
+	cd offchain-processor && cargo build --release
+
+.PHONY: op-test
+op-test: ## Run tests for Offchain Processor.
+	cd offchain-processor && make test
+
+.PHONY: op-run
+op-run: ## Run Offchain Processor.
+	cd offchain-processor && cargo run
+
+.PHONY: op-clean
+op-clean: ## Clean Offchain Processor build artifacts.
+	cd offchain-processor && cargo clean
+	rm -rf offchain-processor/target
+
+##@ Development Environment
+
+.PHONY: dev-services
+dev-services: ## Start all development services.
+	docker compose -f proving-service/docker/docker-compose.test.yml up -d
+	docker compose -f proving-service/docker/docker-compose.sqs.yml up -d
+	docker compose -f offchain-processor/docker-compose.test.yml up -d
+
+.PHONY: dev-services-stop
+dev-services-stop: ## Stop all development services.
+	docker compose -f proving-service/docker/docker-compose.test.yml down
+	docker compose -f proving-service/docker/docker-compose.sqs.yml down
+	docker compose -f offchain-processor/docker-compose.test.yml down
+
+##@ Code Coverage
+
+.PHONY: coverage-all
+coverage-all: ## Run code coverage for all projects
+	@echo "🔍 Running coverage for Proving Service..."
+	cd proving-service && make coverage-clean && \
+	{ docker compose -f docker/docker-compose.test.yml up -d && \
+		CARGO_INCREMENTAL=0 \
+		RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
+		LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
+		cargo test --workspace && \
+		grcov . --binary-path ./target/debug/ -s . -t html  --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/html && \
+		grcov . --binary-path ./target/debug/ -s . -t lcov  --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info && \
+		echo "Coverage report generated at .coverage/html/index.html"; \
+		docker compose -f docker/docker-compose.test.yml down -v; \
+	}
+	@echo "🔍 Running coverage for Offchain Processor..."
+	cd offchain-processor && make coverage-clean && \
+	{ docker compose -f docker-compose.test.yml up -d offchain_processor_db && \
+		CARGO_INCREMENTAL=0 \
+		RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
+		LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
+		cargo test --workspace --all-features && \
+		grcov . --binary-path ./target/debug/ -s . -t html --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/html && \
+		grcov . --binary-path ./target/debug/ -s . -t lcov --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info && \
+		echo "Coverage report generated at .coverage/html/index.html"; \
+		docker compose -f docker-compose.test.yml down -v; \
+	}
+	@echo "✅ Coverage reports generated for all projects"
+	@echo "📊 Proving Service coverage: proving-service/.coverage/html/index.html"
+	@echo "📊 Offchain Processor coverage: offchain-processor/.coverage/html/index.html"
+
+##@ Testing
+.PHONY: test-clean
+test-clean: ## Clean up test environment
+	docker compose -f proving-service/docker/docker-compose.test.yml down -v
+	docker compose -f proving-service/docker/docker-compose.sqs.yml down -v
+	docker compose -f offchain-processor/docker-compose.test.yml down -v
 
 ##@ Help
 
 .PHONY: help
 help: ## Display this help.
-	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)

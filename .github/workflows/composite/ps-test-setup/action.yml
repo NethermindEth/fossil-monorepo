@@ -1,0 +1,35 @@
+name: 'PS Test Setup'
+description: 'Common setup steps for Proving Service tests'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@nightly
+      with:
+        components: llvm-tools-preview
+    
+    - name: Cache dependencies
+      uses: Swatinem/rust-cache@v2
+      with:
+        cache-on-failure: true
+        
+    - name: Start PostgreSQL
+      shell: bash
+      run: |
+        if [[ "$GITHUB_JOB" == *"db"* || "$GITHUB_JOB" == *"proving"* ]]; then
+          docker compose -f proving-service/docker/docker-compose.test.yml up -d postgres
+          
+          # Wait for PostgreSQL to be ready
+          for i in {1..30}; do
+            if docker exec $(docker ps -q -f name=postgres) pg_isready -U postgres; then
+              break
+            fi
+            sleep 1
+          done
+          
+          # Initialize database
+          if [ -f proving-service/tests/init.sql ]; then
+            PGPASSWORD=postgres psql -h localhost -U postgres -d postgres -f proving-service/tests/init.sql
+          fi
+        fi 
