@@ -1,11 +1,10 @@
 # Fossil Monorepo
 
 [![CI Status](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/monorepo-ci.yml/badge.svg)](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/monorepo-ci.yml)
-
-| Component | Build | Coverage |
-|-----------|-------|----------|
-| Proving Service | [![PS Build](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/ps-build.yml/badge.svg)](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/ps-build.yml) | ![PS Coverage][ps-coverage-badge] |
-| Offchain Processor | [![OP Build](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/op-build.yml/badge.svg)](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/op-build.yml) | ![OP Coverage][op-coverage-badge] |
+[![PS Build](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/ps-build.yml/badge.svg)](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/ps-build.yml)
+[![OP Build](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/op-build.yml/badge.svg)](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/op-build.yml)
+![PS Coverage][ps-coverage-badge]
+![OP Coverage][op-coverage-badge]
 
 This monorepo contains two separate projects:
 

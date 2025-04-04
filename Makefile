@@ -152,30 +152,35 @@ dev-services-stop: ## Stop all development services.
 
 ##@ Code Coverage
 
-.PHONY: coverage
-coverage: ## Run tests with coverage and generate HTML report
-	cargo tarpaulin --workspace --out html
-
-.PHONY: coverage-view
-coverage-view: ## Open the coverage report in a browser
-	xdg-open tarpaulin-report.html
-
-.PHONY: coverage-xml
-coverage-xml: ## Generate code coverage report in XML format for CI
-	cargo tarpaulin --workspace --out xml
-
-.PHONY: coverage-clean
-coverage-clean: ## Clean up coverage artifacts
-	rm -f tarpaulin-report.html cobertura.xml
-
-.PHONY: coverage-summary
-coverage-summary: ## Display a text summary of the coverage report
-	cargo tarpaulin --workspace --out stdout
-
-.PHONY: coverage-badge
-coverage-badge: ## Generate a badge for the README
-	cargo tarpaulin --workspace --out json
-	python3 -c "import json; data = json.load(open('tarpaulin-report.json')); print(f'Coverage: {data[\"files\"][\"total\"][\"coverage\"]}%')"
+.PHONY: coverage-all
+coverage-all: ## Run code coverage for all projects
+	@echo "🔍 Running coverage for Proving Service..."
+	cd proving-service && make coverage-clean && \
+	{ docker compose -f docker/docker-compose.test.yml up -d && \
+		CARGO_INCREMENTAL=0 \
+		RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
+		LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
+		cargo test --workspace && \
+		grcov . --binary-path ./target/debug/ -s . -t html  --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/html && \
+		grcov . --binary-path ./target/debug/ -s . -t lcov  --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info && \
+		echo "Coverage report generated at .coverage/html/index.html"; \
+		docker compose -f docker/docker-compose.test.yml down -v; \
+	}
+	@echo "🔍 Running coverage for Offchain Processor..."
+	cd offchain-processor && make coverage-clean && \
+	{ docker compose -f docker-compose.test.yml up -d offchain_processor_db && \
+		CARGO_INCREMENTAL=0 \
+		RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
+		LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
+		cargo test --workspace --all-features && \
+		grcov . --binary-path ./target/debug/ -s . -t html --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/html && \
+		grcov . --binary-path ./target/debug/ -s . -t lcov --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info && \
+		echo "Coverage report generated at .coverage/html/index.html"; \
+		docker compose -f docker-compose.test.yml down -v; \
+	}
+	@echo "✅ Coverage reports generated for all projects"
+	@echo "📊 Proving Service coverage: proving-service/.coverage/html/index.html"
+	@echo "📊 Offchain Processor coverage: offchain-processor/.coverage/html/index.html"
 
 ##@ Testing
 .PHONY: test-clean
