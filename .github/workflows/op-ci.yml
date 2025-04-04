@@ -100,7 +100,7 @@ jobs:
         run: cargo install sqlx-cli
       
       - name: Generate sqlx-data.json
-        run: cd offchain-processor && cargo sqlx prepare --check || cargo sqlx prepare
+        run: cd offchain-processor && cargo sqlx prepare --workspace --check || cargo sqlx prepare
     
       - name: Clippy
         run: |

@@ -67,7 +67,7 @@ jobs:
           cargo install sqlx-cli
           sqlx --version
       - name: Check that sqlx queries metadata is up to date
-        run: cargo sqlx prepare --workspace --check
+        run: cd offchain-processor && cargo sqlx prepare --workspace --check
       - name: Build
         run: cd offchain-processor && cargo build --verbose
       - name: Test
