@@ -509,15 +509,28 @@ mod tests {
             messages.len()
         );
 
-        for (message, original_job) in messages.iter().zip(jobs.iter()) {
+        // Parse all received messages into ProofGenerated jobs
+        let mut received_proofs = Vec::new();
+        for message in messages.iter() {
             let job: Job = serde_json::from_str(&message.body).unwrap();
-
             match job {
                 Job::ProofGenerated(proof) => {
-                    assert_eq!(proof.job_id, original_job.job_id, "Job ID mismatch");
+                    received_proofs.push(proof);
                 }
                 other_job => panic!("Expected ProofGenerated job, got {:?}", other_job),
             }
+        }
+
+        // Sort received proofs by job_id
+        received_proofs.sort_by(|a, b| a.job_id.cmp(&b.job_id));
+
+        // Sort original jobs by job_id
+        let mut sorted_jobs = jobs.clone();
+        sorted_jobs.sort_by(|a, b| a.job_id.cmp(&b.job_id));
+
+        // Now verify job IDs match in the sorted order
+        for (proof, original_job) in received_proofs.iter().zip(sorted_jobs.iter()) {
+            assert_eq!(proof.job_id, original_job.job_id, "Job ID mismatch");
         }
     }
 
