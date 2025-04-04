@@ -10,11 +10,6 @@ on:
     
 env:
   CARGO_TERM_COLOR: always
-  DATABASE_URL: ${{ secrets.DATABASE_URL }}
-  STARKNET_RPC_URL: http://127.0.0.1:5050
-  STARKNET_PRIVATE_KEY: 0x1
-  STARKNET_ACCOUNT_ADDRESS: 0x1
-  NETWORK: SEPOLIA
 
 jobs:
   test:
