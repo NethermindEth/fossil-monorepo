@@ -1,0 +1,35 @@
+[package]
+name = "server"
+version = { workspace = true }
+edition = { workspace = true }
+default-run = "server"
+
+[[bin]]
+name = "create_api_key"
+path = "src/scripts/create_api_key.rs"
+
+[dependencies]
+db-access = { path = "../db-access" }
+
+tokio = { workspace = true }
+tracing = { workspace = true }
+sqlx = { workspace = true }
+dotenv = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+eyre = { workspace = true }
+
+# Add reqwest for HTTP API calls
+reqwest = { version = "0.11", features = ["json"] }
+
+# Server-specific dependencies
+axum = { version = "0.8", features = ["http1", "http2", "json", "macros"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "auth"] }
+tracing-subscriber = { version = "0.3", features = ["registry", "env-filter", "fmt", "time"] }
+
+uuid = { version = "1.10.0", features = ["v4"] }
+
+[dev-dependencies]
+testcontainers = "0.14"
+lazy_static = "1.4"
+axum-test = "17"

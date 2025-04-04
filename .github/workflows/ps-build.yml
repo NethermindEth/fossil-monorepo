@@ -1,0 +1,11 @@
+name: PS Build
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+jobs:
+  ps-build:
+    uses: ./.github/workflows/shared-build.yml
+    with:
+      component: 'ps' 
