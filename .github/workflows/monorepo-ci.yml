@@ -83,114 +83,57 @@ jobs:
           find .coverage-ps -type f | sort
           find .coverage-op -type f | sort
           
-          # Function to update badge in README
-          update_badge() {
-            local component=$1
-            local readme_path=$2
-            local coverage=""
-            local color=""
+          # Look for lcov files
+          PS_LCOV=""
+          OP_LCOV=""
+          
+          for file in $(find .coverage-ps -type f -name "*.info" -o -name "*lcov*"); do
+            echo "Found PS lcov file: $file"
+            PS_LCOV="$file"
+            break
+          done
+          
+          for file in $(find .coverage-op -type f -name "*.info" -o -name "*lcov*"); do
+            echo "Found OP lcov file: $file"
+            OP_LCOV="$file"
+            break
+          done
+          
+          # Run our badge update script
+          chmod +x .github/scripts/update-badges.sh
+          
+          if [ -n "$PS_LCOV" ] && [ -n "$OP_LCOV" ]; then
+            echo "Updating badges from lcov files"
+            .github/scripts/update-badges.sh --ps-lcov "$PS_LCOV" --op-lcov "$OP_LCOV"
+          else
+            echo "Falling back to extracting coverage from badge files"
             
-            if [ "$component" == "ps" ]; then
-              # Try to extract coverage percentage from any available file
-              for file in $(find .coverage-ps -type f -name "*.info" -o -name "*lcov*"); do
-                echo "Found PS coverage file: $file"
-                coverage_pct=$(grep -m 1 "LF:" "$file" | awk '{print $2}') || continue
-                coverage_hit=$(grep -m 1 "LH:" "$file" | awk '{print $2}') || continue
-                
-                if [ -n "$coverage_pct" ] && [ -n "$coverage_hit" ] && [ "$coverage_pct" -gt 0 ]; then
-                  coverage=$(awk "BEGIN { printf \"%.1f\", ($coverage_hit / $coverage_pct) * 100 }")
-                  echo "Calculated PS coverage: $coverage%"
-                  break
-                fi
-              done
-            else
-              # Try to extract coverage percentage from any available file
-              for file in $(find .coverage-op -type f -name "*.info" -o -name "*lcov*"); do
-                echo "Found OP coverage file: $file"
-                coverage_pct=$(grep -m 1 "LF:" "$file" | awk '{print $2}') || continue
-                coverage_hit=$(grep -m 1 "LH:" "$file" | awk '{print $2}') || continue
-                
-                if [ -n "$coverage_pct" ] && [ -n "$coverage_hit" ] && [ "$coverage_pct" -gt 0 ]; then
-                  coverage=$(awk "BEGIN { printf \"%.1f\", ($coverage_hit / $coverage_pct) * 100 }")
-                  echo "Calculated OP coverage: $coverage%"
-                  break
-                fi
-              done
-            fi
-            
-            # If we couldn't extract coverage, try looking for badge files
-            if [ -z "$coverage" ]; then
-              echo "Could not calculate coverage from lcov files, looking for badge files..."
-              
-              # Find and try to extract from badge files
-              if [ "$component" == "ps" ]; then
-                for file in $(find .coverage-ps -type f -name "*badge*"); do
-                  badge_url=$(cat "$file")
-                  # Extract coverage from badge URL
-                  coverage=$(echo "$badge_url" | grep -o "coverage-[0-9.]*" | cut -d'-' -f2)
-                  if [ -n "$coverage" ]; then
-                    echo "Found PS coverage in badge file: $coverage%"
-                    break
-                  fi
-                done
-              else
-                for file in $(find .coverage-op -type f -name "*badge*"); do
-                  badge_url=$(cat "$file")
-                  # Extract coverage from badge URL
-                  coverage=$(echo "$badge_url" | grep -o "coverage-[0-9.]*" | cut -d'-' -f2)
-                  if [ -n "$coverage" ]; then
-                    echo "Found OP coverage in badge file: $coverage%"
-                    break
-                  fi
-                done
+            # Try to find badge files
+            for file in $(find .coverage-ps -type f -name "*badge*"); do
+              PS_COVERAGE=$(cat "$file" | grep -o "coverage-[0-9.]*" | cut -d'-' -f2 || echo "")
+              if [ -n "$PS_COVERAGE" ]; then
+                break
               fi
-            fi
+            done
             
-            # If we still don't have coverage, use a default value
-            if [ -z "$coverage" ]; then
-              echo "Could not determine coverage percentage, using default value"
-              coverage="0.0"
-            fi
+            for file in $(find .coverage-op -type f -name "*badge*"); do
+              OP_COVERAGE=$(cat "$file" | grep -o "coverage-[0-9.]*" | cut -d'-' -f2 || echo "")
+              if [ -n "$OP_COVERAGE" ]; then
+                break
+              fi
+            done
             
-            # Determine badge color based on coverage
-            if (( $(echo "$coverage < 50" | bc -l) )); then
-              color="red"
-            elif (( $(echo "$coverage < 70" | bc -l) )); then
-              color="yellow"
-            elif (( $(echo "$coverage < 90" | bc -l) )); then
-              color="green"
+            # Update badges with extracted values
+            if [ -n "$PS_COVERAGE" ] || [ -n "$OP_COVERAGE" ]; then
+              ARGS=""
+              [ -n "$PS_COVERAGE" ] && ARGS="$ARGS --ps-coverage $PS_COVERAGE"
+              [ -n "$OP_COVERAGE" ] && ARGS="$ARGS --op-coverage $OP_COVERAGE"
+              
+              echo "Updating badges with: $ARGS"
+              .github/scripts/update-badges.sh $ARGS
             else
-              color="brightgreen"
+              echo "Could not determine coverage percentages from artifacts"
             fi
-            
-            # Create badge URL
-            badge_url="https://img.shields.io/badge/coverage-${coverage}%25-${color}"
-            echo "Final badge URL for $component: $badge_url"
-            
-            # Update badge in README
-            if grep -q "!\[Coverage\]\[${component}-coverage-badge\]" "$readme_path"; then
-              sed -i "s|\\[${component}-coverage-badge\\]:.*|[${component}-coverage-badge]: $badge_url|g" "$readme_path"
-              echo "Updated $component badge in $readme_path"
-            else
-              echo "Could not find badge reference in $readme_path"
-            fi
-          }
-          
-          # Update the main README.md
-          echo "Updating main README.md"
-          update_badge "ps" "README.md"
-          update_badge "op" "README.md"
-          
-          # Update proving-service README if it exists
-          if [ -f "proving-service/README.md" ]; then
-            echo "Updating proving-service README.md"
-            update_badge "ps" "proving-service/README.md"
-          fi
-          
-          # Update offchain-processor README if it exists
-          if [ -f "offchain-processor/README.md" ]; then
-            echo "Updating offchain-processor README.md"
-            update_badge "op" "offchain-processor/README.md"
           fi
       
       # Commit and push changes if badges were updated
