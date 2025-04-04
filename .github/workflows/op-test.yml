@@ -31,10 +31,7 @@ jobs:
           sqlx --version
 
       - name: Sqlx prepare
-        run: cd offchain-processor && cargo sqlx prepare --workspace --check || cargo sqlx prepare
-      
-      - name: Build
-        run: cd offchain-processor && cargo build --workspace --all-targets
+        run: cd offchain-processor && cargo sqlx prepare --workspace --check
       
       - name: Test
         run: cd offchain-processor && cargo test --workspace --all-targets 
