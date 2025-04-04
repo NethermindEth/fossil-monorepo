@@ -60,6 +60,7 @@ jobs:
       - name: Sqlx prepare
         run: |
           if [ "${{ inputs.component }}" == "op" ]; then
+            echo "DATABASE_URL=${DATABASE_URL}"
             cd offchain-processor && cargo sqlx prepare --workspace --check
           fi
           
