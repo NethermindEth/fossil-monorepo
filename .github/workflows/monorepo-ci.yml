@@ -82,7 +82,13 @@ jobs:
           update_badge() {
             local component=$1
             local readme_path=$2
-            local badge_url_file=".coverage-${component}/${component}_badge_url.txt"
+            local badge_url_file=""
+            
+            if [ "$component" == "ps" ]; then
+              badge_url_file=".coverage-ps/proving-service/.coverage/ps_badge_url.txt"
+            else
+              badge_url_file=".coverage-op/offchain-processor/.coverage/op_badge_url.txt"
+            fi
             
             if [ -f "$badge_url_file" ]; then
               local badge_url=$(cat "$badge_url_file")
@@ -98,7 +104,9 @@ jobs:
                 echo -e "\n[${component}-coverage-badge]: $badge_url" >> "$readme_path"
               fi
             else
-              echo "Coverage badge URL file not found for $component"
+              echo "Coverage badge URL file not found for $component: $badge_url_file"
+              # List contents of the directory for debugging
+              find .coverage-${component} -type f | sort
             fi
           }
           

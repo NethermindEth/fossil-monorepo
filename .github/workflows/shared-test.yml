@@ -89,7 +89,26 @@ jobs:
           else
             cd offchain-processor
           fi
+          
+          # Ensure coverage directory exists
+          mkdir -p .coverage
+          
+          # Check if profraw files were generated
+          echo "Looking for profraw files..."
+          find . -name "*.profraw" | sort
+          
+          # Generate coverage report
           grcov . --binary-path ./target/debug/ -s . -t lcov --branch --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info
+          
+          # Check if lcov.info was generated
+          if [ -f ".coverage/lcov.info" ]; then
+            echo "Coverage report generated successfully"
+            ls -la .coverage/
+          else
+            echo "Failed to generate coverage report"
+            echo "Current directory: $(pwd)"
+            find . -name "*.profraw" | wc -l
+          fi
       
       # Generate coverage badge
       - name: Generate coverage badge
@@ -120,8 +139,7 @@ jobs:
             fi
             
             # Save badge URL to a file
-            mkdir -p ../../.coverage
-            echo "https://img.shields.io/badge/coverage-$COVERAGE%25-$COLOR" > ../../.coverage/${{ inputs.component }}_badge_url.txt
+            echo "https://img.shields.io/badge/coverage-$COVERAGE%25-$COLOR" > .coverage/${{ inputs.component }}_badge_url.txt
             echo "Coverage badge URL saved for ${{ inputs.component }}"
           else
             echo "Could not determine coverage percentage"
@@ -134,8 +152,9 @@ jobs:
       
       # Upload coverage data as an artifact
       - name: Upload coverage data
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ inputs.component }}-coverage
-          path: .coverage/
+          path: |
+            ${{ (inputs.component == 'ps') && 'proving-service/.coverage/' || 'offchain-processor/.coverage/' }}
           retention-days: 7 
