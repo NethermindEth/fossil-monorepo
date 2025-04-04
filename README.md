@@ -1,5 +1,12 @@
 # Fossil Monorepo
 
+[![CI Status](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/monorepo-ci.yml/badge.svg)](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/monorepo-ci.yml)
+
+| Component | Build | Coverage |
+|-----------|-------|----------|
+| Proving Service | [![PS Build](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/ps-build.yml/badge.svg)](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/ps-build.yml) | ![PS Coverage][ps-coverage-badge] |
+| Offchain Processor | [![OP Build](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/op-build.yml/badge.svg)](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/op-build.yml) | ![OP Coverage][op-coverage-badge] |
+
 This monorepo contains two separate projects:
 
 1. **Proving Service**: A service that handles proof generation and verification
@@ -16,6 +23,7 @@ make setup
 ```
 
 This will:
+
 - Install Rust and required toolchains
 - Set up PostgreSQL databases for both projects
 - Configure LocalStack for AWS services
@@ -23,6 +31,7 @@ This will:
 - Set up project-specific dependencies
 
 You can also set up individual components:
+
 ```bash
 make setup-ps    # Set up Proving Service only
 make setup-op    # Set up Offchain Processor only
@@ -32,8 +41,9 @@ make setup-rust  # Set up Rust only
 ## Development Workflow
 
 > **IMPORTANT:** Always run `make pr` before submitting your changes!
-> 
+>
 > This ensures your code:
+>
 > - Passes all linters (formatting and static analysis)
 > - Passes all tests in both projects
 > - Is ready for review without CI pipeline failures
@@ -90,3 +100,6 @@ For detailed information about each project, see their respective READMEs:
 
 - [Proving Service](proving-service/README.md)
 - [Offchain Processor](offchain-processor/README.md)
+
+[ps-coverage-badge]: https://img.shields.io/badge/coverage-pending-lightgrey
+[op-coverage-badge]: https://img.shields.io/badge/coverage-pending-lightgrey
