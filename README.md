@@ -1,8 +1,6 @@
 # Fossil Monorepo
 
 [![CI Status](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/monorepo-ci.yml/badge.svg)](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/monorepo-ci.yml)
-[![PS Test](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/shared-test.yml/badge.svg?component=ps)](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/shared-test.yml)
-[![OP Test](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/shared-test.yml/badge.svg?component=op)](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/shared-test.yml)
 ![PS Coverage][ps-coverage-badge]
 ![OP Coverage][op-coverage-badge]
 
