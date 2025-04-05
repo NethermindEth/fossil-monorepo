@@ -36,6 +36,11 @@ pub trait HashingProviderTrait {
         start_timestamp: u64,
         end_timestamp: u64,
     ) -> Result<Vec<f64>, ProviderError>;
+    async fn get_avg_fees_in_range_as_felt(
+        &self,
+        start_timestamp: u64,
+        end_timestamp: u64,
+    ) -> Result<Vec<Felt>, ProviderError>;
     async fn get_hash_stored_avg_fees(&self, timestamp: u64) -> Result<[u32; 8], ProviderError>;
     async fn get_hash_batched_avg_fees(
         &self,
@@ -162,6 +167,23 @@ impl HashingProviderTrait for HashingProvider {
         start_timestamp: u64,
         end_timestamp: u64,
     ) -> Result<Vec<f64>, ProviderError> {
+        let call_result = self
+            .get_avg_fees_in_range_as_felt(start_timestamp, end_timestamp)
+            .await?;
+
+        let avg_hourly_fees = call_result
+            .iter()
+            .map(|fee| convert_felt_to_f64(*fee))
+            .collect();
+
+        Ok(avg_hourly_fees)
+    }
+
+    async fn get_avg_fees_in_range_as_felt(
+        &self,
+        start_timestamp: u64,
+        end_timestamp: u64,
+    ) -> Result<Vec<Felt>, ProviderError> {
         let mut call_result = self
             .provider
             .call(
@@ -175,12 +197,7 @@ impl HashingProviderTrait for HashingProvider {
             .await?;
         call_result.remove(0); // the first element is the length of the array, which is not needed by us
 
-        let avg_hourly_fees = call_result
-            .iter()
-            .map(|fee| convert_felt_to_f64(*fee))
-            .collect();
-
-        Ok(avg_hourly_fees)
+        Ok(call_result)
     }
 
     async fn get_hash_stored_avg_fees(&self, timestamp: u64) -> Result<[u32; 8], ProviderError> {

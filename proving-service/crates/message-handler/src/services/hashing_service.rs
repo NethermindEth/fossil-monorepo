@@ -265,6 +265,14 @@ mod tests {
             Ok(self.avg_fees.clone())
         }
 
+        async fn get_avg_fees_in_range_as_felt(
+            &self,
+            _start_timestamp: u64,
+            _end_timestamp: u64,
+        ) -> Result<Vec<Felt>, ProviderError> {
+            todo!()
+        }
+
         async fn get_hash_stored_avg_fees(
             &self,
             _timestamp: u64,
