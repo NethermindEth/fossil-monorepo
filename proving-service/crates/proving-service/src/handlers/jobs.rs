@@ -48,6 +48,12 @@ pub async fn handle_job_request(
         start_timestamp: request.twap.start_timestamp,
         end_timestamp: request.twap.end_timestamp,
         job_group_id: Some(request.job_group_id.clone()),
+        twap_start_timestamp: Some(request.twap.start_timestamp),
+        twap_end_timestamp: Some(request.twap.end_timestamp),
+        reserve_price_start_timestamp: Some(request.reserve_price.start_timestamp),
+        reserve_price_end_timestamp: Some(request.reserve_price.end_timestamp),
+        max_return_start_timestamp: Some(request.max_return.start_timestamp),
+        max_return_end_timestamp: Some(request.max_return.end_timestamp),
     });
     info!("Dispatching TWAP job for group: {}", request.job_group_id);
     if let Err(e) = dispatcher.dispatch_job(twap_job).await {
@@ -61,6 +67,12 @@ pub async fn handle_job_request(
         start_timestamp: request.reserve_price.start_timestamp,
         end_timestamp: request.reserve_price.end_timestamp,
         job_group_id: Some(request.job_group_id.clone()),
+        twap_start_timestamp: Some(request.twap.start_timestamp),
+        twap_end_timestamp: Some(request.twap.end_timestamp),
+        reserve_price_start_timestamp: Some(request.reserve_price.start_timestamp),
+        reserve_price_end_timestamp: Some(request.reserve_price.end_timestamp),
+        max_return_start_timestamp: Some(request.max_return.start_timestamp),
+        max_return_end_timestamp: Some(request.max_return.end_timestamp),
     });
     info!(
         "Dispatching Reserve Price job for group: {}",
@@ -77,6 +89,12 @@ pub async fn handle_job_request(
         start_timestamp: request.max_return.start_timestamp,
         end_timestamp: request.max_return.end_timestamp,
         job_group_id: Some(request.job_group_id.clone()),
+        twap_start_timestamp: Some(request.twap.start_timestamp),
+        twap_end_timestamp: Some(request.twap.end_timestamp),
+        reserve_price_start_timestamp: Some(request.reserve_price.start_timestamp),
+        reserve_price_end_timestamp: Some(request.reserve_price.end_timestamp),
+        max_return_start_timestamp: Some(request.max_return.start_timestamp),
+        max_return_end_timestamp: Some(request.max_return.end_timestamp),
     });
     info!(
         "Dispatching Max Return job for group: {}",
@@ -249,6 +267,7 @@ mod tests {
         dispatcher: Arc<TestJobDispatcher>,
         request: JobRequest,
     ) -> (StatusCode, Response) {
+        info!("Received job request for group: {}", request.job_group_id);
         let mut errors = Vec::new();
 
         // Dispatch TWAP job
@@ -257,9 +276,16 @@ mod tests {
             start_timestamp: request.twap.start_timestamp,
             end_timestamp: request.twap.end_timestamp,
             job_group_id: Some(request.job_group_id.clone()),
+            twap_start_timestamp: Some(request.twap.start_timestamp),
+            twap_end_timestamp: Some(request.twap.end_timestamp),
+            reserve_price_start_timestamp: Some(request.reserve_price.start_timestamp),
+            reserve_price_end_timestamp: Some(request.reserve_price.end_timestamp),
+            max_return_start_timestamp: Some(request.max_return.start_timestamp),
+            max_return_end_timestamp: Some(request.max_return.end_timestamp),
         });
-
+        info!("Dispatching TWAP job for group: {}", request.job_group_id);
         if let Err(e) = dispatcher.dispatch_job(twap_job).await {
+            error!("Failed to dispatch TWAP job: {}", e);
             errors.push(format!("TWAP job failed: {}", e));
         }
 
@@ -269,9 +295,19 @@ mod tests {
             start_timestamp: request.reserve_price.start_timestamp,
             end_timestamp: request.reserve_price.end_timestamp,
             job_group_id: Some(request.job_group_id.clone()),
+            twap_start_timestamp: Some(request.twap.start_timestamp),
+            twap_end_timestamp: Some(request.twap.end_timestamp),
+            reserve_price_start_timestamp: Some(request.reserve_price.start_timestamp),
+            reserve_price_end_timestamp: Some(request.reserve_price.end_timestamp),
+            max_return_start_timestamp: Some(request.max_return.start_timestamp),
+            max_return_end_timestamp: Some(request.max_return.end_timestamp),
         });
-
+        info!(
+            "Dispatching Reserve Price job for group: {}",
+            request.job_group_id
+        );
         if let Err(e) = dispatcher.dispatch_job(reserve_price_job).await {
+            error!("Failed to dispatch Reserve Price job: {}", e);
             errors.push(format!("Reserve Price job failed: {}", e));
         }
 
@@ -281,9 +317,19 @@ mod tests {
             start_timestamp: request.max_return.start_timestamp,
             end_timestamp: request.max_return.end_timestamp,
             job_group_id: Some(request.job_group_id.clone()),
+            twap_start_timestamp: Some(request.twap.start_timestamp),
+            twap_end_timestamp: Some(request.twap.end_timestamp),
+            reserve_price_start_timestamp: Some(request.reserve_price.start_timestamp),
+            reserve_price_end_timestamp: Some(request.reserve_price.end_timestamp),
+            max_return_start_timestamp: Some(request.max_return.start_timestamp),
+            max_return_end_timestamp: Some(request.max_return.end_timestamp),
         });
-
+        info!(
+            "Dispatching Max Return job for group: {}",
+            request.job_group_id
+        );
         if let Err(e) = dispatcher.dispatch_job(max_return_job).await {
+            error!("Failed to dispatch Max Return job: {}", e);
             errors.push(format!("Max Return job failed: {}", e));
         }
 

@@ -2,7 +2,10 @@ use std::sync::{Arc, atomic::AtomicBool};
 use std::time::Duration;
 
 use crate::queue::message_queue::Queue;
-use crate::{proof_composition::ProofProvider, services::jobs::ProofGenerated};
+use crate::{
+    proof_composition::{ProofProvider, ProofTimestampRanges},
+    services::jobs::ProofGenerated,
+};
 use db::DbConnection;
 use db::models::get_block_base_fee_by_time_range;
 use eyre::{Result, eyre};
@@ -88,10 +91,14 @@ where
                 join_set.spawn(async move {
                     debug!("Received & processing job: {:?}", job);
 
+                    // Create ProofTimestampRanges from the job
+                    let timestamp_ranges = create_timestamp_ranges(&job);
+
+                    // Get the overall range for fetching data
+                    let (data_start, data_end) = timestamp_ranges.overall_range();
+
                     let block_base_fees = match get_block_base_fee_by_time_range(
-                        db_clone,
-                        job.start_timestamp,
-                        job.end_timestamp,
+                        db_clone, data_start, data_end,
                     )
                     .await
                     {
@@ -120,11 +127,7 @@ where
                     // Start the proof generation with timeout
                     let proof_result = tokio::time::timeout(
                         timeout_duration,
-                        proof_provider.generate_proofs_from_data(
-                            job.start_timestamp,
-                            job.end_timestamp,
-                            block_base_fees,
-                        ),
+                        proof_provider.generate_proofs_from_data(timestamp_ranges, block_base_fees),
                     )
                     .await;
 
@@ -194,6 +197,32 @@ async fn send_job_to_queue<Q: Queue>(queue: &Arc<Q>, job: &Job) -> Result<()> {
         .map_err(|e| eyre!("Failed to send message to queue: {}", e))
 }
 
+// Add this helper function to create ProofTimestampRanges from RequestProof
+fn create_timestamp_ranges(job: &super::jobs::RequestProof) -> ProofTimestampRanges {
+    // Use specific timestamp ranges if provided, otherwise fall back to the general ones
+    let twap_start = job.twap_start_timestamp.unwrap_or(job.start_timestamp);
+    let twap_end = job.twap_end_timestamp.unwrap_or(job.end_timestamp);
+
+    let reserve_price_start = job
+        .reserve_price_start_timestamp
+        .unwrap_or(job.start_timestamp);
+    let reserve_price_end = job.reserve_price_end_timestamp.unwrap_or(job.end_timestamp);
+
+    let max_return_start = job
+        .max_return_start_timestamp
+        .unwrap_or(job.start_timestamp);
+    let max_return_end = job.max_return_end_timestamp.unwrap_or(job.end_timestamp);
+
+    ProofTimestampRanges::new(
+        twap_start,
+        twap_end,
+        reserve_price_start,
+        reserve_price_end,
+        max_return_start,
+        max_return_end,
+    )
+}
+
 /**
  * Since we cannot really test this well, without a suitable source of bonsai mocking,
  * what we will do instead is to test the following:
@@ -237,8 +266,7 @@ mod tests {
     impl ProofProvider for MockProofProvider {
         async fn generate_proofs_from_data(
             &self,
-            _start_timestamp: i64,
-            _end_timestamp: i64,
+            _timestamp_ranges: ProofTimestampRanges,
             _raw_input: Vec<String>,
         ) -> Result<Receipt> {
             // Simulate some processing time
@@ -296,6 +324,12 @@ mod tests {
             job_id: job_id.to_string(),
             start_timestamp,
             end_timestamp,
+            twap_start_timestamp: None,
+            twap_end_timestamp: None,
+            reserve_price_start_timestamp: None,
+            reserve_price_end_timestamp: None,
+            max_return_start_timestamp: None,
+            max_return_end_timestamp: None,
         }
     }
 

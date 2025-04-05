@@ -34,10 +34,43 @@ use risc0_zkvm::{ExecutorEnv, ProverOpts, Receipt, ReceiptKind, default_prover};
 use simulate_price_verify_position_floating::simulate_price_verify_position;
 #[cfg(feature = "proof-composition")]
 use starknet::core::types::Felt;
+use std::cmp::{max, min};
 #[cfg(feature = "proof-composition")]
 use tokio::{task, try_join};
 #[cfg(feature = "proof-composition")]
 use twap_error_bound_floating::calculate_twap;
+
+/// Struct to hold different timestamp ranges for proof calculations
+#[derive(Debug, Clone)]
+pub struct ProofTimestampRanges {
+    pub twap: (i64, i64),
+    pub reserve_price: (i64, i64),
+    pub max_return: (i64, i64),
+}
+
+impl ProofTimestampRanges {
+    pub fn new(
+        twap_start: i64,
+        twap_end: i64,
+        reserve_price_start: i64,
+        reserve_price_end: i64,
+        max_return_start: i64,
+        max_return_end: i64,
+    ) -> Self {
+        Self {
+            twap: (twap_start, twap_end),
+            reserve_price: (reserve_price_start, reserve_price_end),
+            max_return: (max_return_start, max_return_end),
+        }
+    }
+
+    /// Returns the overall start and end timestamps covering all calculations
+    pub fn overall_range(&self) -> (i64, i64) {
+        let start = min(min(self.twap.0, self.reserve_price.0), self.max_return.0);
+        let end = max(max(self.twap.1, self.reserve_price.1), self.max_return.1);
+        (start, end)
+    }
+}
 
 #[async_trait::async_trait]
 pub trait ProofProvider {
@@ -46,8 +79,7 @@ pub trait ProofProvider {
 
     async fn generate_proofs_from_data(
         &self,
-        start_timestamp: i64,
-        end_timestamp: i64,
+        timestamp_ranges: ProofTimestampRanges,
         raw_input: Vec<String>,
     ) -> Result<Receipt>;
 }
@@ -72,13 +104,19 @@ impl ProofProvider for BonsaiProofProvider {
     #[cfg(feature = "proof-composition")]
     async fn generate_proofs_from_data(
         &self,
-        start_timestamp: i64,
-        end_timestamp: i64,
+        timestamp_ranges: ProofTimestampRanges,
         raw_input: Vec<String>,
     ) -> Result<Receipt> {
         use crate::hashing::HashingProvider;
 
         let hashing_provider = HashingProvider::from_env()?;
+
+        // Get the overall range covering all calculations for fee fetching
+        let (overall_start, overall_end) = timestamp_ranges.overall_range();
+
+        // Fetch fees using the widest range
+        let fees = hashing_provider.get_avg_fees_in_range(overall_start, overall_end)?;
+
         // hashing inputs
         let mut res = Vec::with_capacity(5760);
         for i in 0..5760 {
@@ -90,6 +128,11 @@ impl ProofProvider for BonsaiProofProvider {
 
         let data_8_months = hashing_res.f64_inputs;
         let data = data_8_months[data_8_months.len().saturating_sub(2160)..].to_vec();
+
+        // Extract specific timestamp ranges for each calculation
+        let (twap_start, twap_end) = timestamp_ranges.twap;
+        let (reserve_price_start, reserve_price_end) = timestamp_ranges.reserve_price;
+        let (max_return_start, max_return_end) = timestamp_ranges.max_return;
 
         // max return
         let input = MaxReturnInput { data: data.clone() };
@@ -112,7 +155,8 @@ impl ProofProvider for BonsaiProofProvider {
         // ensure convergence in host
         let n_periods = 720;
 
-        let data_with_timestamps = convert_data_to_vec_of_tuples(data.clone(), start_timestamp);
+        // Use reserve price specific range for data with timestamps
+        let data_with_timestamps = convert_data_to_vec_of_tuples(data.clone(), reserve_price_start);
         let res = original::calculate_reserve_price(&data_with_timestamps, 15000, n_periods);
 
         let num_paths = 4000;
@@ -191,8 +235,8 @@ impl ProofProvider for BonsaiProofProvider {
 
         let simulate_price_verify_position_handle = task::spawn_blocking(move || {
             let (receipt, _) = simulate_price_verify_position(SimulatePriceVerifyPositionInput {
-                start_timestamp,
-                end_timestamp,
+                start_timestamp: reserve_price_start,
+                end_timestamp: reserve_price_end,
                 data_length,
                 positions,
                 pt,
@@ -217,8 +261,8 @@ impl ProofProvider for BonsaiProofProvider {
         let input = ProofCompositionInput {
             data_8_months_hash: hashing_res.hash,
             data_8_months,
-            start_timestamp,
-            end_timestamp,
+            start_timestamp: overall_start,
+            end_timestamp: overall_end,
             positions: res.positions,
             pt: convert_array1_to_dvec(res.pt),
             pt_1: convert_array1_to_dvec(res.pt_1),
@@ -290,8 +334,7 @@ impl ProofProvider for BonsaiProofProvider {
     #[cfg(not(feature = "proof-composition"))]
     async fn generate_proofs_from_data(
         &self,
-        _start_timestamp: i64,
-        _end_timestamp: i64,
+        _timestamp_ranges: ProofTimestampRanges,
         _raw_input: Vec<String>,
     ) -> Result<Receipt> {
         Err(eyre!(
