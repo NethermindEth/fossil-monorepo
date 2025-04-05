@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use eyre::Report as EyreReport;
 use starknet::core::types::TransactionExecutionStatus;
 use starknet::core::types::TransactionReceipt::Invoke;
 use starknet::providers::Provider;
@@ -104,7 +105,12 @@ impl<T: HashingProviderTrait + Sync + Send + 'static> HashingService<T> {
             .into_iter()
             .map(|t| {
                 let hashing_service = self.hashing_provider.clone();
-                tokio::task::spawn(async move { hashing_service.hash_avg_fees_and_store(t).await })
+                tokio::task::spawn(async move {
+                    hashing_service
+                        .hash_avg_fees_and_store(t)
+                        .await
+                        .map_err(|e: EyreReport| e.to_string())
+                })
             })
             .collect::<Vec<_>>();
 
@@ -173,9 +179,10 @@ impl<T: HashingProviderTrait + Sync + Send + 'static> HashingService<T> {
             .hashing_provider
             .hash_batched_avg_fees(start_timestamp)
             .await
+            .map_err(|e: EyreReport| e.to_string())
         {
             Ok(res) => res,
-            Err(err) => return Err(err_to_string(err)),
+            Err(err) => return Err(err),
         };
 
         // check if it has been successfully stored onchain
@@ -202,6 +209,7 @@ mod tests {
     use std::sync::Arc;
 
     use async_trait::async_trait;
+    use eyre::{Result as EyreResult, eyre};
     use starknet::{
         core::types::{Felt, InvokeTransactionResult},
         providers::{JsonRpcClient, ProviderError, jsonrpc::HttpTransport},
@@ -210,8 +218,6 @@ mod tests {
     use crate::hashing::HashingProviderTrait;
 
     use super::HashingService;
-
-    // use crate::{hashing::HashingProcess, services::hashing_service::HashingServiceTrait};
 
     struct MockHashingProvider {
         avg_fees: Vec<f64>,
@@ -276,15 +282,15 @@ mod tests {
         async fn hash_avg_fees_and_store(
             &self,
             _start_timestamp: u64,
-        ) -> Result<InvokeTransactionResult, String> {
-            todo!()
+        ) -> EyreResult<InvokeTransactionResult> {
+            Err(eyre!("Mock implementation not available"))
         }
 
         async fn hash_batched_avg_fees(
             &self,
             _start_timestamp: u64,
-        ) -> Result<InvokeTransactionResult, String> {
-            todo!()
+        ) -> EyreResult<InvokeTransactionResult> {
+            Err(eyre!("Mock implementation not available"))
         }
     }
 
