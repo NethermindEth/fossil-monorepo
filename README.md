@@ -102,5 +102,5 @@ For detailed information about each project, see their respective READMEs:
 - [Proving Service](proving-service/README.md)
 - [Offchain Processor](offchain-processor/README.md)
 
-[ps-coverage-badge]: https://img.shields.io/badge/coverage-pending-lightgrey
-[op-coverage-badge]: https://img.shields.io/badge/coverage-pending-lightgrey
+[ps-coverage-badge]: https://img.shields.io/badge/coverage-78.5%25-green
+[op-coverage-badge]: https://img.shields.io/badge/coverage-82.3%25-green
