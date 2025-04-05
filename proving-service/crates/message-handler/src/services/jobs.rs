@@ -7,6 +7,12 @@ pub struct RequestProof {
     pub job_group_id: Option<String>,
     pub start_timestamp: i64,
     pub end_timestamp: i64,
+    pub twap_start_timestamp: Option<i64>,
+    pub twap_end_timestamp: Option<i64>,
+    pub reserve_price_start_timestamp: Option<i64>,
+    pub reserve_price_end_timestamp: Option<i64>,
+    pub max_return_start_timestamp: Option<i64>,
+    pub max_return_end_timestamp: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
