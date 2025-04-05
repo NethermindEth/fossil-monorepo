@@ -64,6 +64,87 @@ impl HashingProvider {
             account,
         }
     }
+
+    /// Creates a new HashingProvider instance from environment variables.
+    ///
+    /// Requires the following environment variables to be set:
+    /// - RPC_URL: URL for the Starknet RPC provider
+    /// - FOSSIL_LIGHT_CLIENT_ADDRESS: Address of the fossil light client contract
+    /// - HASH_STORAGE_ADDRESS: Address of the hash storage contract
+    /// - STARKNET_PRIVATE_KEY: Private key for the Starknet account
+    /// - STARKNET_ACCOUNT: Address of the Starknet account
+    ///
+    /// # Returns
+    /// A Result containing the HashingProvider or an error message
+    pub fn from_env() -> Result<Self, String> {
+        use starknet::{
+            accounts::ExecutionEncoding,
+            core::chain_id,
+            signers::{LocalWallet, SigningKey},
+        };
+        use std::env;
+        use url::Url;
+
+        // Load environment variables
+        let rpc_url = env::var("RPC_URL")
+            .map_err(|_| "RPC_URL environment variable is not set".to_string())?;
+
+        let fossil_light_client_address =
+            env::var("FOSSIL_LIGHT_CLIENT_ADDRESS").map_err(|_| {
+                "FOSSIL_LIGHT_CLIENT_ADDRESS environment variable is not set".to_string()
+            })?;
+
+        let hash_storage_address = env::var("HASH_STORAGE_ADDRESS")
+            .map_err(|_| "HASH_STORAGE_ADDRESS environment variable is not set".to_string())?;
+
+        let private_key = env::var("STARKNET_PRIVATE_KEY")
+            .map_err(|_| "STARKNET_PRIVATE_KEY environment variable is not set".to_string())?;
+
+        let account_address = env::var("STARKNET_ACCOUNT")
+            .map_err(|_| "STARKNET_ACCOUNT environment variable is not set".to_string())?;
+
+        // Create the provider
+        let provider = JsonRpcClient::new(HttpTransport::new(
+            Url::parse(&rpc_url).map_err(|e| format!("Failed to parse RPC URL: {}", e))?,
+        ));
+
+        // Convert addresses to Felt
+        let fossil_light_client_felt = Felt::from_hex(&fossil_light_client_address)
+            .map_err(|e| format!("Invalid FOSSIL_LIGHT_CLIENT_ADDRESS: {}", e))?;
+
+        let hash_storage_felt = Felt::from_hex(&hash_storage_address)
+            .map_err(|e| format!("Invalid HASH_STORAGE_ADDRESS: {}", e))?;
+
+        // Create the signer from private key
+        let signer = LocalWallet::from(SigningKey::from_secret_scalar(
+            Felt::from_hex(&private_key)
+                .map_err(|e| format!("Invalid STARKNET_PRIVATE_KEY: {}", e))?,
+        ));
+
+        // Create account address from hex
+        let signer_address = Felt::from_hex(&account_address)
+            .map_err(|e| format!("Invalid STARKNET_ACCOUNT: {}", e))?;
+
+        // Create the account
+        let mut account = SingleOwnerAccount::new(
+            provider.clone(),
+            signer,
+            signer_address,
+            chain_id::SEPOLIA,
+            ExecutionEncoding::New,
+        );
+
+        // Set block ID to pending for better transaction handling
+        account.set_block_id(BlockId::Tag(BlockTag::Pending));
+
+        // Create and return the HashingProvider
+        Ok(Self::new(
+            provider,
+            fossil_light_client_felt,
+            hash_storage_felt,
+            account,
+        ))
+    }
 }
 
 #[async_trait]
