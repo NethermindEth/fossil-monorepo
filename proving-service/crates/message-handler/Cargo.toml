@@ -58,9 +58,9 @@ proof_composition_twap_maxreturn_reserveprice_floating_hashing_methods = { git =
 
 risc0-zkvm = { version = "2.0.1" }
 uuid = { version = "1.16.0", features = ["v4"] }
+url = { workspace = true }
 
 [dev-dependencies]
-url = { workspace = true }
 
 [[bin]]
 name = "example-message-handler"

@@ -76,6 +76,9 @@ impl ProofProvider for BonsaiProofProvider {
         end_timestamp: i64,
         raw_input: Vec<String>,
     ) -> Result<Receipt> {
+        use crate::hashing::HashingProvider;
+
+        let hashing_provider = HashingProvider::from_env()?;
         // hashing inputs
         let mut res = Vec::with_capacity(5760);
         for i in 0..5760 {

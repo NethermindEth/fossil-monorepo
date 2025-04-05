@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 #[cfg(feature = "proof-composition")]
 use coprocessor_common::convert_felt_to_f64;
+use eyre::{Result, eyre};
 use starknet::{
     accounts::{Account, SingleOwnerAccount},
     core::types::{BlockId, BlockTag, Call, Felt, FunctionCall, InvokeTransactionResult, U256},
@@ -43,11 +44,8 @@ pub trait HashingProviderTrait {
     async fn hash_avg_fees_and_store(
         &self,
         start_timestamp: u64,
-    ) -> Result<InvokeTransactionResult, String>;
-    async fn hash_batched_avg_fees(
-        &self,
-        start_timestamp: u64,
-    ) -> Result<InvokeTransactionResult, String>;
+    ) -> Result<InvokeTransactionResult>;
+    async fn hash_batched_avg_fees(&self, start_timestamp: u64) -> Result<InvokeTransactionResult>;
 }
 
 impl HashingProvider {
@@ -75,8 +73,8 @@ impl HashingProvider {
     /// - STARKNET_ACCOUNT: Address of the Starknet account
     ///
     /// # Returns
-    /// A Result containing the HashingProvider or an error message
-    pub fn from_env() -> Result<Self, String> {
+    /// A Result containing the HashingProvider or an error
+    pub fn from_env() -> Result<Self> {
         use starknet::{
             accounts::ExecutionEncoding,
             core::chain_id,
@@ -86,44 +84,42 @@ impl HashingProvider {
         use url::Url;
 
         // Load environment variables
-        let rpc_url = env::var("RPC_URL")
-            .map_err(|_| "RPC_URL environment variable is not set".to_string())?;
+        let rpc_url =
+            env::var("RPC_URL").map_err(|_| eyre!("RPC_URL environment variable is not set"))?;
 
-        let fossil_light_client_address =
-            env::var("FOSSIL_LIGHT_CLIENT_ADDRESS").map_err(|_| {
-                "FOSSIL_LIGHT_CLIENT_ADDRESS environment variable is not set".to_string()
-            })?;
+        let fossil_light_client_address = env::var("FOSSIL_LIGHT_CLIENT_ADDRESS")
+            .map_err(|_| eyre!("FOSSIL_LIGHT_CLIENT_ADDRESS environment variable is not set"))?;
 
         let hash_storage_address = env::var("HASH_STORAGE_ADDRESS")
-            .map_err(|_| "HASH_STORAGE_ADDRESS environment variable is not set".to_string())?;
+            .map_err(|_| eyre!("HASH_STORAGE_ADDRESS environment variable is not set"))?;
 
         let private_key = env::var("STARKNET_PRIVATE_KEY")
-            .map_err(|_| "STARKNET_PRIVATE_KEY environment variable is not set".to_string())?;
+            .map_err(|_| eyre!("STARKNET_PRIVATE_KEY environment variable is not set"))?;
 
         let account_address = env::var("STARKNET_ACCOUNT")
-            .map_err(|_| "STARKNET_ACCOUNT environment variable is not set".to_string())?;
+            .map_err(|_| eyre!("STARKNET_ACCOUNT environment variable is not set"))?;
 
         // Create the provider
         let provider = JsonRpcClient::new(HttpTransport::new(
-            Url::parse(&rpc_url).map_err(|e| format!("Failed to parse RPC URL: {}", e))?,
+            Url::parse(&rpc_url).map_err(|e| eyre!("Failed to parse RPC URL: {}", e))?,
         ));
 
         // Convert addresses to Felt
         let fossil_light_client_felt = Felt::from_hex(&fossil_light_client_address)
-            .map_err(|e| format!("Invalid FOSSIL_LIGHT_CLIENT_ADDRESS: {}", e))?;
+            .map_err(|e| eyre!("Invalid FOSSIL_LIGHT_CLIENT_ADDRESS: {}", e))?;
 
         let hash_storage_felt = Felt::from_hex(&hash_storage_address)
-            .map_err(|e| format!("Invalid HASH_STORAGE_ADDRESS: {}", e))?;
+            .map_err(|e| eyre!("Invalid HASH_STORAGE_ADDRESS: {}", e))?;
 
         // Create the signer from private key
         let signer = LocalWallet::from(SigningKey::from_secret_scalar(
             Felt::from_hex(&private_key)
-                .map_err(|e| format!("Invalid STARKNET_PRIVATE_KEY: {}", e))?,
+                .map_err(|e| eyre!("Invalid STARKNET_PRIVATE_KEY: {}", e))?,
         ));
 
         // Create account address from hex
         let signer_address = Felt::from_hex(&account_address)
-            .map_err(|e| format!("Invalid STARKNET_ACCOUNT: {}", e))?;
+            .map_err(|e| eyre!("Invalid STARKNET_ACCOUNT: {}", e))?;
 
         // Create the account
         let mut account = SingleOwnerAccount::new(
@@ -235,7 +231,7 @@ impl HashingProviderTrait for HashingProvider {
     async fn hash_avg_fees_and_store(
         &self,
         start_timestamp: u64,
-    ) -> Result<InvokeTransactionResult, String> {
+    ) -> Result<InvokeTransactionResult> {
         self.account
             .execute_v3(vec![Call {
                 to: self.hash_storage_address,
@@ -244,13 +240,10 @@ impl HashingProviderTrait for HashingProvider {
             }])
             .send()
             .await
-            .map_err(|_| "Error".to_string())
+            .map_err(|e| eyre!("Failed to hash and store average fees: {}", e))
     }
 
-    async fn hash_batched_avg_fees(
-        &self,
-        start_timestamp: u64,
-    ) -> Result<InvokeTransactionResult, String> {
+    async fn hash_batched_avg_fees(&self, start_timestamp: u64) -> Result<InvokeTransactionResult> {
         self.account
             .execute_v3(vec![Call {
                 to: self.hash_storage_address,
@@ -259,7 +252,7 @@ impl HashingProviderTrait for HashingProvider {
             }])
             .send()
             .await
-            .map_err(|_| "Error".to_string())
+            .map_err(|e| eyre!("Failed to hash batched average fees: {}", e))
     }
 }
 
