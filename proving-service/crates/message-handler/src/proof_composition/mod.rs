@@ -49,7 +49,7 @@ pub struct ProofTimestampRanges {
 }
 
 impl ProofTimestampRanges {
-    pub fn new(
+    pub const fn new(
         twap_start: i64,
         twap_end: i64,
         reserve_price_start: i64,
@@ -80,7 +80,6 @@ pub trait ProofProvider {
     async fn generate_proofs_from_data(
         &self,
         timestamp_ranges: ProofTimestampRanges,
-        raw_input: Vec<String>,
     ) -> Result<Receipt>;
 }
 
@@ -105,7 +104,6 @@ impl ProofProvider for BonsaiProofProvider {
     async fn generate_proofs_from_data(
         &self,
         timestamp_ranges: ProofTimestampRanges,
-        raw_input: Vec<String>,
     ) -> Result<Receipt> {
         use crate::hashing::HashingProvider;
 
@@ -335,7 +333,6 @@ impl ProofProvider for BonsaiProofProvider {
     async fn generate_proofs_from_data(
         &self,
         _timestamp_ranges: ProofTimestampRanges,
-        _raw_input: Vec<String>,
     ) -> Result<Receipt> {
         Err(eyre!(
             "Proof composition is disabled. Enable the 'proof-composition' feature to use this functionality."
