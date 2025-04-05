@@ -6,8 +6,6 @@ use crate::{
     proof_composition::{ProofProvider, ProofTimestampRanges},
     services::jobs::ProofGenerated,
 };
-use db::DbConnection;
-use db::models::get_block_base_fee_by_time_range;
 use eyre::{Result, eyre};
 use tokio::task::JoinSet;
 use tracing::{debug, error, warn};
@@ -20,7 +18,6 @@ pub struct ProofJobHandler<
 > {
     queue: Arc<Q>,
     terminator: Arc<AtomicBool>,
-    db: Arc<DbConnection>,
     proof_provider: Arc<P>,
     proof_generation_timeout: Duration,
 }
@@ -33,14 +30,12 @@ where
     pub const fn new(
         queue: Arc<Q>,
         terminator: Arc<AtomicBool>,
-        db: Arc<DbConnection>,
         proof_provider: Arc<P>,
         proof_generation_timeout: Duration,
     ) -> Self {
         Self {
             queue,
             terminator,
-            db,
             proof_provider,
             proof_generation_timeout,
         }
@@ -83,7 +78,6 @@ where
                 };
 
                 // Spawn a new task to handle the job
-                let db_clone = self.db.clone();
                 let queue_clone = self.queue.clone();
                 let proof_provider = self.proof_provider.clone();
                 let timeout_duration = self.proof_generation_timeout;
@@ -94,40 +88,10 @@ where
                     // Create ProofTimestampRanges from the job
                     let timestamp_ranges = create_timestamp_ranges(&job);
 
-                    // Get the overall range for fetching data
-                    let (data_start, data_end) = timestamp_ranges.overall_range();
-
-                    let block_base_fees = match get_block_base_fee_by_time_range(
-                        db_clone, data_start, data_end,
-                    )
-                    .await
-                    {
-                        Ok(block_base_fees) => block_base_fees,
-                        Err(e) => {
-                            error!("Error getting block base fees: {}", e);
-
-                            // Attempting to requeue the job
-                            if let Err(e) =
-                                send_job_to_queue(&queue_clone, &Job::RequestProof(job.clone()))
-                                    .await
-                            {
-                                error!("Failed to requeue job: {}", e);
-                            }
-                            return;
-                        }
-                    };
-
-                    if block_base_fees.is_empty() {
-                        // Not retrying this in particular, as if the database is empty, it will likely
-                        // remain empty.
-                        warn!("No block base fees found for job: {:?}", job);
-                        return;
-                    }
-
                     // Start the proof generation with timeout
                     let proof_result = tokio::time::timeout(
                         timeout_duration,
-                        proof_provider.generate_proofs_from_data(timestamp_ranges, block_base_fees),
+                        proof_provider.generate_proofs_from_data(timestamp_ranges),
                     )
                     .await;
 
@@ -267,7 +231,6 @@ mod tests {
         async fn generate_proofs_from_data(
             &self,
             _timestamp_ranges: ProofTimestampRanges,
-            _raw_input: Vec<String>,
         ) -> Result<Receipt> {
             // Simulate some processing time
             sleep(self.delay).await;
@@ -310,13 +273,6 @@ mod tests {
         }
     }
 
-    // Helper function to setup test database
-    async fn setup_db() -> Arc<DbConnection> {
-        DbConnection::new("postgres://postgres:postgres@localhost:5432")
-            .await
-            .unwrap()
-    }
-
     // Helper function to create a test job
     fn create_test_job(job_id: &str, start_timestamp: i64, end_timestamp: i64) -> RequestProof {
         RequestProof {
@@ -346,7 +302,6 @@ mod tests {
             .unwrap();
 
         let terminator = Arc::new(AtomicBool::new(false));
-        let db = setup_db().await;
         let proof_provider = Arc::new(MockProofProvider::new(
             vec![true],
             Duration::from_millis(50),
@@ -355,7 +310,6 @@ mod tests {
         let handler = ProofJobHandler::new(
             queue.clone(),
             terminator.clone(),
-            db,
             proof_provider,
             Duration::from_millis(50),
         );
@@ -397,7 +351,6 @@ mod tests {
             .unwrap();
 
         let terminator = Arc::new(AtomicBool::new(false));
-        let db = setup_db().await;
         let proof_provider = Arc::new(MockProofProvider::new(
             vec![false],
             Duration::from_millis(50),
@@ -406,7 +359,6 @@ mod tests {
         let handler = ProofJobHandler::new(
             queue.clone(),
             terminator.clone(),
-            db,
             proof_provider,
             Duration::from_millis(50),
         );
@@ -456,7 +408,6 @@ mod tests {
             .unwrap();
 
         let terminator = Arc::new(AtomicBool::new(false));
-        let db = setup_db().await;
         let proof_provider = Arc::new(MockProofProvider::new(
             vec![true],
             Duration::from_millis(50),
@@ -465,7 +416,6 @@ mod tests {
         let handler = ProofJobHandler::new(
             queue.clone(),
             terminator.clone(),
-            db,
             proof_provider,
             Duration::from_millis(50),
         );
@@ -507,7 +457,6 @@ mod tests {
         }
 
         let terminator = Arc::new(AtomicBool::new(false));
-        let db = setup_db().await;
         let proof_provider = Arc::new(MockProofProvider::new(
             vec![true, true, true],
             Duration::from_millis(50),
@@ -516,7 +465,6 @@ mod tests {
         let handler = ProofJobHandler::new(
             queue.clone(),
             terminator.clone(),
-            db,
             proof_provider,
             Duration::from_millis(50),
         );
@@ -588,7 +536,6 @@ mod tests {
         }
 
         let terminator = Arc::new(AtomicBool::new(false));
-        let db = setup_db().await;
         // Create a proof provider that fails for specific jobs
         let proof_provider = Arc::new(MockProofProvider::new(
             vec![true, false, true],
@@ -598,7 +545,6 @@ mod tests {
         let handler = ProofJobHandler::new(
             queue.clone(),
             terminator.clone(),
-            db,
             proof_provider,
             Duration::from_millis(50),
         );

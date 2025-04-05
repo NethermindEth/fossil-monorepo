@@ -68,17 +68,17 @@ impl HashingProvider {
         }
     }
 
-    /// Creates a new HashingProvider instance from environment variables.
+    /// Creates a new `HashingProvider` instance from environment variables.
     ///
     /// Requires the following environment variables to be set:
-    /// - RPC_URL: URL for the Starknet RPC provider
-    /// - FOSSIL_LIGHT_CLIENT_ADDRESS: Address of the fossil light client contract
-    /// - HASH_STORAGE_ADDRESS: Address of the hash storage contract
-    /// - STARKNET_PRIVATE_KEY: Private key for the Starknet account
-    /// - STARKNET_ACCOUNT: Address of the Starknet account
+    /// - `RPC_URL`: URL for the Starknet RPC provider
+    /// - `FOSSIL_LIGHT_CLIENT_ADDRESS`: Address of the fossil light client contract
+    /// - `HASH_STORAGE_ADDRESS`: Address of the hash storage contract
+    /// - `STARKNET_PRIVATE_KEY`: Private key for the Starknet account
+    /// - `STARKNET_ACCOUNT`: Address of the Starknet account
     ///
     /// # Returns
-    /// A Result containing the HashingProvider or an error
+    /// A Result containing the `HashingProvider` or an error
     pub fn from_env() -> Result<Self> {
         use starknet::{
             accounts::ExecutionEncoding,
