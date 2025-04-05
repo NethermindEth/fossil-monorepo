@@ -1,10 +1,13 @@
-# Fossil Monorepo
-
 <div align="center">
 
+# Fossil Monorepo
+
 [![CI Status](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/monorepo-ci.yml/badge.svg)](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/monorepo-ci.yml)
-![PS Coverage][ps-coverage-badge]
-![OP Coverage][op-coverage-badge]
+
+| Component | Coverage |
+|:--------:|:--------:|
+| **Proving Service** | ![PS Coverage][ps-coverage-badge] |
+| **Offchain Processor** | ![OP Coverage][op-coverage-badge] |
 
 </div>
 
