@@ -4,7 +4,6 @@
 
 [![CI Status](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/monorepo-ci.yml/badge.svg)](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/monorepo-ci.yml)
 
-| Component | Coverage |
 |:--------:|:--------:|
 | **Proving Service** | ![PS Coverage][ps-coverage-badge] |
 | **Offchain Processor** | ![OP Coverage][op-coverage-badge] |
