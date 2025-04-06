@@ -15,12 +15,23 @@ proof-composition = [
     "calculate_pt_pt1_error_bound_floating", 
     "twap_error_bound_floating", 
     "hashing_felts", 
-    "proof_composition_twap_maxreturn_reserveprice_floating_hashing_methods"
+    "proof_composition_twap_maxreturn_reserveprice_floating_hashing_methods",
+]
+mock-proof = [
+    "mock-proof-composition-methods", 
+    "coprocessor_core", 
+    "nalgebra", 
+    "garaga_rs", 
+    "risc0-ethereum-contracts"
 ]
 
 [[bin]]
 name = "message-handler"
 path = "src/main.rs"
+
+[[bin]]
+name = "example-message-handler"
+path = "src/example_service_main.rs"
 
 [dependencies]
 # Core dependencies
@@ -32,6 +43,8 @@ serde_json = { workspace = true }
 async-trait = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+uuid = { version = "1.16.0", features = ["v4"] }
+url = { workspace = true }
 
 # AWS
 aws-config = { workspace = true }
@@ -41,25 +54,100 @@ aws-sdk-sqs = { workspace = true }
 starknet = { workspace = true }
 starknet-crypto = { workspace = true }
 
-# Proving deps - all optional behind the proof-composition feature
-coprocessor_common = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "common", optional = true }
-coprocessor_core = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "core", optional = true }
+# RISC Zero dependencies
+[dependencies.risc0-zkvm]
+version = "2.0.1"
+default-features = false
+features = [
+    "std",
+    "unstable",
+    "client",
+    "bonsai",
+] 
 
-add_twap_7d_error_bound_floating = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "add-twap-7d-error-bound-floating", optional = true }
-max_return_floating = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "max-return-floating", optional = true }
-remove_seasonality_error_bound_floating = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "remove-seasonality-error-bound-floating", optional = true }
-simulate_price_verify_position_floating = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "simulate-price-verify-position-floating", optional = true }
-calculate_pt_pt1_error_bound_floating = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "calculate-pt-pt1-error-bound-floating", optional = true }
-twap_error_bound_floating = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "twap-error-bound-floating", optional = true }
-hashing_felts = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "hashing-felts", optional = true }
-proof_composition_twap_maxreturn_reserveprice_floating_hashing_methods = { git = "https://github.com/NethermindEth/pitchlake-coprocessor", package = "proof-composition-twap-maxreturn-reserveprice-floating-hashing-methods", optional = true }
+[dependencies.risc0-ethereum-contracts]
+git = "https://github.com/risc0/risc0-ethereum"
+tag = "v2.0.2"
+optional = true
 
-risc0-zkvm = { version = "2.0.1" }
-uuid = { version = "1.16.0", features = ["v4"] }
-url = { workspace = true }
+# Proving dependencies
+# Math utilities
+[dependencies.nalgebra]
+version = "0.33.2"
+optional = true 
+
+[dependencies.garaga_rs]
+git = "https://github.com/keep-starknet-strange/garaga.git"
+branch = "main"
+optional = true 
+
+# Coprocessor base dependencies
+[dependencies.coprocessor_common]
+git = "https://github.com/NethermindEth/pitchlake-coprocessor"
+package = "common"
+optional = true
+branch = "main" 
+
+[dependencies.coprocessor_core]
+git = "https://github.com/NethermindEth/pitchlake-coprocessor"
+package = "core"
+optional = true
+branch = "main" 
+
+# Coprocessor computation methods
+[dependencies.add_twap_7d_error_bound_floating]
+git = "https://github.com/NethermindEth/pitchlake-coprocessor"
+package = "add-twap-7d-error-bound-floating"
+optional = true
+branch = "main" 
+
+[dependencies.max_return_floating]
+git = "https://github.com/NethermindEth/pitchlake-coprocessor"
+package = "max-return-floating"
+optional = true
+branch = "main" 
+
+[dependencies.remove_seasonality_error_bound_floating]
+git = "https://github.com/NethermindEth/pitchlake-coprocessor"
+package = "remove-seasonality-error-bound-floating"
+optional = true
+branch = "main" 
+
+[dependencies.simulate_price_verify_position_floating]
+git = "https://github.com/NethermindEth/pitchlake-coprocessor"
+package = "simulate-price-verify-position-floating"
+optional = true
+branch = "main" 
+
+[dependencies.calculate_pt_pt1_error_bound_floating]
+git = "https://github.com/NethermindEth/pitchlake-coprocessor"
+package = "calculate-pt-pt1-error-bound-floating"
+optional = true
+branch = "main" 
+
+[dependencies.twap_error_bound_floating]
+git = "https://github.com/NethermindEth/pitchlake-coprocessor"
+package = "twap-error-bound-floating"
+optional = true
+branch = "main" 
+
+[dependencies.hashing_felts]
+git = "https://github.com/NethermindEth/pitchlake-coprocessor"
+package = "hashing-felts"
+optional = true
+branch = "main" 
+
+# Proof composition dependencies
+[dependencies.proof_composition_twap_maxreturn_reserveprice_floating_hashing_methods]
+git = "https://github.com/NethermindEth/pitchlake-coprocessor"
+package = "proof-composition-twap-maxreturn-reserveprice-floating-hashing-methods"
+optional = true
+branch = "main" 
+
+[dependencies.mock-proof-composition-methods]
+git = "https://github.com/NethermindEth/pitchlake-coprocessor"
+package = "mock-proof-composition-methods"
+optional = true
+branch = "main" 
 
 [dev-dependencies]
-
-[[bin]]
-name = "example-message-handler"
-path = "src/example_service_main.rs"
