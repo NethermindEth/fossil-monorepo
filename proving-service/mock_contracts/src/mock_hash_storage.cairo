@@ -26,6 +26,11 @@ mod MockHashStorage {
         hash_batched_avg_fees: Map<u64, [u32; 8]> // hash of hash of 180 avg fees
     }
 
+    #[constructor]
+    fn constructor(ref self: ContractState, fossil_store: starknet::ContractAddress) {
+        self.fossil_store.write(IMockFossilStoreDispatcher { contract_address: fossil_store });
+    }
+
     #[abi(embed_v0)]
     impl MockHashStorageImpl of super::IMockHashStorage<ContractState> {
         fn set_fossil_store(ref self: ContractState, fossil_store: starknet::ContractAddress) {
