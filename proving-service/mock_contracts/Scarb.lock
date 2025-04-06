@@ -2,10 +2,61 @@
 version = 1
 
 [[package]]
+name = "fp"
+version = "0.1.4"
+source = "registry+https://scarbs.xyz/"
+checksum = "sha256:f636c02dfcb0fd321cd865c3ef0d5d352c7e27e4e21a2c3ad5836ab0d2511236"
+
+[[package]]
+name = "garaga"
+version = "0.16.0"
+source = "git+https://github.com/keep-starknet-strange/garaga.git?branch=main#d55651a9a205d2e35a8653844a1437f823c924df"
+
+[[package]]
 name = "mock_contracts"
 version = "0.1.0"
 dependencies = [
+ "pitchlake_verifier",
  "snforge_std",
+]
+
+[[package]]
+name = "openzeppelin_access"
+version = "1.0.0"
+source = "registry+https://scarbs.xyz/"
+checksum = "sha256:a39a4ea1582916c637bf7e3aee0832c3fe1ea3a3e39191955e8dc39d08327f9b"
+dependencies = [
+ "openzeppelin_introspection",
+ "openzeppelin_utils",
+]
+
+[[package]]
+name = "openzeppelin_introspection"
+version = "1.0.0"
+source = "registry+https://scarbs.xyz/"
+checksum = "sha256:34e088ecf19e0b3012481a29f1fbb20e600540cb9a5db1c3002a97ebb7f5a32a"
+
+[[package]]
+name = "openzeppelin_upgrades"
+version = "1.0.0"
+source = "registry+https://scarbs.xyz/"
+checksum = "sha256:36f7a03e7e7111577916aacf31f88ad0053de20f33ee10b0ab3804849c3aa373"
+
+[[package]]
+name = "openzeppelin_utils"
+version = "1.0.0"
+source = "registry+https://scarbs.xyz/"
+checksum = "sha256:fd348b31c4a4407add33adc3c2b8f26dca71dbd7431faaf726168f37a91db0c1"
+
+[[package]]
+name = "pitchlake_verifier"
+version = "0.1.0"
+source = "git+https://github.com/NethermindEth/pitchlake-coprocessor.git?branch=main#5e7baa79c2a0971bb0ae82af9b1e141521e9bf25"
+dependencies = [
+ "fp",
+ "garaga",
+ "openzeppelin_access",
+ "openzeppelin_upgrades",
 ]
 
 [[package]]
