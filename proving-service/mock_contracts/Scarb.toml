@@ -7,6 +7,7 @@ edition = "2024_07"
 
 [dependencies]
 starknet = "2.11.2"
+pitchlake_verifier = { git = "https://github.com/NethermindEth/pitchlake-coprocessor.git", branch = "main" }
 
 [dev-dependencies]
 snforge_std = "0.40.0"
@@ -14,6 +15,12 @@ assert_macros = "2.11.2"
 
 [[target.starknet-contract]]
 sierra = true
+build-external-contracts = [
+    "pitchlake_verifier::pitchlake_verifier::PitchLakeVerifier",
+    "pitchlake_verifier::groth16_verifier::Risc0Groth16VerifierBN254",
+    "pitchlake_verifier::universal_ecip::UniversalECIP",
+    "pitchlake_verifier::mocks::pitchlake_client::MockPitchLakeClient",
+]
 
 [scripts]
 test = "snforge test"
