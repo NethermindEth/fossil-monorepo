@@ -40,80 +40,50 @@ pub async fn handle_job_request(
     Json(request): Json<JobRequest>,
 ) -> impl IntoResponse {
     info!("Received job request for group: {}", request.job_group_id);
-    let mut errors = Vec::new();
 
-    // Dispatch TWAP job
-    let twap_job = Job::RequestProof(RequestProof {
-        job_id: "twap".to_string(),
+    // Create a single job with ranges for all three components
+    // Use job_group_id as the job_id to simplify identification
+    let job_id = request.job_group_id.clone();
+    info!("Creating a single job with ID: {}", job_id);
+
+    let combined_job = Job::RequestProof(RequestProof {
+        job_id: job_id.clone(), // Use job_group_id as the job_id
         start_timestamp: request.twap.start_timestamp,
         end_timestamp: request.twap.end_timestamp,
         job_group_id: Some(request.job_group_id.clone()),
+        twap_start_timestamp: Some(request.twap.start_timestamp),
+        twap_end_timestamp: Some(request.twap.end_timestamp),
+        reserve_price_start_timestamp: Some(request.reserve_price.start_timestamp),
+        reserve_price_end_timestamp: Some(request.reserve_price.end_timestamp),
+        max_return_start_timestamp: Some(request.max_return.start_timestamp),
+        max_return_end_timestamp: Some(request.max_return.end_timestamp),
     });
-    info!("Dispatching TWAP job for group: {}", request.job_group_id);
-    if let Err(e) = dispatcher.dispatch_job(twap_job).await {
-        error!("Failed to dispatch TWAP job: {}", e);
-        errors.push(format!("TWAP job failed: {}", e));
-    }
 
-    // Dispatch Reserve Price job
-    let reserve_price_job = Job::RequestProof(RequestProof {
-        job_id: "reserve_price".to_string(),
-        start_timestamp: request.reserve_price.start_timestamp,
-        end_timestamp: request.reserve_price.end_timestamp,
-        job_group_id: Some(request.job_group_id.clone()),
-    });
-    info!(
-        "Dispatching Reserve Price job for group: {}",
-        request.job_group_id
-    );
-    if let Err(e) = dispatcher.dispatch_job(reserve_price_job).await {
-        error!("Failed to dispatch Reserve Price job: {}", e);
-        errors.push(format!("Reserve Price job failed: {}", e));
-    }
+    info!("Dispatching job with ID: {}", job_id);
 
-    // Dispatch Max Return job
-    let max_return_job = Job::RequestProof(RequestProof {
-        job_id: "max_return".to_string(),
-        start_timestamp: request.max_return.start_timestamp,
-        end_timestamp: request.max_return.end_timestamp,
-        job_group_id: Some(request.job_group_id.clone()),
-    });
-    info!(
-        "Dispatching Max Return job for group: {}",
-        request.job_group_id
-    );
-    if let Err(e) = dispatcher.dispatch_job(max_return_job).await {
-        error!("Failed to dispatch Max Return job: {}", e);
-        errors.push(format!("Max Return job failed: {}", e));
-    }
-
-    if errors.is_empty() {
-        info!(
-            "Successfully dispatched all jobs for group: {}",
-            request.job_group_id
-        );
-        (
-            StatusCode::OK,
-            Json(Response {
-                status: "success".to_string(),
-                message: "All jobs dispatched successfully".to_string(),
-                job_group_id: request.job_group_id,
-            }),
-        )
-    } else {
-        error!(
-            "Failed to dispatch some jobs for group: {}. Errors: {}",
-            request.job_group_id,
-            errors.join(", ")
-        );
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(Response {
-                status: "error".to_string(),
-                message: errors.join(", "),
-                job_group_id: request.job_group_id,
-            }),
-        )
+    match dispatcher.dispatch_job(combined_job).await {
+        Ok(_) => {
+            info!("Successfully dispatched job with ID: {}", job_id);
+            (
+                StatusCode::OK,
+                Json(Response {
+                    status: "success".to_string(),
+                    message: "Job dispatched successfully".to_string(),
+                    job_group_id: request.job_group_id,
+                }),
+            )
+        }
+        Err(e) => {
+            error!("Failed to dispatch job with ID: {}. Error: {}", job_id, e);
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(Response {
+                    status: "error".to_string(),
+                    message: format!("Failed to dispatch job: {}", e),
+                    job_group_id: request.job_group_id,
+                }),
+            )
+        }
     }
 }
 
@@ -207,7 +177,7 @@ mod tests {
         assert_eq!(response.0, StatusCode::OK);
         assert_eq!(response.1.status, "success");
         assert_eq!(response.1.job_group_id, "test-group-123");
-        assert_eq!(response.1.message, "All jobs dispatched successfully");
+        assert_eq!(response.1.message, "Job dispatched successfully");
     }
 
     #[tokio::test]
@@ -249,62 +219,51 @@ mod tests {
         dispatcher: Arc<TestJobDispatcher>,
         request: JobRequest,
     ) -> (StatusCode, Response) {
-        let mut errors = Vec::new();
+        info!("Received job request for group: {}", request.job_group_id);
 
-        // Dispatch TWAP job
-        let twap_job = Job::RequestProof(RequestProof {
-            job_id: "twap".to_string(),
+        // Create a single job with ranges for all three components
+        // Use job_group_id as the job_id to simplify identification
+        let job_id = request.job_group_id.clone();
+        info!("Creating a single job with ID: {}", job_id);
+
+        let combined_job = Job::RequestProof(RequestProof {
+            job_id: job_id.clone(), // Use job_group_id as the job_id
             start_timestamp: request.twap.start_timestamp,
             end_timestamp: request.twap.end_timestamp,
             job_group_id: Some(request.job_group_id.clone()),
+            twap_start_timestamp: Some(request.twap.start_timestamp),
+            twap_end_timestamp: Some(request.twap.end_timestamp),
+            reserve_price_start_timestamp: Some(request.reserve_price.start_timestamp),
+            reserve_price_end_timestamp: Some(request.reserve_price.end_timestamp),
+            max_return_start_timestamp: Some(request.max_return.start_timestamp),
+            max_return_end_timestamp: Some(request.max_return.end_timestamp),
         });
 
-        if let Err(e) = dispatcher.dispatch_job(twap_job).await {
-            errors.push(format!("TWAP job failed: {}", e));
-        }
+        info!("Dispatching job with ID: {}", job_id);
 
-        // Dispatch Reserve Price job
-        let reserve_price_job = Job::RequestProof(RequestProof {
-            job_id: "reserve_price".to_string(),
-            start_timestamp: request.reserve_price.start_timestamp,
-            end_timestamp: request.reserve_price.end_timestamp,
-            job_group_id: Some(request.job_group_id.clone()),
-        });
-
-        if let Err(e) = dispatcher.dispatch_job(reserve_price_job).await {
-            errors.push(format!("Reserve Price job failed: {}", e));
-        }
-
-        // Dispatch Max Return job
-        let max_return_job = Job::RequestProof(RequestProof {
-            job_id: "max_return".to_string(),
-            start_timestamp: request.max_return.start_timestamp,
-            end_timestamp: request.max_return.end_timestamp,
-            job_group_id: Some(request.job_group_id.clone()),
-        });
-
-        if let Err(e) = dispatcher.dispatch_job(max_return_job).await {
-            errors.push(format!("Max Return job failed: {}", e));
-        }
-
-        if errors.is_empty() {
-            (
-                StatusCode::OK,
-                Response {
-                    status: "success".to_string(),
-                    message: "All jobs dispatched successfully".to_string(),
-                    job_group_id: request.job_group_id,
-                },
-            )
-        } else {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Response {
-                    status: "error".to_string(),
-                    message: errors.join(", "),
-                    job_group_id: request.job_group_id,
-                },
-            )
+        match dispatcher.dispatch_job(combined_job).await {
+            Ok(_) => {
+                info!("Successfully dispatched job with ID: {}", job_id);
+                (
+                    StatusCode::OK,
+                    Response {
+                        status: "success".to_string(),
+                        message: "Job dispatched successfully".to_string(),
+                        job_group_id: request.job_group_id,
+                    },
+                )
+            }
+            Err(e) => {
+                error!("Failed to dispatch job with ID: {}. Error: {}", job_id, e);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Response {
+                        status: "error".to_string(),
+                        message: format!("Failed to dispatch job: {}", e),
+                        job_group_id: request.job_group_id,
+                    },
+                )
+            }
         }
     }
 

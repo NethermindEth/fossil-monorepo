@@ -52,3 +52,11 @@ zkvm/.bonsai-env
 zkvm/.bonsay-env
 changes.diff 
 offchain-processor/tarpaulin-report.html
+
+proving-service/mock_contracts/.env.katana
+
+proving-service/mock_contracts/.env.devnet
+
+proving-service/message_handler.log
+
+proving-service/mock_contracts/.env.local

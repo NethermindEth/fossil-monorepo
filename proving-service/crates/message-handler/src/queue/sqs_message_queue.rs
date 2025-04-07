@@ -43,6 +43,7 @@ impl Queue for SqsMessageQueue {
             .queue_url(self.queue_url.clone())
             .wait_time_seconds(20)
             .max_number_of_messages(10)
+            .visibility_timeout(300) // 5 minutes visibility timeout to match proof generation timeout
             .send()
             .await;
 

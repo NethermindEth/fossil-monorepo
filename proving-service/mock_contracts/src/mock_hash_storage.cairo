@@ -17,21 +17,24 @@ mod MockHashStorage {
     use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
     };
-    use crate::mock_fossil_light_client::IMockFossilLightClientDispatcher;
+    use crate::mock_fossil_light_client::IMockFossilStoreDispatcher;
 
     #[storage]
     struct Storage {
-        fossil_store: IMockFossilLightClientDispatcher,
+        fossil_store: IMockFossilStoreDispatcher,
         hash_stored_avg_fees: Map<u64, [u32; 8]>, // hash of 180 avg fees
         hash_batched_avg_fees: Map<u64, [u32; 8]> // hash of hash of 180 avg fees
+    }
+
+    #[constructor]
+    fn constructor(ref self: ContractState, fossil_store: starknet::ContractAddress) {
+        self.fossil_store.write(IMockFossilStoreDispatcher { contract_address: fossil_store });
     }
 
     #[abi(embed_v0)]
     impl MockHashStorageImpl of super::IMockHashStorage<ContractState> {
         fn set_fossil_store(ref self: ContractState, fossil_store: starknet::ContractAddress) {
-            self
-                .fossil_store
-                .write(IMockFossilLightClientDispatcher { contract_address: fossil_store });
+            self.fossil_store.write(IMockFossilStoreDispatcher { contract_address: fossil_store });
         }
 
         fn get_fossil_store(self: @ContractState) -> starknet::ContractAddress {
