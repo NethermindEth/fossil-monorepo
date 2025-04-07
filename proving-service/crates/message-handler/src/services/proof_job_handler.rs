@@ -116,17 +116,16 @@ where
                 };
 
                 // Only handle RequestProof jobs
-                let job = match job {
-                    Job::RequestProof(job) => job,
-                    _ => {
-                        // Delete non-RequestProof messages
-                        if let Err(e) = self.queue.delete_message(&message).await {
-                            error!("Error deleting non-RequestProof message from queue: {}", e);
-                        } else {
-                            info!("Deleted non-RequestProof message from queue");
-                        }
-                        continue;
+                let job = if let Job::RequestProof(job) = job {
+                    job
+                } else {
+                    // Delete non-RequestProof messages
+                    if let Err(e) = self.queue.delete_message(&message).await {
+                        error!("Error deleting non-RequestProof message from queue: {}", e);
+                    } else {
+                        info!("Deleted non-RequestProof message from queue");
                     }
+                    continue;
                 };
 
                 // Check if the job is already being processed
@@ -175,7 +174,6 @@ where
                                 failure_count: 0,
                                 last_failure_time: std::time::Instant::now(),
                             });
-                        
                         let should_delete = failure_entry.failure_count >= max_failures;
                         if should_delete {
                             info!("Job ID {} has failed {} times, will delete after processing", job.job_id, failure_entry.failure_count);
@@ -187,10 +185,9 @@ where
                     let timestamp_ranges = create_timestamp_ranges(&job);
 
                     // Check if this job has all the required timestamp ranges
-                    let has_all_components = job.twap_start_timestamp.is_some() && 
-                                         job.reserve_price_start_timestamp.is_some() && 
+                    let has_all_components = job.twap_start_timestamp.is_some() &&
+                                         job.reserve_price_start_timestamp.is_some() &&
                                          job.max_return_start_timestamp.is_some();
-                    
                     if has_all_components {
                         info!("Processing job ID: {} with all three components (twap, reserve_price, max_return)", job.job_id);
                     } else {
@@ -213,13 +210,11 @@ where
                     match proof_result {
                         Ok(Ok(receipt)) => {
                             info!("Proof generation successful for job ID: {}", job.job_id);
-                            
                             // Remove from failure tracking on success
                             {
                                 let mut failures = job_failures.lock().await;
                                 failures.remove(&job.job_id);
                             }
-                            
                             // Use the same job ID for the ProofGenerated to maintain consistency
                             let proof_generated = Job::ProofGenerated(Box::new(ProofGenerated {
                                 job_id: job.job_id.clone(),
@@ -230,7 +225,6 @@ where
                                 error!("Failed to send proof generated to queue: {}", e);
                             } else {
                                 info!("Successfully sent proof result to queue for job ID: {}", job.job_id);
-                                
                                 // Delete the message on success
                                 if let Err(e) = queue_clone.delete_message(&message_clone).await {
                                     error!("Error deleting processed message from queue: {}", e);
@@ -241,7 +235,6 @@ where
                         }
                         Ok(Err(e)) => {
                             error!("Error generating proofs for job ID {}: {}", job.job_id, e);
-                            
                             // Increment failure count
                             {
                                 let mut failures = job_failures.lock().await;
@@ -250,13 +243,10 @@ where
                                         failure_count: 0,
                                         last_failure_time: std::time::Instant::now(),
                                     });
-                                
                                 failure_entry.failure_count += 1;
                                 failure_entry.last_failure_time = std::time::Instant::now();
-                                
                                 info!("Job ID {} has failed {} times", job.job_id, failure_entry.failure_count);
                             }
-                            
                             // Delete if we've reached max failures
                             if should_delete_after_processing {
                                 info!("Forcibly deleting message for job ID {} after {} failures", job.job_id, max_failures);
@@ -264,7 +254,6 @@ where
                                     error!("Error deleting failed message from queue: {}", e);
                                 } else {
                                     info!("Successfully deleted failed message from queue for job ID: {}", job.job_id);
-                                    
                                     // Also remove from failure tracking
                                     let mut failures = job_failures.lock().await;
                                     failures.remove(&job.job_id);
@@ -276,7 +265,6 @@ where
                         }
                         Err(_) => {
                             error!("Proof generation timed out after {:?} for job ID: {}", timeout_duration, job.job_id);
-                            
                             // Increment failure count for timeouts too
                             {
                                 let mut failures = job_failures.lock().await;
@@ -285,13 +273,10 @@ where
                                         failure_count: 0,
                                         last_failure_time: std::time::Instant::now(),
                                     });
-                                
                                 failure_entry.failure_count += 1;
                                 failure_entry.last_failure_time = std::time::Instant::now();
-                                
                                 info!("Job ID {} has timed out {} times", job.job_id, failure_entry.failure_count);
                             }
-                            
                             // Delete if we've reached max failures
                             if should_delete_after_processing {
                                 info!("Forcibly deleting message for job ID {} after {} timeouts", job.job_id, max_failures);
@@ -299,7 +284,6 @@ where
                                     error!("Error deleting timed out message from queue: {}", e);
                                 } else {
                                     info!("Successfully deleted timed out message from queue for job ID: {}", job.job_id);
-                                    
                                     // Also remove from failure tracking
                                     let mut failures = job_failures.lock().await;
                                     failures.remove(&job.job_id);

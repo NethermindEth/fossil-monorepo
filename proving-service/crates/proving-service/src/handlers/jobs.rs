@@ -13,7 +13,6 @@ use message_handler::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{error, info};
-use uuid::Uuid;
 
 #[derive(Debug, Deserialize)]
 pub struct TimeRange {
