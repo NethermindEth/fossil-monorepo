@@ -37,7 +37,7 @@ echo -e "${BLUE}Using Starknet RPC: ${YELLOW}$STARKNET_RPC${NC}"
 
 # Declare Hash Storage contract
 echo -e "\n${BLUE}==================================================${NC}"
-echo -e "${BLUE}Declaring and deploying ECIP contract${NC}"
+echo -e "${BLUE} Declaring ECIP contract${NC}"
 echo -e "${BLUE}==================================================${NC}"
 ECIP_CLASS_HASH=$(starkli declare ./target/dev/mock_contracts_UniversalECIP.contract_class.json --private-key $STARKNET_PRIVATE_KEY | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
 echo -e "Class hash: ${GREEN}$ECIP_CLASS_HASH${NC}"
