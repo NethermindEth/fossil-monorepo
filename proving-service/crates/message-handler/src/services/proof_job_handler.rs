@@ -1,3 +1,4 @@
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, atomic::AtomicBool};
 use std::time::Duration;
 
@@ -7,30 +8,42 @@ use crate::{
     services::jobs::ProofGenerated,
 };
 use eyre::{Result, eyre};
+use tokio::sync::Mutex;
 use tokio::task::JoinSet;
-use tracing::{debug, error, warn};
+use tracing::{debug, error, info, warn};
 
 use super::jobs::Job;
 
-pub struct ProofJobHandler<
-    Q: Queue + Send + Sync + 'static,
-    P: ProofProvider + Send + Sync + 'static,
-> {
-    queue: Arc<Q>,
-    terminator: Arc<AtomicBool>,
-    proof_provider: Arc<P>,
-    proof_generation_timeout: Duration,
+// Track job processing state and failure count
+#[derive(Debug, Clone)]
+struct JobProcessingState {
+    failure_count: u32,
+    last_failure_time: std::time::Instant,
 }
 
-impl<Q, P> ProofJobHandler<Q, P>
+// Updated ProofJobHandler to use trait object for ProofProvider
+pub struct ProofJobHandler<Q: Queue + Send + Sync + 'static> {
+    queue: Arc<Q>,
+    terminator: Arc<AtomicBool>,
+    proof_provider: Arc<dyn ProofProvider + Send + Sync>,
+    proof_generation_timeout: Duration,
+    // Track currently processing job IDs to prevent duplicate processing
+    processing_jobs: Arc<Mutex<HashSet<String>>>,
+    // Track job failure counts to help decide when to forcibly delete
+    job_failures: Arc<Mutex<HashMap<String, JobProcessingState>>>,
+    // Maximum number of failures before forcing deletion
+    max_failures: u32,
+}
+
+// Implementation for the updated ProofJobHandler
+impl<Q> ProofJobHandler<Q>
 where
     Q: Queue + Send + Sync + 'static,
-    P: ProofProvider + Send + Sync + 'static,
 {
-    pub const fn new(
+    pub fn new(
         queue: Arc<Q>,
         terminator: Arc<AtomicBool>,
-        proof_provider: Arc<P>,
+        proof_provider: Arc<dyn ProofProvider + Send + Sync>,
         proof_generation_timeout: Duration,
     ) -> Self {
         Self {
@@ -38,28 +51,66 @@ where
             terminator,
             proof_provider,
             proof_generation_timeout,
+            processing_jobs: Arc::new(Mutex::new(HashSet::new())),
+            job_failures: Arc::new(Mutex::new(HashMap::new())),
+            max_failures: 3, // Allow up to 3 failures before forcibly deleting
         }
     }
 
     pub async fn receive_job(&self) -> Result<()> {
+        // Check if proof provider is disabled at startup
+        if self.proof_provider.is_disabled() {
+            info!("Proof generation is disabled, jobs will be acknowledged without processing");
+        }
+
         // Create a join set to keep track of all the jobs;
         let mut join_set = JoinSet::new();
+        info!("Starting to poll for messages from queue");
+        let mut poll_counter = 0;
+
         while !self.terminator.load(std::sync::atomic::Ordering::Relaxed) {
+            poll_counter += 1;
+            if poll_counter % 10 == 0 {
+                debug!("Polling for messages (count: {})", poll_counter);
+            }
+
             let messages = match self.queue.receive_messages().await {
-                Ok(messages) => messages,
+                Ok(messages) => {
+                    if !messages.is_empty() {
+                        info!("Received {} messages from queue", messages.len());
+                    }
+                    messages
+                }
                 Err(e) => {
                     warn!("Error receiving messages from queue: {}", e);
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                     continue;
                 }
             };
 
+            if messages.is_empty() {
+                // No messages, sleep briefly to avoid tight loop
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                continue;
+            }
+
             for message in messages {
+                // Log the raw message for debugging
+                debug!("Received message body: {}", message.body);
+
                 let job: Job = match serde_json::from_str(&message.body) {
-                    Ok(job) => job,
+                    Ok(job) => {
+                        debug!("Successfully parsed Job variant");
+                        job
+                    }
                     Err(e) => {
-                        warn!("Error parsing job: {}", e);
-                        // Ignoring any extra messages that are not valid
-                        // TODO: maybe we should delete them?
+                        warn!("Error parsing job: {}. Message body: {}", e, message.body);
+                        // Delete invalid messages to prevent them from being processed repeatedly
+                        if let Err(e) = self.queue.delete_message(&message).await {
+                            error!("Error deleting invalid message from queue: {}", e);
+                        } else {
+                            info!("Deleted invalid message from queue");
+                        }
                         continue;
                     }
                 };
@@ -67,26 +118,84 @@ where
                 // Only handle RequestProof jobs
                 let job = match job {
                     Job::RequestProof(job) => job,
-                    _ => continue,
+                    _ => {
+                        // Delete non-RequestProof messages
+                        if let Err(e) = self.queue.delete_message(&message).await {
+                            error!("Error deleting non-RequestProof message from queue: {}", e);
+                        } else {
+                            info!("Deleted non-RequestProof message from queue");
+                        }
+                        continue;
+                    }
                 };
 
-                // Take the job by deleting it from the queue
-                if let Err(e) = self.queue.delete_message(&message).await {
-                    error!("Error deleting message from queue: {}", e);
-                    // We are continuing since other messages might still be valid
+                // Check if the job is already being processed
+                {
+                    let mut processing_jobs = self.processing_jobs.lock().await;
+                    if processing_jobs.contains(&job.job_id) {
+                        info!("Job ID {} is already being processed, skipping", job.job_id);
+                        continue;
+                    }
+
+                    // Mark this job as being processed
+                    processing_jobs.insert(job.job_id.clone());
+                }
+
+                // Check if proof provider is disabled
+                if self.proof_provider.is_disabled() {
+                    info!(
+                        "Proof generation is disabled. Acknowledging job without processing: {:?}",
+                        job
+                    );
+                    // Delete the message from the queue to acknowledge it
+                    if let Err(e) = self.queue.delete_message(&message).await {
+                        error!("Error deleting disabled proof message from queue: {}", e);
+                    }
                     continue;
-                };
+                }
 
-                // Spawn a new task to handle the job
+                // Clone all necessary variables for the task
+                let message_clone = message.clone();
                 let queue_clone = self.queue.clone();
                 let proof_provider = self.proof_provider.clone();
                 let timeout_duration = self.proof_generation_timeout;
+                let processing_jobs = self.processing_jobs.clone();
+                let job_failures = self.job_failures.clone();
+                let max_failures = self.max_failures;
 
                 join_set.spawn(async move {
+                    info!("Starting processing for job ID: {}", job.job_id);
                     debug!("Received & processing job: {:?}", job);
+
+                    // Check if this job has failed too many times
+                    let should_delete_after_processing = {
+                        let mut failures = job_failures.lock().await;
+                        let failure_entry = failures.entry(job.job_id.clone())
+                            .or_insert_with(|| JobProcessingState {
+                                failure_count: 0,
+                                last_failure_time: std::time::Instant::now(),
+                            });
+                        
+                        let should_delete = failure_entry.failure_count >= max_failures;
+                        if should_delete {
+                            info!("Job ID {} has failed {} times, will delete after processing", job.job_id, failure_entry.failure_count);
+                        }
+                        should_delete
+                    };
 
                     // Create ProofTimestampRanges from the job
                     let timestamp_ranges = create_timestamp_ranges(&job);
+
+                    // Check if this job has all the required timestamp ranges
+                    let has_all_components = job.twap_start_timestamp.is_some() && 
+                                         job.reserve_price_start_timestamp.is_some() && 
+                                         job.max_return_start_timestamp.is_some();
+                    
+                    if has_all_components {
+                        info!("Processing job ID: {} with all three components (twap, reserve_price, max_return)", job.job_id);
+                    } else {
+                        warn!("Job ID: {} is missing some components, but will attempt to process with available data", job.job_id);
+                    }
 
                     // Start the proof generation with timeout
                     let proof_result = tokio::time::timeout(
@@ -95,48 +204,109 @@ where
                     )
                     .await;
 
+                    // Always remove this job from the processing set when done
+                    let _remove_result = {
+                        let mut processing_jobs = processing_jobs.lock().await;
+                        processing_jobs.remove(&job.job_id)
+                    };
+
                     match proof_result {
                         Ok(Ok(receipt)) => {
-                            // If successful, send the proof to the queue
+                            info!("Proof generation successful for job ID: {}", job.job_id);
+                            
+                            // Remove from failure tracking on success
+                            {
+                                let mut failures = job_failures.lock().await;
+                                failures.remove(&job.job_id);
+                            }
+                            
+                            // Use the same job ID for the ProofGenerated to maintain consistency
                             let proof_generated = Job::ProofGenerated(Box::new(ProofGenerated {
-                                job_id: job.clone().job_id,
+                                job_id: job.job_id.clone(),
                                 receipt,
                             }));
 
-                            if let Err(e) = send_job_to_queue(&queue_clone, &proof_generated).await
-                            {
+                            if let Err(e) = send_job_to_queue(&queue_clone, &proof_generated).await {
                                 error!("Failed to send proof generated to queue: {}", e);
-
-                                if let Err(e) =
-                                    send_job_to_queue(&queue_clone, &Job::RequestProof(job.clone()))
-                                        .await
-                                {
-                                    error!(
-                                        "Failed to requeue job after proof generation success: {}",
-                                        e
-                                    );
+                            } else {
+                                info!("Successfully sent proof result to queue for job ID: {}", job.job_id);
+                                
+                                // Delete the message on success
+                                if let Err(e) = queue_clone.delete_message(&message_clone).await {
+                                    error!("Error deleting processed message from queue: {}", e);
+                                } else {
+                                    info!("Successfully deleted message from queue for job ID: {}", job.job_id);
                                 }
                             }
                         }
                         Ok(Err(e)) => {
-                            error!("Error generating proofs: {}", e);
-
-                            if let Err(e) =
-                                send_job_to_queue(&queue_clone, &Job::RequestProof(job)).await
+                            error!("Error generating proofs for job ID {}: {}", job.job_id, e);
+                            
+                            // Increment failure count
                             {
-                                error!("Failed to requeue job after proof generation error: {}", e);
+                                let mut failures = job_failures.lock().await;
+                                let failure_entry = failures.entry(job.job_id.clone())
+                                    .or_insert_with(|| JobProcessingState {
+                                        failure_count: 0,
+                                        last_failure_time: std::time::Instant::now(),
+                                    });
+                                
+                                failure_entry.failure_count += 1;
+                                failure_entry.last_failure_time = std::time::Instant::now();
+                                
+                                info!("Job ID {} has failed {} times", job.job_id, failure_entry.failure_count);
+                            }
+                            
+                            // Delete if we've reached max failures
+                            if should_delete_after_processing {
+                                info!("Forcibly deleting message for job ID {} after {} failures", job.job_id, max_failures);
+                                if let Err(e) = queue_clone.delete_message(&message_clone).await {
+                                    error!("Error deleting failed message from queue: {}", e);
+                                } else {
+                                    info!("Successfully deleted failed message from queue for job ID: {}", job.job_id);
+                                    
+                                    // Also remove from failure tracking
+                                    let mut failures = job_failures.lock().await;
+                                    failures.remove(&job.job_id);
+                                }
+                            } else {
+                                // Message will be reprocessed after visibility timeout
+                                info!("Message will be reprocessed after visibility timeout for job ID: {}", job.job_id);
                             }
                         }
                         Err(_) => {
-                            error!("Proof generation timed out after {:?}", timeout_duration);
-
-                            if let Err(e) =
-                                send_job_to_queue(&queue_clone, &Job::RequestProof(job)).await
+                            error!("Proof generation timed out after {:?} for job ID: {}", timeout_duration, job.job_id);
+                            
+                            // Increment failure count for timeouts too
                             {
-                                error!(
-                                    "Failed to requeue job after proof generation timeout: {}",
-                                    e
-                                );
+                                let mut failures = job_failures.lock().await;
+                                let failure_entry = failures.entry(job.job_id.clone())
+                                    .or_insert_with(|| JobProcessingState {
+                                        failure_count: 0,
+                                        last_failure_time: std::time::Instant::now(),
+                                    });
+                                
+                                failure_entry.failure_count += 1;
+                                failure_entry.last_failure_time = std::time::Instant::now();
+                                
+                                info!("Job ID {} has timed out {} times", job.job_id, failure_entry.failure_count);
+                            }
+                            
+                            // Delete if we've reached max failures
+                            if should_delete_after_processing {
+                                info!("Forcibly deleting message for job ID {} after {} timeouts", job.job_id, max_failures);
+                                if let Err(e) = queue_clone.delete_message(&message_clone).await {
+                                    error!("Error deleting timed out message from queue: {}", e);
+                                } else {
+                                    info!("Successfully deleted timed out message from queue for job ID: {}", job.job_id);
+                                    
+                                    // Also remove from failure tracking
+                                    let mut failures = job_failures.lock().await;
+                                    failures.remove(&job.job_id);
+                                }
+                            } else {
+                                // Message will be reprocessed after visibility timeout
+                                info!("Message will be reprocessed after visibility timeout for job ID: {}", job.job_id);
                             }
                         }
                     };
@@ -250,6 +420,10 @@ mod tests {
                 Err(eyre::eyre!("Mock proof generation failed"))
             }
         }
+
+        fn is_disabled(&self) -> bool {
+            false
+        }
     }
 
     struct MockQueue;
@@ -257,9 +431,7 @@ mod tests {
     #[async_trait::async_trait]
     impl Queue for MockQueue {
         async fn send_message(&self, _message: String) -> Result<(), QueueError> {
-            Err(QueueError::SendError(
-                "Mock queue send message failed".to_string(),
-            ))
+            Err(QueueError::SendError("Mock error".to_string()))
         }
 
         async fn receive_messages(&self) -> Result<Vec<QueueMessage>, QueueError> {
@@ -267,17 +439,14 @@ mod tests {
         }
 
         async fn delete_message(&self, _message: &QueueMessage) -> Result<(), QueueError> {
-            Err(QueueError::DeleteError(
-                "Mock queue delete message failed".to_string(),
-            ))
+            Ok(())
         }
     }
 
-    // Helper function to create a test job
     fn create_test_job(job_id: &str, start_timestamp: i64, end_timestamp: i64) -> RequestProof {
         RequestProof {
-            job_group_id: None,
             job_id: job_id.to_string(),
+            job_group_id: Some("test_group".to_string()),
             start_timestamp,
             end_timestamp,
             twap_start_timestamp: None,
@@ -302,10 +471,9 @@ mod tests {
             .unwrap();
 
         let terminator = Arc::new(AtomicBool::new(false));
-        let proof_provider = Arc::new(MockProofProvider::new(
-            vec![true],
-            Duration::from_millis(50),
-        ));
+        let proof_provider: Arc<dyn ProofProvider + Send + Sync> = Arc::new(
+            MockProofProvider::new(vec![true], Duration::from_millis(50)),
+        );
 
         let handler = ProofJobHandler::new(
             queue.clone(),
