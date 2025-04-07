@@ -186,6 +186,7 @@ lint: fmt clippy lint-codespell ## Run all linters.
 dev-services: ## Start all development services.
 	docker compose -f docker/docker-compose.test.yml up -d
 	docker compose -f docker/docker-compose.sqs.yml up -d
+	./scripts/setup-localstack.sh
 
 .PHONY: dev-services-stop
 dev-services-stop: ## Stop all development services.
