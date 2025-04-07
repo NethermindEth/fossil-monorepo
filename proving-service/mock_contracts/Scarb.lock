@@ -51,7 +51,6 @@ checksum = "sha256:fd348b31c4a4407add33adc3c2b8f26dca71dbd7431faaf726168f37a91db
 [[package]]
 name = "pitchlake_verifier"
 version = "0.1.0"
-source = "git+https://github.com/NethermindEth/pitchlake-coprocessor.git?branch=main#5e7baa79c2a0971bb0ae82af9b1e141521e9bf25"
 dependencies = [
  "fp",
  "garaga",
