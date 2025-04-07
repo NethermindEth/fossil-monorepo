@@ -90,14 +90,14 @@ With a transformed payload:
 ### 4. Proving Service API Handling
 
 1. The Proving Service receives the job request.
-2. It creates three separate jobs (TWAP, reserve price, max return) with the same job group ID.
-3. Each job is dispatched to an AWS SQS queue for processing.
+2. It creates a single combined job with ID format `combined_{job_group_id}` that contains time ranges for all three components (TWAP, reserve price, max return).
+3. The combined job is dispatched to an AWS SQS queue for processing.
 4. The Proving Service responds with a success status and the job group ID:
 
 ```json
 {
   "status": "success",
-  "message": "All jobs dispatched successfully",
+  "message": "Job dispatched successfully",
   "job_group_id": "<job_id>"
 }
 ```
