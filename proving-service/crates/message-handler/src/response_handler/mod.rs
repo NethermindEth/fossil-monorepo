@@ -3,13 +3,25 @@ use std::{sync::Arc, time::Duration};
 use eyre::{Result, eyre};
 use starknet::{
     accounts::{Account, ExecutionEncoding, SingleOwnerAccount},
-    core::chain_id,
+    core::{
+        chain_id,
+        codec::{Decode, Encode},
+    },
     macros::selector,
     providers::{JsonRpcClient, jsonrpc::HttpTransport},
     signers::{LocalWallet, SigningKey},
 };
 use starknet_crypto::Felt;
 use tracing::{debug, info, instrument, warn};
+
+#[derive(Clone, Default, Debug, Encode, Decode)]
+pub struct PitchLakeJobRequest {
+    pub vault_address: Felt, // Which vault is this request for
+    // The timestamp the results are for
+    pub timestamp: u64,
+    // 'PITCH_LAKE_V1' (or program hash when proving ?)
+    pub program_id: Felt, // 'PITCH_LAKE_V1'}
+}
 
 pub struct StarknetAccount {
     account: SingleOwnerAccount<Arc<JsonRpcClient<HttpTransport>>, LocalWallet>,
@@ -48,15 +60,63 @@ impl StarknetAccount {
         Ok(Self { account })
     }
 
+    /// Creates a new `StarknetAccount` instance from environment variables.
+    ///
+    /// Requires the following environment variables to be set:
+    /// - `STARKNET_RPC`: URL for the Starknet RPC provider
+    /// - `STARKNET_PRIVATE_KEY`: Private key for the Starknet account
+    /// - `STARKNET_ACCOUNT_ADDRESS`: Address of the Starknet account
+    ///
+    /// # Returns
+    /// A Result containing the `StarknetAccount` or an error
+    #[instrument(level = "debug")]
+    pub fn from_env() -> Result<Self> {
+        use std::env;
+        use url::Url;
+
+        debug!("Creating Starknet account from environment variables");
+
+        // Load environment variables
+        let rpc_url = env::var("STARKNET_RPC")
+            .map_err(|_| eyre!("STARKNET_RPC environment variable is not set"))?;
+
+        let private_key = env::var("STARKNET_PRIVATE_KEY")
+            .map_err(|_| eyre!("STARKNET_PRIVATE_KEY environment variable is not set"))?;
+
+        let account_address = env::var("STARKNET_ACCOUNT_ADDRESS")
+            .map_err(|_| eyre!("STARKNET_ACCOUNT_ADDRESS environment variable is not set"))?;
+
+        // Create the provider
+        let provider = Arc::new(JsonRpcClient::new(HttpTransport::new(
+            Url::parse(&rpc_url).map_err(|e| eyre!("Failed to parse RPC URL: {}", e))?,
+        )));
+
+        debug!("Provider created, initializing account");
+        Self::new(provider, &private_key, &account_address)
+    }
+
     #[instrument(skip(self), level = "debug")]
-    pub async fn verify_mmr_proof(&self, verifier_address: &str, proof: Vec<Felt>) -> Result<Felt> {
+    pub async fn verify_proof(
+        &self,
+        verifier_address: &str,
+        proof: Vec<Felt>,
+        request: PitchLakeJobRequest,
+    ) -> Result<Felt> {
         const MAX_RETRIES: u32 = 3;
         const INITIAL_BACKOFF: Duration = Duration::from_secs(1);
 
-        let selector = selector!("verify_mmr_proof");
+        let mut calldata: Vec<Felt> = vec![];
+        let mut encoded_request: Vec<Felt> = vec![];
+
+        proof.encode(&mut calldata)?;
+
+        request.encode(&mut encoded_request)?;
+        calldata.extend(encoded_request);
+
+        let selector = selector!("verify_proof");
         let call = starknet::core::types::Call {
             selector,
-            calldata: proof,
+            calldata,
             to: Self::felt(verifier_address)?,
         };
 
@@ -159,10 +219,11 @@ mod tests {
 
         let verifier_address = "0x123456789";
         let proof = vec![Felt::from_str("0x1").unwrap()];
+        let request: PitchLakeJobRequest = Default::default();
 
         // Note: This test will fail in real execution since we're using a dummy provider
         // In a real test environment, you would mock the provider and account interactions
-        let result = account.verify_mmr_proof(verifier_address, proof).await;
+        let result = account.verify_proof(verifier_address, proof, request).await;
         assert!(result.is_err()); // Will error due to dummy provider
     }
 
@@ -172,7 +233,12 @@ mod tests {
         let account =
             StarknetAccount::new(provider, "0x1234567890abcdef", "0x987654321fedcba").unwrap();
 
-        let result = account.verify_mmr_proof("0x123456789", vec![]).await;
+        let verifier_address = "0x123456789";
+        let request: PitchLakeJobRequest = Default::default();
+
+        let result = account
+            .verify_proof(verifier_address, vec![], request)
+            .await;
         assert!(result.is_err());
     }
 }

@@ -8,19 +8,21 @@ use coprocessor_common::{
     original::{self, convert_array1_to_dvec},
     tests::mock::convert_data_to_vec_of_tuples,
 };
+#[cfg(feature = "mock-proof")]
+use coprocessor_core::ProofCompositionInput;
 #[cfg(feature = "proof-composition")]
 use coprocessor_core::{
     AddTwap7dErrorBoundFloatingInput, CalculatePtPt1ErrorBoundFloatingInput, HashingFeltInput,
     MaxReturnInput, ProofCompositionInput, RemoveSeasonalityErrorBoundFloatingInput,
     SimulatePriceVerifyPositionInput, TwapErrorBoundInput,
 };
-#[cfg(feature = "mock-proof")]
-use mock_proof_composition_methods::MOCK_PROOF_COMPOSITION_GUEST_ELF;
 use eyre::{Result, eyre};
 #[cfg(feature = "proof-composition")]
 use hashing_felts::hash_felts;
 #[cfg(feature = "proof-composition")]
 use max_return_floating::max_return;
+#[cfg(feature = "mock-proof")]
+use mock_proof_composition_methods::MOCK_PROOF_COMPOSITION_GUEST_ELF;
 #[cfg(feature = "proof-composition")]
 use proof_composition_twap_maxreturn_reserveprice_floating_hashing_methods::{
     PROOF_COMPOSITION_TWAP_MAXRETURN_RESERVEPRICE_FLOATING_HASHING_GUEST_ELF,
@@ -28,30 +30,34 @@ use proof_composition_twap_maxreturn_reserveprice_floating_hashing_methods::{
 };
 #[cfg(feature = "proof-composition")]
 use remove_seasonality_error_bound_floating::remove_seasonality_error_bound;
+#[cfg(feature = "mock-proof")]
+use risc0_ethereum_contracts::encode_seal;
 #[cfg(any(not(feature = "proof-composition"), feature = "mock-proof"))]
 use risc0_zkvm::Receipt;
 #[cfg(feature = "proof-composition")]
 use risc0_zkvm::{ExecutorEnv, ProverOpts, Receipt, ReceiptKind, default_prover};
 #[cfg(feature = "mock-proof")]
-use risc0_zkvm::{compute_image_id, default_prover, ExecutorEnv, ProverOpts, VerifierContext};
-#[cfg(feature = "mock-proof")]
-use coprocessor_core::{ProofCompositionInput, ProofCompositionOutput};
-#[cfg(feature = "mock-proof")]
-use risc0_ethereum_contracts::encode_seal;
+use risc0_zkvm::{ExecutorEnv, ProverOpts, VerifierContext, compute_image_id, default_prover};
 #[cfg(feature = "proof-composition")]
 use simulate_price_verify_position_floating::simulate_price_verify_position;
 #[cfg(feature = "proof-composition")]
 use starknet::core::types::Felt;
+#[cfg(feature = "mock-proof")]
+use starknet_crypto::Felt;
 use std::cmp::{max, min};
+#[cfg(feature = "mock-proof")]
+use std::env;
 #[cfg(feature = "proof-composition")]
 use tokio::{task, try_join};
 #[cfg(feature = "proof-composition")]
 use twap_error_bound_floating::calculate_twap;
 
 #[cfg(feature = "mock-proof")]
+use crate::response_handler::{PitchLakeJobRequest, StarknetAccount};
+#[cfg(feature = "mock-proof")]
 use garaga_rs::{
     calldata::full_proof_with_hints::groth16::{
-        get_groth16_calldata_felt, risc0_utils::get_risc0_vk, Groth16Proof,
+        Groth16Proof, get_groth16_calldata_felt, risc0_utils::get_risc0_vk,
     },
     definitions::CurveID,
 };
@@ -99,6 +105,10 @@ pub trait ProofProvider {
         &self,
         timestamp_ranges: ProofTimestampRanges,
     ) -> Result<Receipt>;
+
+    fn is_disabled(&self) -> bool {
+        false
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -107,6 +117,10 @@ pub struct BonsaiProofProvider;
 impl BonsaiProofProvider {
     pub const fn new() -> Self {
         Self
+    }
+
+    pub const fn is_disabled(&self) -> bool {
+        false
     }
 }
 
@@ -350,74 +364,107 @@ impl ProofProvider for BonsaiProofProvider {
     #[cfg(feature = "mock-proof")]
     async fn generate_proofs_from_data(
         &self,
-        _timestamp_ranges: ProofTimestampRanges,
+        timestamp_ranges: ProofTimestampRanges,
     ) -> Result<Receipt> {
-        // Use the mock proof generation from the mock-proof-composition crate
-        let data = ProofCompositionInput {
-            data_8_months: vec![0.1, 0.2, 0.3, 0.4, 0.5],
-            data_8_months_hash: [
-                0x12345678, 0x23456789, 0x3456789a, 0x456789ab, 0x56789abc, 0x6789abcd, 0x789abcde,
-                0x89abcdef,
-            ],
-            start_timestamp: 1672531200, // 2023-01-01
-            end_timestamp: 1704067200,   // 2024-01-01
-            positions: vec![1.0, 2.0, 3.0, 4.0, 5.0],
-            pt: DVector::from_vec(vec![0.1, 0.2, 0.3]),
-            pt_1: DVector::from_vec(vec![0.2, 0.3, 0.4]),
-            gradient_tolerance: 0.001,
-            de_seasonalised_detrended_log_base_fee: DVector::from_vec(vec![0.5, 0.6, 0.7]),
-            n_periods: 24,
-            num_paths: 100,
-            season_param: DVector::from_vec(vec![0.8, 0.9, 1.0]),
-            twap_7d: vec![1.1, 1.2, 1.3],
-            slope: 0.05,
-            intercept: 1.5,
-            reserve_price: 2.5,
-            floating_point_tolerance: 0.0001,
-            reserve_price_tolerance: 0.01,
-            twap_tolerance: 0.05,
-            twap_result: 1.25,
-            max_return: 0.3,
-        };
-    
-        let env = ExecutorEnv::builder()
-            .write(&data)
-            .map_err(|e| eyre!("Failed to write data to executor: {}", e))?
-            .build()
-            .map_err(|e| eyre!("Failed to build executor environment: {}", e))?;
-    
-        let prover_result = default_prover()
-            .prove_with_ctx(
-                env,
-                &VerifierContext::default(),
-                MOCK_PROOF_COMPOSITION_GUEST_ELF,
-                &ProverOpts::groth16(),
-            )
-            .map_err(|e| eyre!("Failed to prove: {}", e))?;
-        
-        let receipt = prover_result.receipt;
-    
-        let encoded_seal = encode_seal(&receipt)
-            .map_err(|e| eyre!("Failed to encode seal: {}", e))?;
-    
-        let image_id = compute_image_id(MOCK_PROOF_COMPOSITION_GUEST_ELF)
-            .map_err(|e| eyre!("Failed to compute image ID: {}", e))?;
-    
-        let journal = receipt.journal.bytes.clone();
-        println!("JOURNAL: {:?}", journal);
-    
-        let decoded_journal = receipt.journal.decode::<ProofCompositionOutput>()
-            .map_err(|e| eyre!("Failed to decode journal: {}", e))?;
-        println!("DECODED JOURNAL: {:?}", decoded_journal);
-    
-        let groth16_proof =
-            Groth16Proof::from_risc0(encoded_seal, image_id.as_bytes().to_vec(), journal.clone());
-    
-        let calldata =
-            get_groth16_calldata_felt(&groth16_proof, &get_risc0_vk(), CurveID::BN254)
-                .map_err(|e| eyre!("Failed to get calldata: {}", e))?;
-        println!("CALLDATA: {:?}", calldata);
-        
+        tracing::info!(
+            "Generating combined mock proof for all components (twap, reserve_price, max_return)"
+        );
+        tracing::debug!("Using timestamp ranges: {:?}", timestamp_ranges);
+
+        // First, get the StarknetAccount outside of the blocking context
+        let account = StarknetAccount::from_env()?;
+
+        // Get the verifier address upfront to avoid env vars in blocking context
+        let verifier_address = env::var("PITCH_LAKE_VERIFIER_CONTRACT_ADDRESS").map_err(|_| {
+            eyre!("PITCH_LAKE_VERIFIER_CONTRACT_ADDRESS environment variable is not set")
+        })?;
+
+        // This part has to run in a blocking context since it uses CPU-intensive operations
+        let (receipt, calldata) =
+            tokio::task::spawn_blocking(move || -> Result<(Receipt, Vec<Felt>)> {
+                // Create mock data for the proof
+                let data = ProofCompositionInput {
+                    data_8_months: vec![0.1, 0.2, 0.3, 0.4, 0.5],
+                    data_8_months_hash: [
+                        0x12345678, 0x23456789, 0x3456789a, 0x456789ab, 0x56789abc, 0x6789abcd,
+                        0x789abcde, 0x89abcdef,
+                    ],
+                    start_timestamp: 1672531200, // 2023-01-01
+                    end_timestamp: 1704067200,   // 2024-01-01
+                    positions: vec![1.0, 2.0, 3.0, 4.0, 5.0],
+                    pt: DVector::from_vec(vec![0.1, 0.2, 0.3]),
+                    pt_1: DVector::from_vec(vec![0.2, 0.3, 0.4]),
+                    gradient_tolerance: 0.001,
+                    de_seasonalised_detrended_log_base_fee: DVector::from_vec(vec![0.5, 0.6, 0.7]),
+                    n_periods: 24,
+                    num_paths: 100,
+                    season_param: DVector::from_vec(vec![0.8, 0.9, 1.0]),
+                    twap_7d: vec![1.1, 1.2, 1.3],
+                    slope: 0.05,
+                    intercept: 1.5,
+                    reserve_price: 2.5,
+                    floating_point_tolerance: 0.0001,
+                    reserve_price_tolerance: 0.01,
+                    twap_tolerance: 0.05,
+                    twap_result: 1.25,
+                    max_return: 0.3,
+                };
+
+                // Create an environment and prove
+                let env = ExecutorEnv::builder()
+                    .write(&data)
+                    .map_err(|e| eyre!("Failed to write data to executor: {}", e))?
+                    .build()
+                    .map_err(|e| eyre!("Failed to build executor environment: {}", e))?;
+
+                let prover_result = default_prover()
+                    .prove_with_ctx(
+                        env,
+                        &VerifierContext::default(),
+                        MOCK_PROOF_COMPOSITION_GUEST_ELF,
+                        &ProverOpts::groth16(),
+                    )
+                    .map_err(|e| eyre!("Failed to prove: {}", e))?;
+
+                let receipt = prover_result.receipt;
+
+                let encoded_seal =
+                    encode_seal(&receipt).map_err(|e| eyre!("Failed to encode seal: {}", e))?;
+
+                let image_id = compute_image_id(MOCK_PROOF_COMPOSITION_GUEST_ELF)
+                    .map_err(|e| eyre!("Failed to compute image ID: {}", e))?;
+
+                let journal = receipt.journal.bytes.clone();
+
+                let groth16_proof = Groth16Proof::from_risc0(
+                    encoded_seal,
+                    image_id.as_bytes().to_vec(),
+                    journal.clone(),
+                );
+
+                let calldata =
+                    get_groth16_calldata_felt(&groth16_proof, &get_risc0_vk(), CurveID::BN254)
+                        .map_err(|e| eyre!("Failed to get calldata: {}", e))?;
+
+                Ok((receipt, calldata))
+            })
+            .await
+            .map_err(|e| eyre!("Failed to execute blocking task: {}", e))??;
+
+        let request: PitchLakeJobRequest = Default::default();
+
+        // Now we're back in async context, we can make the async StarknetAccount call
+        let tx_hash = account
+            .verify_proof(&verifier_address, calldata, request)
+            .await?;
+
+        // Log with proper formatting
+        tracing::info!(
+            "Combined mock proof for all components generated successfully with tx hash: {:?}",
+            tx_hash
+        );
+
+        // Return the Receipt
         Ok(receipt)
     }
 
