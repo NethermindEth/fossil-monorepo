@@ -19,6 +19,7 @@ Cargo.lock
 .env
 */.env
 **/.env
+**/.env.*
 
 # Build artifacts
 debug/
