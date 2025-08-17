@@ -15,6 +15,7 @@ serde = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 dotenv = { workspace = true }
+# uuid = { version = "1.6.1", features = ["v4"] }
 
 # AWS
 aws-config = { workspace = true }

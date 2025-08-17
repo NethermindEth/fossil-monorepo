@@ -104,5 +104,11 @@ For detailed information about each project, see their respective READMEs:
 - [Proving Service](proving-service/README.md)
 - [Offchain Processor](offchain-processor/README.md)
 
+## Documentation
+
+Technical documentation about the system:
+
+- [Data Workflow](docs/data_workflow.md) - End-to-end data flow from Offchain Processor to Proving Service
+
 [ps-coverage-badge]: https://img.shields.io/badge/coverage-78.5%25-green
 [op-coverage-badge]: https://img.shields.io/badge/coverage-82.3%25-green

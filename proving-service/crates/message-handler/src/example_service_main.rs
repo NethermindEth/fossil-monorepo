@@ -60,6 +60,12 @@ async fn main() -> Result<()> {
                             0 // Fallback value
                         }
                     },
+                    twap_start_timestamp: None,
+                    twap_end_timestamp: None,
+                    reserve_price_start_timestamp: None,
+                    reserve_price_end_timestamp: None,
+                    max_return_start_timestamp: None,
+                    max_return_end_timestamp: None,
                 }))
                 .await;
             println!("Job dispatched: {:?}", result);
