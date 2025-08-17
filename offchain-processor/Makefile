@@ -86,12 +86,12 @@ build-debug: ## Build the project in debug mode.
 
 ##@ Development
 
-.PHONY: dev-services
-dev-services: ## Start all development services.
+.PHONY: dev-up
+dev-up: ## Start all development services.
 	docker compose -f docker-compose.test.yml up -d
 
-.PHONY: dev-services-stop
-dev-services-stop: ## Stop all development services.
+.PHONY: dev-down
+dev-down: ## Stop all development services.
 	docker compose -f docker-compose.test.yml down
 
 ##@ Test

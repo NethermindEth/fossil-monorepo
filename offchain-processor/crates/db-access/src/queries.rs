@@ -31,6 +31,7 @@ pub async fn get_job_request(
             job_id,
             status as "status: JobStatus",
             created_at,
+            updated_at,
             result
         FROM job_requests
         WHERE job_id = $1
@@ -50,7 +51,7 @@ pub async fn update_job_status(
     sqlx::query!(
         r#"
         UPDATE job_requests
-        SET status = $2, result = $3
+        SET status = $2, result = $3, updated_at = CURRENT_TIMESTAMP
         WHERE job_id = $1
         "#,
         job_id,
@@ -83,4 +84,27 @@ pub async fn update_job_result(
     .await?;
 
     Ok(())
+}
+
+pub async fn get_multiple_job_requests(
+    db: Arc<OffchainProcessorDbConnection>,
+    job_ids: &[String],
+) -> Result<Vec<JobRequest>, sqlx::Error> {
+    sqlx::query_as!(
+        JobRequest,
+        r#"
+        SELECT 
+            job_id,
+            status as "status: JobStatus",
+            created_at,
+            updated_at,
+            result
+        FROM job_requests
+        WHERE job_id = ANY($1)
+        ORDER BY created_at DESC
+        "#,
+        job_ids
+    )
+    .fetch_all(&db.db_connection().pool)
+    .await
 }

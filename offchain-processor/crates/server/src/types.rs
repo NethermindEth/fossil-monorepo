@@ -51,3 +51,23 @@ pub enum GetJobStatusResponseEnum {
     Success(JobResponse),
     Error(ErrorResponse),
 }
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JobResultResponse {
+    pub job_id: String,
+    pub status: JobStatus,
+    pub result: Option<serde_json::Value>,
+    pub created_at: Option<String>,
+    pub completed_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BatchJobStatusRequest {
+    pub job_ids: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BatchJobStatusResponse {
+    pub jobs: Vec<JobResultResponse>,
+    pub not_found: Vec<String>,
+}

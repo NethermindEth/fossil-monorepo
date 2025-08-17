@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "\n        SELECT \n            job_id,\n            status as \"status: JobStatus\",\n            created_at,\n            result\n        FROM job_requests\n        WHERE job_id = $1\n        ",
+  "query": "\n        SELECT \n            job_id,\n            status as \"status: JobStatus\",\n            created_at,\n            updated_at,\n            result\n        FROM job_requests\n        WHERE job_id = ANY($1)\n        ORDER BY created_at DESC\n        ",
   "describe": {
     "columns": [
       {
@@ -20,21 +20,27 @@
       },
       {
         "ordinal": 3,
+        "name": "updated_at",
+        "type_info": "Timestamp"
+      },
+      {
+        "ordinal": 4,
         "name": "result",
         "type_info": "Jsonb"
       }
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "TextArray"
       ]
     },
     "nullable": [
       false,
       false,
       false,
+      true,
       true
     ]
   },
-  "hash": "0b1a6addf2f510f67242339d802f79301eb2634e22d5edd9a36d513e85dd5410"
+  "hash": "385812265a0e82df4c2d2f77112a8b45f2ab3cce504f2bcad72361938f59587e"
 }

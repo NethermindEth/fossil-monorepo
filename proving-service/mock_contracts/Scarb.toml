@@ -7,6 +7,7 @@ edition = "2024_07"
 
 [dependencies]
 starknet = "2.9.4"
+fossil_store = { path = "/home/ametel/source/fossil-light-client" }
 
 [dev-dependencies]
 snforge_std = "0.38.3"
@@ -33,7 +34,7 @@ test = "snforge test"
 
 # [[tool.snforge.fork]]
 # name = "SOME_SECOND_NAME"
-# url = "http://your.second.rpc.url"                         
+# url = "http://your.second.rpc.url"
 # block_id.number = "123"                                    # Block to fork from (block number)
 
 # [[tool.snforge.fork]]

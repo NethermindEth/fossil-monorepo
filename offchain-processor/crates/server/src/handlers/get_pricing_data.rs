@@ -384,6 +384,24 @@ fn validate_time_ranges(
     Ok(())
 }
 
+// Enhanced error responses for better PL integration
+fn _enhanced_error_response(
+    status: StatusCode,
+    error_code: &str,
+    message: &str,
+    job_id: Option<String>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    (
+        status,
+        Json(serde_json::json!({
+            "error_code": error_code,
+            "message": message,
+            "job_id": job_id.unwrap_or_default(),
+            "timestamp": "2024-01-01T00:00:00Z"
+        })),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

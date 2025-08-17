@@ -1,5 +1,5 @@
 #!/bin/bash
-echo "Deploying to Starknet Devnet"
+echo "Deploying to Katana"
 
 # Build contracts
 if [ ! -f "./target/dev/mock_contracts_MockHashStorage.contract_class.json" ]; then
