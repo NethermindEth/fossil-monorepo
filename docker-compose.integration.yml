@@ -1,0 +1,92 @@
+# Integration testing compose file for fossil-monorepo
+# Connects to external fossil-network services while providing isolated test databases
+services:
+  # Proving Service PostgreSQL (port 5433 to avoid conflicts with external indexer)
+  proving_service_db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres  
+      POSTGRES_DB: postgres
+    ports:
+      - "5433:5432"
+    networks:
+      - fossil-network
+      - internal
+    volumes:
+      - proving_service_data:/var/lib/postgresql/data
+      - ./proving-service/tests/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Offchain Processor PostgreSQL (port 5434)
+  offchain_processor_db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres  
+    ports:
+      - "5434:5432"
+    networks:
+      - fossil-network
+      - internal
+    volumes:
+      - offchain_processor_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # LocalStack for SQS (AWS emulation)
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4567:4566"
+    networks:
+      - fossil-network
+      - internal
+    environment:
+      - SERVICES=sqs
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    volumes:
+      - localstack_data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD", "awslocal", "sqs", "list-queues"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Mock Contract Deployer - deploys to external Katana
+  mock-contract-deployer:
+    image: deploy
+    networks:
+      - fossil-network
+    volumes:
+      - ./proving-service/mock_contracts:/app
+    env_file:
+      - ./proving-service/mock_contracts/.env.local
+    stdin_open: true
+    tty: true
+    command: [ "sh", "-c", "chmod +x scripts/deploy-mock-hash-storage.sh && ./scripts/deploy-mock-hash-storage.sh" ]
+    restart: "no"
+    profiles:
+      - deploy
+
+networks:
+  fossil-network:
+    external: true
+    name: fossil-network
+  internal:
+    driver: bridge
+
+volumes:
+  proving_service_data:
+  offchain_processor_data: 
+  localstack_data:

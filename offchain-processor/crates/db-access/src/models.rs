@@ -30,5 +30,6 @@ pub struct JobRequest {
     pub job_id: String,
     pub status: JobStatus,
     pub created_at: chrono::NaiveDateTime,
+    pub updated_at: Option<chrono::NaiveDateTime>,
     pub result: Option<serde_json::Value>,
 }

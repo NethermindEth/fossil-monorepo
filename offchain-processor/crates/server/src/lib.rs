@@ -49,6 +49,14 @@ pub async fn create_app(offchain_processor_db: Arc<OffchainProcessorDbConnection
             "/pricing_data",
             post(handlers::get_pricing_data::get_pricing_data),
         )
+        .route(
+            "/job_result/{job_id}",
+            get(handlers::pl_integration::get_job_result),
+        )
+        .route(
+            "/batch_job_status",
+            post(handlers::pl_integration::get_batch_job_status),
+        )
         .layer(from_fn_with_state(app_state.clone(), simple_apikey_auth));
     //.layer(cors_layer.clone());
 
@@ -58,6 +66,10 @@ pub async fn create_app(offchain_processor_db: Arc<OffchainProcessorDbConnection
         .route(
             "/job_status/{job_id}",
             get(handlers::job_status::get_job_status),
+        )
+        .route(
+            "/webhook/{job_id}",
+            post(handlers::pl_integration::job_callback_webhook),
         )
         .layer(CorsLayer::permissive());
     //.layer(cors_layer.clone());

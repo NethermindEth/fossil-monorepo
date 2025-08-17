@@ -10,10 +10,10 @@ RUN rustup default stable
 # Install Scarb
 RUN mkdir -p /root/.local/bin
 ENV PATH="/root/.local/bin:$CARGO_HOME/bin:$PATH"
-RUN curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh -s -- -v 2.9.4
+RUN curl --proto '=https' --tlsv1.2 -sSf https://docs.swmansion.com/scarb/install.sh | sh -s -- -v 2.12.0
 
 #Install Starkli
-RUN curl https://get.starkli.sh | sh && /root/.starkli/bin/starkliup 
+RUN curl https://get.starkli.sh | sh && /root/.starkli/bin/starkliup
 ENV PATH="/root/.local/bin:/root/.starkli/bin:$CARGO_HOME/bin:$PATH"
 
 FROM debian:bookworm-slim

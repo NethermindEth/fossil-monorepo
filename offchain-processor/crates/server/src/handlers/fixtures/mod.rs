@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use crate::{
-    types::{GetJobStatusResponseEnum, JobResponse, PitchLakeJobRequest},
+    types::{
+        BatchJobStatusRequest, BatchJobStatusResponse, GetJobStatusResponseEnum, JobResponse,
+        JobResultResponse, PitchLakeJobRequest,
+    },
     AppState,
 };
 use axum::{extract::State, http::StatusCode, Json};
@@ -12,7 +15,11 @@ use lazy_static::lazy_static;
 use sqlx::postgres::PgPoolOptions;
 use testcontainers::{clients::Cli, images::postgres::Postgres as PostgresImage, Container};
 
-use super::{get_pricing_data::get_pricing_data, job_status::get_job_status};
+use super::{
+    get_pricing_data::get_pricing_data,
+    job_status::get_job_status,
+    pl_integration::{get_batch_job_status, get_job_result},
+};
 
 lazy_static! {
     static ref DOCKER: Cli = Cli::default();
@@ -44,7 +51,8 @@ impl TestContext {
                 job_id TEXT PRIMARY KEY,
                 status TEXT NOT NULL CHECK (status IN ('Completed', 'Pending', 'Failed')),
                 result JSONB, -- Stores dynamic JSON responses
-                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP
             )
             "#,
         )
@@ -100,8 +108,8 @@ impl TestContext {
     ) {
         sqlx::query(
             r#"
-            INSERT INTO job_requests (job_id, status, result)
-            VALUES ($1, $2, $3::jsonb)
+            INSERT INTO job_requests (job_id, status, result, updated_at)
+            VALUES ($1, $2, $3::jsonb, CURRENT_TIMESTAMP)
             "#,
         )
         .bind(job_id)
@@ -110,5 +118,26 @@ impl TestContext {
         .execute(&self.offchain_processor_db.db_connection().pool)
         .await
         .expect("Failed to create job request with result");
+    }
+
+    pub async fn get_job_result(
+        &self,
+        job_id: &str,
+    ) -> (
+        StatusCode,
+        Json<Result<JobResultResponse, crate::types::ErrorResponse>>,
+    ) {
+        get_job_result(
+            State(self.app_state.clone()),
+            axum::extract::Path(job_id.to_string()),
+        )
+        .await
+    }
+
+    pub async fn get_batch_job_status(
+        &self,
+        request: BatchJobStatusRequest,
+    ) -> (StatusCode, Json<BatchJobStatusResponse>) {
+        get_batch_job_status(State(self.app_state.clone()), Json(request)).await
     }
 }

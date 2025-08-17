@@ -4,7 +4,7 @@
 
 .PHONY: build
 build: ## Build Rust code in release mode.
-	cargo build --release 
+	cargo build --release
 
 .PHONY: build-debug
 build-debug: ## Build Rust code in debug mode.
@@ -182,13 +182,13 @@ lint: fmt clippy lint-codespell ## Run all linters.
 
 ##@ Local Development
 
-.PHONY: dev-services
-dev-services: ## Start all development services.
+.PHONY: dev-up
+dev-up: ## Start all development services.
 	docker compose -f docker/docker-compose.test.yml up -d
 	docker compose -f docker/docker-compose.sqs.yml up -d
 
-.PHONY: dev-services-stop
-dev-services-stop: ## Stop all development services.
+.PHONY: dev-down
+dev-down: ## Stop all development services.
 	docker compose -f docker/docker-compose.test.yml down
 	docker compose -f docker/docker-compose.sqs.yml down
 
@@ -266,4 +266,4 @@ clean: ## Clean project build artifacts.
 
 .PHONY: help
 help: ## Display this help.
-	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST) 
+	@awk 'BEGIN {FS = ":.*##"; printf "Usage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)

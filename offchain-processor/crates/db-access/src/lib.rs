@@ -3,6 +3,7 @@
 pub mod auth;
 pub mod models;
 pub mod queries;
+pub mod types;
 
 use eyre::{eyre, Result};
 use sqlx::postgres::PgPoolOptions;

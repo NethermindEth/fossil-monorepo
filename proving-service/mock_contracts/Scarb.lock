@@ -2,11 +2,54 @@
 version = 1
 
 [[package]]
+name = "fossil_store"
+version = "0.1.0"
+dependencies = [
+ "fp",
+ "openzeppelin_access",
+ "openzeppelin_upgrades",
+ "verifier",
+]
+
+[[package]]
+name = "fp"
+version = "0.1.4"
+source = "registry+https://scarbs.xyz/"
+checksum = "sha256:f636c02dfcb0fd321cd865c3ef0d5d352c7e27e4e21a2c3ad5836ab0d2511236"
+
+[[package]]
+name = "garaga"
+version = "0.18.2"
+source = "git+https://github.com/keep-starknet-strange/garaga.git?branch=main#ffb90e533497121ffa5284c7362dc56fa10b18c6"
+
+[[package]]
 name = "mock_contracts"
 version = "0.1.0"
 dependencies = [
+ "fossil_store",
  "snforge_std",
 ]
+
+[[package]]
+name = "openzeppelin_access"
+version = "2.0.0"
+source = "registry+https://scarbs.xyz/"
+checksum = "sha256:511681dd26d814ee2bc996d44ff8cb4aaa5ae9d14272130def7eb901cf004850"
+dependencies = [
+ "openzeppelin_introspection",
+]
+
+[[package]]
+name = "openzeppelin_introspection"
+version = "2.0.0"
+source = "registry+https://scarbs.xyz/"
+checksum = "sha256:87773ed6cd2318f169283ecbbb161890d1996260a80302d81ec45b70ee5e54c1"
+
+[[package]]
+name = "openzeppelin_upgrades"
+version = "2.0.0"
+source = "registry+https://scarbs.xyz/"
+checksum = "sha256:560d57a9c3f3ec5a476e82fec8963c93c8df63a4ff9ff134f64ab8383bde3c61"
 
 [[package]]
 name = "snforge_scarb_plugin"
@@ -21,4 +64,14 @@ source = "registry+https://scarbs.xyz/"
 checksum = "sha256:d376526fbbe22535ad89ed630b11d6e209f22c50168de6c6430c0591c81c3174"
 dependencies = [
  "snforge_scarb_plugin",
+]
+
+[[package]]
+name = "verifier"
+version = "0.1.0"
+dependencies = [
+ "fossil_store",
+ "garaga",
+ "openzeppelin_access",
+ "openzeppelin_upgrades",
 ]

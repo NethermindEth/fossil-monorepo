@@ -18,8 +18,8 @@ make init-repo          # Initialize repository (git hooks, etc.)
 # Development
 make build              # Build the project in release mode
 make build-debug        # Build the project in debug mode
-make dev-services       # Start all development services
-make dev-services-stop  # Stop all development services
+make dev-up             # Start all development services
+make dev-down           # Stop all development services
 
 # Testing
 make test               # Run all tests with database dependencies
@@ -96,18 +96,52 @@ curl -X POST http://localhost:3000/pricing_data \
 
 ## HTTP API
 
-The service exposes an HTTP endpoint for pricing data requests:
+The service exposes multiple HTTP endpoints for pricing data requests and job management:
 
-### Endpoint
+### Main Endpoints
 
+#### Pricing Data Request
 ```bash
 POST http://localhost:3000/pricing_data
 ```
 
-### Request Format
+#### Job Status Check
+```bash
+GET http://localhost:3000/job_status/{job_id}
+```
 
-Send a POST request with a JSON body in the following format:
+#### Enhanced Job Result (with detailed information)
+```bash
+GET http://localhost:3000/job_result/{job_id}
+```
+*Requires API key authentication*
 
+#### Batch Job Status Check
+```bash
+POST http://localhost:3000/batch_job_status
+```
+*Requires API key authentication*
+
+#### Job Metrics and Analytics
+```bash
+GET http://localhost:3000/job_metrics?hours=24
+```
+*Requires API key authentication*
+
+#### Webhook Callback
+```bash
+POST http://localhost:3000/webhook/{job_id}
+```
+*Public endpoint for external systems to send notifications*
+
+### API Endpoint Details
+
+#### 1. Pricing Data Request
+
+**Endpoint:** `POST /pricing_data`
+**Authentication:** Required (API Key)
+
+Request Format:
 ```json
 {
   "identifiers": ["0x50495443485f4c414b455f5631"],
@@ -123,6 +157,91 @@ Send a POST request with a JSON body in the following format:
   }
 }
 ```
+
+Response:
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "message": "New job request registered and processing initiated.",
+  "status": "Pending"
+}
+```
+
+#### 2. Enhanced Job Result
+
+**Endpoint:** `GET /job_result/{job_id}`
+**Authentication:** Required (API Key)
+
+Response:
+```json
+{
+  "job_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "Completed",
+  "result": {
+    "twap": 123.45,
+    "volatility": 67.89,
+    "reserve_price": 234.56
+  },
+  "created_at": "2024-01-15T10:30:00Z",
+  "completed_at": "2024-01-15T10:32:00Z"
+}
+```
+
+#### 3. Batch Job Status Check
+
+**Endpoint:** `POST /batch_job_status`
+**Authentication:** Required (API Key)
+
+Request:
+```json
+{
+  "job_ids": [
+    "550e8400-e29b-41d4-a716-446655440000",
+    "550e8400-e29b-41d4-a716-446655440001"
+  ]
+}
+```
+
+Response:
+```json
+{
+  "jobs": [
+    {
+      "job_id": "550e8400-e29b-41d4-a716-446655440000",
+      "status": "Completed",
+      "result": {...},
+      "created_at": "2024-01-15T10:30:00Z",
+      "completed_at": "2024-01-15T10:32:00Z"
+    }
+  ],
+  "not_found": [
+    "550e8400-e29b-41d4-a716-446655440001"
+  ]
+}
+```
+
+#### 4. Job Metrics
+
+**Endpoint:** `GET /job_metrics?hours=24`
+**Authentication:** Required (API Key)
+
+Response:
+```json
+{
+  "total_jobs": 150,
+  "pending_jobs": 5,
+  "completed_jobs": 140,
+  "failed_jobs": 5,
+  "average_completion_time_seconds": 45.2
+}
+```
+
+#### 5. Webhook Callback
+
+**Endpoint:** `POST /webhook/{job_id}`
+**Authentication:** Not required (Public)
+
+This endpoint allows external systems (like PitchLake) to send notifications about job processing.
 
 ### Headers
 

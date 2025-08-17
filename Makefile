@@ -150,6 +150,43 @@ dev-services-stop: ## Stop all development services.
 	docker compose -f proving-service/docker/docker-compose.sqs.yml down
 	docker compose -f offchain-processor/docker-compose.test.yml down
 
+##@ Integration Testing
+
+.PHONY: integration-up
+integration-up: ## Start integration testing services (requires external fossil-network).
+	@echo "🚀 Starting integration testing services..."
+	@echo "⚠️  Note: This requires external fossil-network services to be running:"
+	@echo "   - fossil-light-client (Katana on port 5050)"
+	@echo "   - fossil-headers-db (Indexer + DB on ports 3000/5432)"
+	docker compose -f docker-compose.integration.yml up -d proving_service_db offchain_processor_db localstack
+	@echo "✅ Integration services started"
+	@echo "💡 To deploy mock contracts: make integration-deploy-contracts"
+
+.PHONY: integration-down
+integration-down: ## Stop integration testing services.
+	docker compose -f docker-compose.integration.yml down
+
+.PHONY: integration-clean
+integration-clean: ## Stop integration testing services and remove volumes.
+	docker compose -f docker-compose.integration.yml down -v
+
+.PHONY: integration-deploy-contracts
+integration-deploy-contracts: ## Deploy mock contracts to external Katana instance.
+	@echo "🔧 Deploying mock contracts to external Katana..."
+	docker compose -f docker-compose.integration.yml --profile deploy up mock-contract-deployer
+
+.PHONY: integration-test
+integration-test: ## Run full integration test suite with external services.
+	@echo "🧪 Running integration tests..."
+	@echo "⚠️  Ensure external services are running and mock contracts are deployed"
+	make ps-test
+	make op-test
+	@echo "✅ Integration tests completed"
+
+.PHONY: integration-logs
+integration-logs: ## View logs from integration services.
+	docker compose -f docker-compose.integration.yml logs -f
+
 ##@ Code Coverage
 
 .PHONY: coverage-all
@@ -188,6 +225,7 @@ test-clean: ## Clean up test environment
 	docker compose -f proving-service/docker/docker-compose.test.yml down -v
 	docker compose -f proving-service/docker/docker-compose.sqs.yml down -v
 	docker compose -f offchain-processor/docker-compose.test.yml down -v
+	docker compose -f docker-compose.integration.yml down -v
 
 ##@ Help
 
