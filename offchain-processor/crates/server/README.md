@@ -20,7 +20,7 @@ You can run the whole of the api server locally by using docker compose. This wi
 2. The migration service which will terminate once migration is completed
 3. The service itself
 
-First, you'll need to set the environment variables in the `.env` file. Create a copy of `.env.example` (root) into the `crates/server` directory, name it `.env` and fill in the values.
+First, you'll need to set the environment variables. The service will automatically use the root `.env.local` file in the monorepo root directory. Make sure the root `.env.local` file exists and contains the required values.
 
 Now you can run the components with:
 

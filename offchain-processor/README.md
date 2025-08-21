@@ -46,6 +46,42 @@ make help               # Display all available commands
 
 For more details on each command, run `make help`.
 
+## SQLx Offline Compilation
+
+This project uses SQLx with offline compilation to avoid requiring a database connection during builds. The `.sqlx` directory contains pre-generated query metadata that allows compilation without a database.
+
+### For Developers
+
+- **Building**: No database required! Just run `cargo build` or `make build`
+- **The `.sqlx` directory**: Contains query metadata - **commit this to version control**
+- **Automatic offline mode**: Configured in `.cargo/config.toml` with `SQLX_OFFLINE=true`
+
+### Updating Query Metadata
+
+When you modify SQL queries, you need to regenerate the `.sqlx` metadata:
+
+```bash
+# 1. Start the database
+make setup-postgres
+
+# 2. Run migrations
+OFFCHAIN_PROCESSOR_DATABASE_URL="postgres://postgres:postgres@localhost:5434/postgres" sqlx migrate run --source crates/db-access/migrations
+
+# 3. Regenerate query metadata
+OFFCHAIN_PROCESSOR_DATABASE_URL="postgres://postgres:postgres@localhost:5434/postgres" cargo sqlx prepare --workspace
+
+# 4. Commit the updated .sqlx directory
+git add .sqlx
+git commit -m "Update SQLx query metadata"
+```
+
+### CI/CD Benefits
+
+- ✅ No database required in CI pipelines
+- ✅ Faster build times
+- ✅ More reliable builds (no network dependencies)
+- ✅ Works in restricted environments
+
 ## Contributing and Pull Requests
 
 **IMPORTANT:** Before submitting a pull request, always run:

@@ -4,7 +4,7 @@
 
 .PHONY: build
 build: ## Build Rust code in release mode.
-	cargo build --release
+	cargo build --release --features mock-proof
 
 .PHONY: build-debug
 build-debug: ## Build Rust code in debug mode.
@@ -87,7 +87,7 @@ fmt: ## Format code with rustfmt.
 
 .PHONY: clippy
 clippy: ## Run clippy linter with project-specific settings.
-	cargo +nightly clippy \
+	cargo clippy \
 		--no-deps \
 		-p db \
 		-p message-handler \

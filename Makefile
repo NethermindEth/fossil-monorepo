@@ -104,7 +104,7 @@ clean-all: ## Clean all projects.
 
 .PHONY: ps-build
 ps-build: ## Build Proving Service in release mode.
-	cd proving-service && cargo build --release
+	cd proving-service && make build
 
 .PHONY: ps-test
 ps-test: ## Run tests for Proving Service.
@@ -141,13 +141,13 @@ op-clean: ## Clean Offchain Processor build artifacts.
 ##@ Development Environment
 
 .PHONY: dev-services
-dev-services: ## Start all development services.
+dev-up: ## Start all development services.
 	docker compose -f proving-service/docker/docker-compose.test.yml up -d
 	docker compose -f proving-service/docker/docker-compose.sqs.yml up -d
 	docker compose -f offchain-processor/docker-compose.test.yml up -d
 
 .PHONY: dev-services-stop
-dev-services-stop: ## Stop all development services.
+dev-down: ## Stop all development services.
 	docker compose -f proving-service/docker/docker-compose.test.yml down
 	docker compose -f proving-service/docker/docker-compose.sqs.yml down
 	docker compose -f offchain-processor/docker-compose.test.yml down
