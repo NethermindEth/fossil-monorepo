@@ -170,7 +170,7 @@ fmt: ## Format code with rustfmt.
 
 .PHONY: clippy
 clippy: ## Run clippy linter with project-specific settings.
-	cargo +nightly clippy \
+	cargo clippy \
 		--no-deps \
 		-- \
 		-W clippy::branches_sharing_code \

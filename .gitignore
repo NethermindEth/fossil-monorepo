@@ -19,7 +19,9 @@ Cargo.lock
 .env
 */.env
 **/.env
-**/.env.*
+**/.env.docker
+**/.env.local
+**/.env.sepolia
 
 # Build artifacts
 debug/
@@ -51,7 +53,7 @@ data.csv
 crates/mmr-accumulator/db-instances/
 zkvm/.bonsai-env
 zkvm/.bonsay-env
-changes.diff 
+changes.diff
 offchain-processor/tarpaulin-report.html
 
 proving-service/mock_contracts/.env.katana
@@ -61,3 +63,7 @@ proving-service/mock_contracts/.env.devnet
 proving-service/message_handler.log
 
 proving-service/mock_contracts/.env.local
+
+*.log
+
+CLAUDE.md
