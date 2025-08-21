@@ -79,7 +79,7 @@ pub async fn handle_job_request(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(Response {
                     status: "error".to_string(),
-                    message: format!("Failed to dispatch job: {}", e),
+                    message: format!("Failed to dispatch job: {e}"),
                     job_group_id: request.job_group_id,
                 }),
             )

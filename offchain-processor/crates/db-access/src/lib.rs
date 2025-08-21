@@ -33,8 +33,8 @@ pub struct OffchainProcessorDbConnection(Arc<DbConnection>);
 
 impl OffchainProcessorDbConnection {
     pub async fn from_env() -> Result<Self> {
-        let database_url =
-            env::var("DATABASE_URL").map_err(|_| eyre!("DATABASE_URL must be set"))?;
+        let database_url = env::var("OFFCHAIN_PROCESSOR_DATABASE_URL")
+            .map_err(|_| eyre!("OFFCHAIN_PROCESSOR_DATABASE_URL must be set"))?;
 
         let db_connection = DbConnection::new(&database_url).await?;
         Ok(Self(db_connection))

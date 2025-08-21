@@ -1,4 +1,7 @@
-use axum::{Router, routing::post};
+use axum::{
+    Json, Router,
+    routing::{get, post},
+};
 use message_handler::{
     queue::sqs_message_queue::SqsMessageQueue, services::job_dispatcher::JobDispatcher,
 };
@@ -6,6 +9,7 @@ use std::sync::Arc;
 use tracing::info;
 
 use crate::handlers::jobs::handle_job_request;
+use serde_json::{Value, json};
 
 pub async fn create_router(queue: Arc<SqsMessageQueue>) -> Router {
     info!("Setting up HTTP router");
@@ -13,8 +17,16 @@ pub async fn create_router(queue: Arc<SqsMessageQueue>) -> Router {
     let dispatcher = Arc::new(JobDispatcher::new(queue));
 
     Router::new()
+        .route("/health", get(health_check))
         .route("/api/job", post(handle_job_request))
         .with_state(dispatcher)
+}
+
+async fn health_check() -> Json<Value> {
+    Json(json!({
+        "status": "healthy",
+        "service": "proving-service"
+    }))
 }
 
 #[cfg(test)]

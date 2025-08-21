@@ -1,6 +1,6 @@
 use aws_config::{BehaviorVersion, defaults};
 use eyre::Result;
-#[cfg(feature = "mock-proof")]
+#[cfg(any(feature = "proof-composition", feature = "mock-proof"))]
 use message_handler::proof_composition::BonsaiProofProvider;
 use message_handler::proof_composition::ProofProvider;
 use message_handler::queue::sqs_message_queue::SqsMessageQueue;
@@ -137,8 +137,12 @@ async fn main() -> Result<()> {
     // Get the queue URL from environment variable
     let queue_url = std::env::var("SQS_QUEUE_URL")
         .map_err(|e| eyre::eyre!("SQS_QUEUE_URL environment variable not set: {}", e))?;
-    let database_url = std::env::var("DATABASE_URL")
-        .map_err(|e| eyre::eyre!("DATABASE_URL environment variable not set: {}", e))?;
+    let database_url = std::env::var("PROVING_SERVICE_DATABASE_URL").map_err(|e| {
+        eyre::eyre!(
+            "PROVING_SERVICE_DATABASE_URL environment variable not set: {}",
+            e
+        )
+    })?;
     info!("Using SQS Queue URL: {}", queue_url);
     info!("Using database URL: {}", database_url);
 

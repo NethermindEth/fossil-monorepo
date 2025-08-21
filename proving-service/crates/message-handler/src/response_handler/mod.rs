@@ -63,7 +63,7 @@ impl StarknetAccount {
     /// Creates a new `StarknetAccount` instance from environment variables.
     ///
     /// Requires the following environment variables to be set:
-    /// - `STARKNET_RPC`: URL for the Starknet RPC provider
+    /// - `STARKNET_RPC_URL`: URL for the Starknet RPC provider
     /// - `STARKNET_PRIVATE_KEY`: Private key for the Starknet account
     /// - `STARKNET_ACCOUNT_ADDRESS`: Address of the Starknet account
     ///
@@ -77,8 +77,8 @@ impl StarknetAccount {
         debug!("Creating Starknet account from environment variables");
 
         // Load environment variables
-        let rpc_url = env::var("STARKNET_RPC")
-            .map_err(|_| eyre!("STARKNET_RPC environment variable is not set"))?;
+        let rpc_url = env::var("STARKNET_RPC_URL")
+            .map_err(|_| eyre!("STARKNET_RPC_URL environment variable is not set"))?;
 
         let private_key = env::var("STARKNET_PRIVATE_KEY")
             .map_err(|_| eyre!("STARKNET_PRIVATE_KEY environment variable is not set"))?;
