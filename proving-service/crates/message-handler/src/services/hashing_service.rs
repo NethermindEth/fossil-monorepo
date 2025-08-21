@@ -16,7 +16,7 @@ pub struct HashingService<T: HashingProviderTrait + Sync + Send + 'static> {
 
 // Move the helper function to the module level
 fn err_to_string<E: std::fmt::Display>(err: E) -> String {
-    format!("{}", err)
+    format!("{err}")
 }
 
 impl<T: HashingProviderTrait + Sync + Send + 'static> HashingService<T> {
@@ -249,7 +249,7 @@ mod tests {
             todo!()
         }
 
-        fn get_fossil_light_client_address(&self) -> &Felt {
+        fn get_fossil_store_address(&self) -> &Felt {
             todo!()
         }
 

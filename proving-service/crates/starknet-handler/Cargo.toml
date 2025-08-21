@@ -1,0 +1,27 @@
+[package]
+name = "starknet-handler"
+version = { workspace = true }
+edition = { workspace = true }
+
+[[bin]]
+name = "starknet-handler-example"
+path = "src/main.rs"
+required-features = ["binary"]
+
+[dependencies]
+eyre = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+starknet = { workspace = true }
+starknet-crypto = { workspace = true }
+num-traits = "0.2"
+tracing-subscriber = { workspace = true, optional = true }
+dotenv = { workspace = true, optional = true }
+
+[features]
+default = []
+binary = ["tracing-subscriber", "dotenv"]
+
+[dev-dependencies]
+url = { workspace = true }
+serial_test = "3.0"

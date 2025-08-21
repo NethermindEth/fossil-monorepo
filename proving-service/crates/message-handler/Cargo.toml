@@ -16,13 +16,15 @@ proof-composition = [
     "twap_error_bound_floating", 
     "hashing_felts", 
     "proof_composition_twap_maxreturn_reserveprice_floating_hashing_methods",
+    "starknet-handler",
 ]
 mock-proof = [
     "mock-proof-composition-methods", 
     "coprocessor_core", 
     "nalgebra", 
     "garaga_rs", 
-    "risc0-ethereum-contracts"
+    "risc0-ethereum-contracts",
+    "starknet-handler"
 ]
 
 [[bin]]
@@ -32,6 +34,10 @@ path = "src/main.rs"
 [[bin]]
 name = "example-message-handler"
 path = "src/example_service_main.rs"
+
+[[bin]]
+name = "bonsai-test"
+path = "src/bonsai_test.rs"
 
 [dependencies]
 # Core dependencies
@@ -54,9 +60,13 @@ aws-sdk-sqs = { workspace = true }
 starknet = { workspace = true }
 starknet-crypto = { workspace = true }
 
+[dependencies.starknet-handler]
+path = "../starknet-handler"
+optional = true
+
 # RISC Zero dependencies
 [dependencies.risc0-zkvm]
-version = "2.0.1"
+version = "2.3.1"
 default-features = false
 features = [
     "std",
@@ -67,7 +77,7 @@ features = [
 
 [dependencies.risc0-ethereum-contracts]
 git = "https://github.com/risc0/risc0-ethereum"
-tag = "v2.0.2"
+tag = "v2.2.2"
 optional = true
 
 # Proving dependencies

@@ -8,7 +8,7 @@ use crate::{
     services::jobs::ProofGenerated,
 };
 use eyre::{Result, eyre};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Semaphore};
 use tokio::task::JoinSet;
 use tracing::{debug, error, info, warn};
 
@@ -33,6 +33,8 @@ pub struct ProofJobHandler<Q: Queue + Send + Sync + 'static> {
     job_failures: Arc<Mutex<HashMap<String, JobProcessingState>>>,
     // Maximum number of failures before forcing deletion
     max_failures: u32,
+    // Semaphore to limit concurrent proof generation (prevent Bonsai API contention)
+    proof_generation_semaphore: Arc<Semaphore>,
 }
 
 // Implementation for the updated ProofJobHandler
@@ -46,6 +48,17 @@ where
         proof_provider: Arc<dyn ProofProvider + Send + Sync>,
         proof_generation_timeout: Duration,
     ) -> Self {
+        // Get concurrent proof limit from environment (default: 1 to prevent Bonsai API contention)
+        let concurrent_proofs = std::env::var("MAX_CONCURRENT_PROOFS")
+            .ok()
+            .and_then(|s| s.parse().ok())
+            .unwrap_or(1);
+
+        info!(
+            "ProofJobHandler configured with max {} concurrent proof generations",
+            concurrent_proofs
+        );
+
         Self {
             queue,
             terminator,
@@ -54,6 +67,7 @@ where
             processing_jobs: Arc::new(Mutex::new(HashSet::new())),
             job_failures: Arc::new(Mutex::new(HashMap::new())),
             max_failures: 3, // Allow up to 3 failures before forcibly deleting
+            proof_generation_semaphore: Arc::new(Semaphore::new(concurrent_proofs)),
         }
     }
 
@@ -161,6 +175,7 @@ where
                 let processing_jobs = self.processing_jobs.clone();
                 let job_failures = self.job_failures.clone();
                 let max_failures = self.max_failures;
+                let proof_semaphore = self.proof_generation_semaphore.clone();
 
                 join_set.spawn(async move {
                     info!("Starting processing for job ID: {}", job.job_id);
@@ -194,12 +209,22 @@ where
                         warn!("Job ID: {} is missing some components, but will attempt to process with available data", job.job_id);
                     }
 
+                    // Acquire semaphore permit to limit concurrent proof generations
+                    info!("Acquiring proof generation permit for job ID: {} (prevents Bonsai API contention)", job.job_id);
+                    let _permit = if let Ok(permit) = proof_semaphore.acquire().await { permit } else {
+                        error!("Semaphore has been closed for job ID: {}", job.job_id);
+                        return;
+                    };
+                    info!("Proof generation permit acquired for job ID: {} - starting proof generation", job.job_id);
+
                     // Start the proof generation with timeout
                     let proof_result = tokio::time::timeout(
                         timeout_duration,
                         proof_provider.generate_proofs_from_data(timestamp_ranges),
                     )
                     .await;
+
+                    info!("Proof generation completed for job ID: {} - releasing permit", job.job_id);
 
                     // Always remove this job from the processing set when done
                     let _remove_result = {

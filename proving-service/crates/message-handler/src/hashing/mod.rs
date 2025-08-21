@@ -21,7 +21,7 @@ pub fn convert_felt_to_f64(felt: Felt) -> f64 {
 
 pub struct HashingProvider {
     provider: JsonRpcClient<HttpTransport>,
-    fossil_light_client_address: Felt,
+    fossil_store_address: Felt,
     hash_storage_address: Felt,
     account: SingleOwnerAccount<JsonRpcClient<HttpTransport>, LocalWallet>,
 }
@@ -29,7 +29,7 @@ pub struct HashingProvider {
 #[async_trait]
 pub trait HashingProviderTrait {
     fn get_provider(&self) -> &JsonRpcClient<HttpTransport>;
-    fn get_fossil_light_client_address(&self) -> &Felt;
+    fn get_fossil_store_address(&self) -> &Felt;
     fn get_hash_storage_address(&self) -> &Felt;
     async fn get_avg_fees_in_range(
         &self,
@@ -56,13 +56,13 @@ pub trait HashingProviderTrait {
 impl HashingProvider {
     pub const fn new(
         provider: JsonRpcClient<HttpTransport>,
-        fossil_light_client_address: Felt,
+        fossil_store_address: Felt,
         hash_storage_address: Felt,
         account: SingleOwnerAccount<JsonRpcClient<HttpTransport>, LocalWallet>,
     ) -> Self {
         Self {
             provider,
-            fossil_light_client_address,
+            fossil_store_address,
             hash_storage_address,
             account,
         }
@@ -72,10 +72,10 @@ impl HashingProvider {
     ///
     /// Requires the following environment variables to be set:
     /// - `RPC_URL`: URL for the Starknet RPC provider
-    /// - `FOSSIL_LIGHT_CLIENT_ADDRESS`: Address of the fossil light client contract
+    /// - `FOSSIL_STORE_ADDRESS`: Address of the fossil store contract
     /// - `HASH_STORAGE_ADDRESS`: Address of the hash storage contract
     /// - `STARKNET_PRIVATE_KEY`: Private key for the Starknet account
-    /// - `STARKNET_ACCOUNT`: Address of the Starknet account
+    /// - `STARKNET_ACCOUNT_ADDRESS`: Address of the Starknet account
     ///
     /// # Returns
     /// A Result containing the `HashingProvider` or an error
@@ -92,8 +92,8 @@ impl HashingProvider {
         let rpc_url =
             env::var("RPC_URL").map_err(|_| eyre!("RPC_URL environment variable is not set"))?;
 
-        let fossil_light_client_address = env::var("FOSSIL_LIGHT_CLIENT_ADDRESS")
-            .map_err(|_| eyre!("FOSSIL_LIGHT_CLIENT_ADDRESS environment variable is not set"))?;
+        let fossil_store_address = env::var("FOSSIL_STORE_ADDRESS")
+            .map_err(|_| eyre!("FOSSIL_STORE_ADDRESS environment variable is not set"))?;
 
         let hash_storage_address = env::var("HASH_STORAGE_ADDRESS")
             .map_err(|_| eyre!("HASH_STORAGE_ADDRESS environment variable is not set"))?;
@@ -101,8 +101,8 @@ impl HashingProvider {
         let private_key = env::var("STARKNET_PRIVATE_KEY")
             .map_err(|_| eyre!("STARKNET_PRIVATE_KEY environment variable is not set"))?;
 
-        let account_address = env::var("STARKNET_ACCOUNT")
-            .map_err(|_| eyre!("STARKNET_ACCOUNT environment variable is not set"))?;
+        let account_address = env::var("STARKNET_ACCOUNT_ADDRESS")
+            .map_err(|_| eyre!("STARKNET_ACCOUNT_ADDRESS environment variable is not set"))?;
 
         // Create the provider
         let provider = JsonRpcClient::new(HttpTransport::new(
@@ -110,8 +110,8 @@ impl HashingProvider {
         ));
 
         // Convert addresses to Felt
-        let fossil_light_client_felt = Felt::from_hex(&fossil_light_client_address)
-            .map_err(|e| eyre!("Invalid FOSSIL_LIGHT_CLIENT_ADDRESS: {}", e))?;
+        let fossil_store_felt = Felt::from_hex(&fossil_store_address)
+            .map_err(|e| eyre!("Invalid FOSSIL_STORE_ADDRESS: {}", e))?;
 
         let hash_storage_felt = Felt::from_hex(&hash_storage_address)
             .map_err(|e| eyre!("Invalid HASH_STORAGE_ADDRESS: {}", e))?;
@@ -124,7 +124,7 @@ impl HashingProvider {
 
         // Create account address from hex
         let signer_address = Felt::from_hex(&account_address)
-            .map_err(|e| eyre!("Invalid STARKNET_ACCOUNT: {}", e))?;
+            .map_err(|e| eyre!("Invalid STARKNET_ACCOUNT_ADDRESS: {}", e))?;
 
         // Create the account
         let mut account = SingleOwnerAccount::new(
@@ -141,7 +141,7 @@ impl HashingProvider {
         // Create and return the HashingProvider
         Ok(Self::new(
             provider,
-            fossil_light_client_felt,
+            fossil_store_felt,
             hash_storage_felt,
             account,
         ))
@@ -154,8 +154,8 @@ impl HashingProviderTrait for HashingProvider {
         &self.provider
     }
 
-    fn get_fossil_light_client_address(&self) -> &Felt {
-        &self.fossil_light_client_address
+    fn get_fossil_store_address(&self) -> &Felt {
+        &self.fossil_store_address
     }
 
     fn get_hash_storage_address(&self) -> &Felt {
@@ -188,7 +188,7 @@ impl HashingProviderTrait for HashingProvider {
             .provider
             .call(
                 FunctionCall {
-                    contract_address: self.fossil_light_client_address,
+                    contract_address: self.fossil_store_address,
                     entry_point_selector: selector!("get_avg_fees_in_range"),
                     calldata: vec![Felt::from(start_timestamp), Felt::from(end_timestamp)],
                 },
@@ -289,13 +289,13 @@ mod tests {
         let provider = JsonRpcClient::new(HttpTransport::new(
             Url::parse(&env::var("RPC_URL").unwrap()).unwrap(),
         ));
-        let fossil_light_client_address =
-            Felt::from_hex(&env::var("FOSSIL_LIGHT_CLIENT_ADDRESS").unwrap()).unwrap();
+        let fossil_store_address =
+            Felt::from_hex(&env::var("FOSSIL_STORE_ADDRESS").unwrap()).unwrap();
         let hash_storage_address =
             Felt::from_hex(&env::var("HASH_STORAGE_ADDRESS").unwrap()).unwrap();
 
         let private_key = env::var("STARKNET_PRIVATE_KEY").unwrap();
-        let account_address = env::var("STARKNET_ACCOUNT").unwrap();
+        let account_address = env::var("STARKNET_ACCOUNT_ADDRESS").unwrap();
         let signer = LocalWallet::from(SigningKey::from_secret_scalar(
             Felt::from_hex(&private_key).unwrap(),
         ));
@@ -314,7 +314,7 @@ mod tests {
 
         HashingProvider::new(
             provider,
-            fossil_light_client_address,
+            fossil_store_address,
             hash_storage_address,
             account,
         )
