@@ -7,7 +7,7 @@ edition = "2024_07"
 
 [dependencies]
 pitchlake_verifier = { path = "/home/ametel/source/pitchlake-coprocessor" }
-starknet = "2.11.2"
+starknet = "2.12.0"
 
 [dev-dependencies]
 snforge_std = "0.40.0"
