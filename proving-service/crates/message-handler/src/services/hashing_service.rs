@@ -85,10 +85,10 @@ impl<T: HashingProviderTrait + Sync + Send + 'static> HashingService<T> {
                 return Err(err.to_string());
             }
 
-            if let Ok(hash_value) = hash {
-                if hash_value == [0; 8] {
-                    unavailable_batch_timestamp_hashes.push(t);
-                }
+            if let Ok(hash_value) = hash
+                && hash_value == [0; 8]
+            {
+                unavailable_batch_timestamp_hashes.push(t);
             }
         }
 
@@ -146,14 +146,11 @@ impl<T: HashingProviderTrait + Sync + Send + 'static> HashingService<T> {
                 return Err(err.to_string());
             }
 
-            if let Ok(result) = invoke_tx_result {
-                if let Invoke(invoke_receipt) = result.receipt {
-                    if invoke_receipt.execution_result.status()
-                        == TransactionExecutionStatus::Reverted
-                    {
-                        return Err("invoke reverted".to_string());
-                    }
-                }
+            if let Ok(result) = invoke_tx_result
+                && let Invoke(invoke_receipt) = result.receipt
+                && invoke_receipt.execution_result.status() == TransactionExecutionStatus::Reverted
+            {
+                return Err("invoke reverted".to_string());
             }
         }
 
