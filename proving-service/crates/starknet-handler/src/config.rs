@@ -14,6 +14,7 @@ pub const STARKNET_ACCOUNT_PRIVATE_KEY_ENV: &str = "STARKNET_PRIVATE_KEY";
 pub const STARKNET_MAX_RETRIES_ENV: &str = "STARKNET_MAX_RETRIES";
 pub const STARKNET_INITIAL_BACKOFF_MS_ENV: &str = "STARKNET_INITIAL_BACKOFF_MS";
 pub const STARKNET_MAX_BACKOFF_MS_ENV: &str = "STARKNET_MAX_BACKOFF_MS";
+pub const USE_MOCK_STARKNET_DATA_ENV: &str = "USE_MOCK_STARKNET_DATA";
 
 /// Default values for StarkNet configuration
 pub const DEFAULT_STARKNET_RPC: &str = "https://starknet-mainnet.public.blastapi.io";
@@ -34,12 +35,16 @@ pub fn load_starknet_config() -> Result<StarkNetConfig> {
     let hash_store_address = env::var(HASH_STORE_ADDRESS_ENV).ok();
     let account_address = env::var(STARKNET_ACCOUNT_ADDRESS_ENV).ok();
     let account_private_key = env::var(STARKNET_ACCOUNT_PRIVATE_KEY_ENV).ok();
+    let use_mock_data = env::var(USE_MOCK_STARKNET_DATA_ENV)
+        .map(|v| v.to_lowercase() == "true")
+        .unwrap_or(false);
 
     info!(
         rpc_url = %rpc_url,
         fossil_store_address = %fossil_store_address,
         hash_store_address = ?hash_store_address,
         account_configured = account_address.is_some() && account_private_key.is_some(),
+        use_mock_data = use_mock_data,
         "Loaded StarkNet configuration"
     );
 
@@ -71,6 +76,9 @@ pub fn load_starknet_config() -> Result<StarkNetConfig> {
             initial_backoff, max_backoff, "Loaded custom retry configuration"
         );
     }
+
+    // Set mock data mode
+    config = config.with_mock_data(use_mock_data);
 
     Ok(config)
 }
