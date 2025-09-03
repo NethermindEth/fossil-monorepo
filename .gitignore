@@ -67,3 +67,5 @@ proving-service/mock_contracts/.env.local
 *.log
 
 CLAUDE.md
+
+starknet-contracts/.snfoundry_cache/
