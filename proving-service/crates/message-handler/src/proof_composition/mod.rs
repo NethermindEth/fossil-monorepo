@@ -384,6 +384,85 @@ impl ProofProvider for BonsaiProofProvider {
                 max_return: max_return_res.max_return,
             };
 
+            // Log ProofCompositionInput details for verification
+            tracing::info!("📊 ProofCompositionInput prepared and ready for real proof method:");
+            tracing::info!(
+                "   • data_8_months: {} values (need 5760) ✓",
+                composition_input.data_8_months.len()
+            );
+            tracing::info!(
+                "   • data_8_months_hash: {:?}",
+                composition_input.data_8_months_hash
+            );
+            tracing::info!(
+                "   • timestamps: {} to {}",
+                composition_input.start_timestamp,
+                composition_input.end_timestamp
+            );
+            tracing::info!(
+                "   • positions: {} values",
+                composition_input.positions.len()
+            );
+            tracing::info!(
+                "   • Statistical data: pt={}, pt_1={}, season_param={}",
+                composition_input.pt.len(),
+                composition_input.pt_1.len(),
+                composition_input.season_param.len()
+            );
+            tracing::info!(
+                "   • Parameters: reserve_price={}, max_return={}, twap_result={}",
+                composition_input.reserve_price,
+                composition_input.max_return,
+                composition_input.twap_result
+            );
+            tracing::info!(
+                "   • Tolerances: gradient={}, floating_point={}, reserve_price={}, twap={}",
+                composition_input.gradient_tolerance,
+                composition_input.floating_point_tolerance,
+                composition_input.reserve_price_tolerance,
+                composition_input.twap_tolerance
+            );
+
+            // Check if we're using mock data
+            let using_mock_data = std::env::var("USE_MOCK_STARKNET_DATA")
+                .map(|v| v.to_lowercase() == "true")
+                .unwrap_or(false);
+
+            if using_mock_data {
+                tracing::info!(
+                    "🔧 Using mock StarkNet data - ProofCompositionInput contains mock-derived data"
+                );
+                tracing::info!("💡 This input is ready to be sent to the real proof method at:");
+                tracing::info!(
+                    "   /home/ametel/source/pitchlake-coprocessor/methods/proof-composition-twap-maxreturn-reserveprice-floating-hashing-methods"
+                );
+            } else {
+                tracing::info!(
+                    "🌍 Using real onchain data - ProofCompositionInput contains onchain-derived data"
+                );
+            }
+
+            // Optionally save ProofCompositionInput for debugging/integration testing
+            let save_proof_input = std::env::var("SAVE_PROOF_COMPOSITION_INPUT")
+                .map(|v| v.to_lowercase() == "true")
+                .unwrap_or(false);
+
+            if save_proof_input {
+                tracing::info!("💾 Saving ProofCompositionInput to proof_composition_input.json");
+                match serde_json::to_string_pretty(&composition_input) {
+                    Ok(json_str) => {
+                        if let Err(e) = std::fs::write("proof_composition_input.json", json_str) {
+                            tracing::warn!("Failed to save ProofCompositionInput: {}", e);
+                        } else {
+                            tracing::info!("✅ ProofCompositionInput saved successfully");
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to serialize ProofCompositionInput: {}", e);
+                    }
+                }
+            }
+
             // Generate the composed proof
             let env = ExecutorEnv::builder()
                 .write(&composition_input)

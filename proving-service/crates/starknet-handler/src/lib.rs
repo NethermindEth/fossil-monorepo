@@ -8,6 +8,8 @@ use tracing_subscriber as _;
 pub mod account;
 pub mod config;
 pub mod example;
+pub mod mock_data;
+pub mod mock_example;
 pub mod provider;
 
 use eyre::{Result, eyre};

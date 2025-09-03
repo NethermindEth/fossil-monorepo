@@ -8,6 +8,7 @@ name = "starknet-handler-example"
 path = "src/main.rs"
 required-features = ["binary"]
 
+
 [dependencies]
 eyre = { workspace = true }
 tokio = { workspace = true }

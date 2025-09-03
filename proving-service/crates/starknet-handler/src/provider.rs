@@ -13,6 +13,7 @@ use tracing::{debug, error, info, instrument, warn};
 use crate::{
     FeeData, FeeDataWithHash,
     account::{PitchLakeJobRequest, StarknetAccount},
+    mock_data::{MockFeeDataGenerator, generate_mock_verification_hash},
 };
 
 // Default retry configuration
@@ -31,6 +32,7 @@ pub struct StarkNetConfig {
     pub max_retries: Option<u32>,
     pub initial_backoff_ms: Option<u64>,
     pub max_backoff_ms: Option<u64>,
+    pub use_mock_data: bool,
 }
 
 impl StarkNetConfig {
@@ -44,6 +46,7 @@ impl StarkNetConfig {
             max_retries: None,
             initial_backoff_ms: None,
             max_backoff_ms: None,
+            use_mock_data: false,
         }
     }
 
@@ -67,6 +70,11 @@ impl StarkNetConfig {
         self.max_retries = Some(max_retries);
         self.initial_backoff_ms = Some(initial_backoff_ms);
         self.max_backoff_ms = Some(max_backoff_ms);
+        self
+    }
+
+    pub fn with_mock_data(mut self, use_mock_data: bool) -> Self {
+        self.use_mock_data = use_mock_data;
         self
     }
 }
@@ -178,8 +186,30 @@ impl StarknetProvider {
     ) -> Result<FeeData> {
         debug!(
             start_timestamp,
-            end_timestamp, "Fetching average fees in range"
+            end_timestamp,
+            use_mock_data = self.config.use_mock_data,
+            "Fetching average fees in range"
         );
+
+        // Return mock data if enabled
+        if self.config.use_mock_data {
+            info!("Using mock data for fee range request");
+            let mock_generator = MockFeeDataGenerator::default();
+            let block_hashes = mock_generator.generate_mock_fee_data();
+
+            // Generate mock average fees
+            let avg_l1_gas_fee = 1_000_000_000u64; // 1 gwei
+            let avg_l2_gas_fee = 500_000_000u64; // 0.5 gwei
+
+            info!(
+                avg_l1_gas_fee,
+                avg_l2_gas_fee,
+                num_hashes = block_hashes.len(),
+                "Generated mock average fees and block hashes"
+            );
+
+            return Ok(FeeData::new(avg_l1_gas_fee, avg_l2_gas_fee, block_hashes));
+        }
 
         self.with_retry("get_avg_fees_in_range", || async {
             let entry_point_selector = selector!("get_avg_fees_in_range");
@@ -243,8 +273,24 @@ impl StarknetProvider {
     ) -> Result<Vec<Felt>> {
         debug!(
             start_timestamp,
-            end_timestamp, "Fetching raw fees for RISC0 proof generation"
+            end_timestamp,
+            use_mock_data = self.config.use_mock_data,
+            "Fetching raw fees for RISC0 proof generation"
         );
+
+        // Return mock data if enabled
+        if self.config.use_mock_data {
+            info!("Using mock data for raw fees request");
+            let mock_generator = MockFeeDataGenerator::default();
+            let raw_fees = mock_generator.generate_mock_fee_data_as_felts()?;
+
+            info!(
+                num_fees = raw_fees.len(),
+                "Generated mock raw fee data for RISC0 processing"
+            );
+
+            return Ok(raw_fees);
+        }
 
         self.with_retry("get_raw_fees_in_range", || async {
             let entry_point_selector = selector!("get_avg_fees_in_range");
@@ -281,14 +327,30 @@ impl StarknetProvider {
     /// Returns the cryptographic hash used for data integrity verification in RISC0
     #[instrument(skip(self), level = "debug")]
     pub async fn get_verification_hash(&self, start_timestamp: u64) -> Result<[u32; 8]> {
+        debug!(
+            start_timestamp,
+            use_mock_data = self.config.use_mock_data,
+            "Fetching verification hash from hash store"
+        );
+
+        // Return mock data if enabled
+        if self.config.use_mock_data {
+            info!("Using mock data for verification hash request");
+            let mock_hash = generate_mock_verification_hash(start_timestamp);
+
+            info!(
+                hash = ?mock_hash,
+                "Generated mock verification hash"
+            );
+
+            return Ok(mock_hash);
+        }
+
         let hash_store_address = self
             .hash_store_address()
             .ok_or_else(|| eyre::eyre!("Hash store address not configured"))?;
 
-        debug!(
-            start_timestamp,
-            hash_store_address, "Fetching verification hash from hash store"
-        );
+        debug!(hash_store_address, "Using real hash store address");
 
         self.with_retry("get_verification_hash", || async {
             let entry_point_selector = selector!("get_hash_stored_batched_avg_fees");
