@@ -83,7 +83,9 @@ pub mod PitchLakeVerifier {
             .write(IRisc0Groth16VerifierBN254Dispatcher { contract_address: verifier_address });
         self
             .pitchlake_client
-            .write(IFossilClientDispatcher { contract_address: pitchlake_client_address });
+            .write(
+                IFossilClientDispatcher { contract_address: pitchlake_client_address },
+            ); // @dev can omit this
         self.ownable.initializer(owner);
     }
 
@@ -119,9 +121,11 @@ pub mod PitchLakeVerifier {
             journal.twap_result.serialize(ref job_result_data);
             journal.max_return.serialize(ref job_result_data);
 
-            let pitchlake_client: IFossilClientDispatcher = IFossilClientDispatcher{contract_address: pitchlake_job_request.vault_address};
+            let pitchlake_vault: IFossilClientDispatcher = IFossilClientDispatcher {
+                contract_address: pitchlake_job_request.vault_address,
+            };
 
-            pitchlake_client.fossil_callback(job_request_data.span(), job_result_data.span());
+            pitchlake_vault.fossil_callback(job_request_data.span(), job_result_data.span());
 
             self
                 .emit(
