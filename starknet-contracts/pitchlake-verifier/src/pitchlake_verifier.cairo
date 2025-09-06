@@ -40,7 +40,6 @@ pub mod PitchLakeVerifier {
     #[storage]
     struct Storage {
         bn254_verifier: IRisc0Groth16VerifierBN254Dispatcher,
-        pitchlake_client: IFossilClientDispatcher, // @dev can omit this
         #[substorage(v0)]
         ownable: OwnableComponent::Storage,
         #[substorage(v0)]
@@ -81,11 +80,6 @@ pub mod PitchLakeVerifier {
         self
             .bn254_verifier
             .write(IRisc0Groth16VerifierBN254Dispatcher { contract_address: verifier_address });
-        self
-            .pitchlake_client
-            .write(
-                IFossilClientDispatcher { contract_address: pitchlake_client_address },
-            ); // @dev can omit this
         self.ownable.initializer(owner);
     }
 
@@ -160,7 +154,7 @@ pub mod PitchLakeVerifier {
         }
 
         fn get_pitchlake_client_address(self: @ContractState) -> starknet::ContractAddress {
-            self.pitchlake_client.read().contract_address
+            0xdead.try_into().unwrap()
         }
 
         fn upgrade(ref self: ContractState, new_class_hash: starknet::ClassHash) {
