@@ -15,6 +15,7 @@ fp = "0.1.4"
 [dev-dependencies]
 snforge_std = "0.48.1"
 assert_macros = "2.12.0"
+cairo_test = "2.12.0"
 
 [[target.starknet-contract]]
 casm = true
