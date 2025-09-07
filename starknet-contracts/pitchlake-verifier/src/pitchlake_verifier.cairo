@@ -40,7 +40,6 @@ pub mod PitchLakeVerifier {
     #[storage]
     struct Storage {
         bn254_verifier: IRisc0Groth16VerifierBN254Dispatcher,
-        pitchlake_client: IFossilClientDispatcher,
         #[substorage(v0)]
         ownable: OwnableComponent::Storage,
         #[substorage(v0)]
@@ -75,15 +74,12 @@ pub mod PitchLakeVerifier {
     fn constructor(
         ref self: ContractState,
         verifier_address: starknet::ContractAddress,
-        pitchlake_client_address: starknet::ContractAddress,
+        pitchlake_client_address: starknet::ContractAddress, // @dev can omit this
         owner: starknet::ContractAddress,
     ) {
         self
             .bn254_verifier
             .write(IRisc0Groth16VerifierBN254Dispatcher { contract_address: verifier_address });
-        self
-            .pitchlake_client
-            .write(IFossilClientDispatcher { contract_address: pitchlake_client_address });
         self.ownable.initializer(owner);
     }
 
@@ -103,27 +99,27 @@ pub mod PitchLakeVerifier {
 
             let journal = decode_journal(journal);
 
-            let mut proof_data: Array<felt252> = array![];
-
-            // TODO: review the Journal fields that need to be sent to pitchlake client
-            journal.start_timestamp.serialize(ref proof_data);
-            journal.end_timestamp.serialize(ref proof_data);
-            journal.reserve_price.serialize(ref proof_data);
-            journal.floating_point_tolerance.serialize(ref proof_data);
-            journal.reserve_price_tolerance.serialize(ref proof_data);
-            journal.twap_tolerance.serialize(ref proof_data);
-            journal.gradient_tolerance.serialize(ref proof_data);
-            journal.twap_result.serialize(ref proof_data);
-            journal.max_return.serialize(ref proof_data);
-
             let mut job_request_data: Array<felt252> = array![];
             pitchlake_job_request.vault_address.serialize(ref job_request_data);
             pitchlake_job_request.timestamp.serialize(ref job_request_data);
             pitchlake_job_request.program_id.serialize(ref job_request_data);
 
-            let pitchlake_client = self.pitchlake_client.read();
+            let mut job_result_data: Array<felt252> = array![];
+            journal.start_timestamp.serialize(ref job_result_data);
+            journal.end_timestamp.serialize(ref job_result_data);
+            journal.reserve_price.serialize(ref job_result_data);
+            journal.floating_point_tolerance.serialize(ref job_result_data);
+            journal.reserve_price_tolerance.serialize(ref job_result_data);
+            journal.twap_tolerance.serialize(ref job_result_data);
+            journal.gradient_tolerance.serialize(ref job_result_data);
+            journal.twap_result.serialize(ref job_result_data);
+            journal.max_return.serialize(ref job_result_data);
 
-            pitchlake_client.fossil_callback(proof_data.span(), job_request_data.span());
+            let pitchlake_vault: IFossilClientDispatcher = IFossilClientDispatcher {
+                contract_address: pitchlake_job_request.vault_address,
+            };
+
+            pitchlake_vault.fossil_callback(job_request_data.span(), job_result_data.span());
 
             self
                 .emit(
@@ -158,7 +154,7 @@ pub mod PitchLakeVerifier {
         }
 
         fn get_pitchlake_client_address(self: @ContractState) -> starknet::ContractAddress {
-            self.pitchlake_client.read().contract_address
+            0xdead.try_into().unwrap()
         }
 
         fn upgrade(ref self: ContractState, new_class_hash: starknet::ClassHash) {
