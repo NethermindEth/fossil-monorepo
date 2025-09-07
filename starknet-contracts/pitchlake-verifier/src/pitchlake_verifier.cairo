@@ -74,7 +74,7 @@ pub mod PitchLakeVerifier {
     fn constructor(
         ref self: ContractState,
         verifier_address: starknet::ContractAddress,
-        pitchlake_client_address: starknet::ContractAddress, // @dev can omit this
+        //pitchlake_client_address: starknet::ContractAddress, // @dev can omit this
         owner: starknet::ContractAddress,
     ) {
         self

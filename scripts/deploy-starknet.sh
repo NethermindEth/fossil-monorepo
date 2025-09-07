@@ -159,7 +159,7 @@ echo -e "${GREEN}Class hash declared: ${BOLD}$PITCHLAKE_VERIFIER_HASH${NC}"
 echo
 
 echo -e "${YELLOW}Deploying PitchLake Verifier contract...${NC}"
-PITCHLAKE_VERIFIER_ADDRESS=$(starkli deploy $PITCHLAKE_VERIFIER_HASH $VERIFIER_ADDRESS $PITCHLAKE_CLIENT_ADDRESS $STARKNET_ACCOUNT_ADDRESS --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
+PITCHLAKE_VERIFIER_ADDRESS=$(starkli deploy $PITCHLAKE_VERIFIER_HASH $VERIFIER_ADDRESS $STARKNET_ACCOUNT_ADDRESS --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
 echo -e "${GREEN}Contract deployed at: ${BOLD}$PITCHLAKE_VERIFIER_ADDRESS${NC}"
 echo
 
