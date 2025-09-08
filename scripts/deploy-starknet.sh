@@ -17,7 +17,13 @@ update_env_var() {
 
     if grep -q "^$var_name=" "$env_file"; then
         echo -e "${BLUE}$var_name already exists, replacing in $env_file...${NC}"
-        sed -i "s|^$var_name=.*|$var_name=$var_value|" "$env_file"
+        # Use awk to replace the line without temporary files (Docker volume safe)
+        awk -v var="$var_name" -v val="$var_value" '
+            BEGIN { replaced = 0 }
+            $0 ~ "^" var "=" { print var "=" val; replaced = 1; next }
+            { print }
+            END { if (!replaced) print var "=" val }
+        ' "$env_file" > "${env_file}.new" && cat "${env_file}.new" > "$env_file" && rm "${env_file}.new"
     else
         echo -e "${BLUE}Appending $var_name to $env_file...${NC}"
         echo "$var_name=$var_value" >>"$env_file"
@@ -141,15 +147,15 @@ VERIFIER_ADDRESS=$(starkli deploy $VERIFIER_HASH $ECIP_HASH --account $STARKNET_
 echo -e "${GREEN}Contract deployed at: ${BOLD}$VERIFIER_ADDRESS${NC}"
 echo
 
-# Declare and deploy MockPitchLakeClient contract
-echo -e "${YELLOW}Declaring MockPitchLakeClient contract...${NC}"
-PITCHLAKE_CLIENT_HASH=$(starkli declare ../target/dev/pitchlake_verifier_MockPitchLakeClient.contract_class.json --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL --compiler-version 2.9.1 -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
-echo -e "${GREEN}Class hash declared: ${BOLD}$PITCHLAKE_CLIENT_HASH${NC}"
+# Declare and deploy MockPitchLakeVault contract
+echo -e "${YELLOW}Declaring MockPitchLakeVault contract...${NC}"
+PITCHLAKE_VAULT_HASH=$(starkli declare ../target/dev/pitchlake_verifier_MockPitchLakeVault.contract_class.json --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL --compiler-version 2.9.1 -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
+echo -e "${GREEN}Class hash declared: ${BOLD}$PITCHLAKE_VAULT_HASH${NC}"
 echo
 
-echo -e "${YELLOW}Deploying MockPitchLakeClient contract...${NC}"
-PITCHLAKE_CLIENT_ADDRESS=$(starkli deploy $PITCHLAKE_CLIENT_HASH --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
-echo -e "${GREEN}Contract deployed at: ${BOLD}$PITCHLAKE_CLIENT_ADDRESS${NC}"
+echo -e "${YELLOW}Deploying MockPitchLakeVault contract...${NC}"
+PITCHLAKE_VAULT_ADDRESS=$(starkli deploy $PITCHLAKE_VAULT_HASH --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
+echo -e "${GREEN}Contract deployed at: ${BOLD}$PITCHLAKE_VAULT_ADDRESS${NC}"
 echo
 
 # Declare and deploy PitchLake Verifier contract
@@ -174,7 +180,7 @@ for env_file in "${ENV_FILES[@]}"; do
     update_env_var "$env_file" "HASH_STORAGE_ADDRESS" "$SHA2INPUT_ADDRESS"
     update_env_var "$env_file" "UNIVERSAL_ECIP_CONTRACT" "$ECIP_HASH"
     update_env_var "$env_file" "GROTH16_VERIFIER_CONTRACT" "$VERIFIER_ADDRESS"
-    update_env_var "$env_file" "PITCHLAKE_CLIENT" "$PITCHLAKE_CLIENT_ADDRESS"
+    update_env_var "$env_file" "PITCHLAKE_VAULT" "$PITCHLAKE_VAULT_ADDRESS"
     update_env_var "$env_file" "PITCHLAKE_VERIFIER_CONTRACT" "$PITCHLAKE_VERIFIER_ADDRESS"
 done
 
@@ -184,7 +190,7 @@ if [ "$ENV_TYPE" = "docker" ] && [ -f "$SECONDARY_ENV" ]; then
     update_env_var "$SECONDARY_ENV" "HASH_STORAGE_ADDRESS" "$SHA2INPUT_ADDRESS"
     update_env_var "$SECONDARY_ENV" "UNIVERSAL_ECIP_CONTRACT" "$ECIP_HASH"
     update_env_var "$SECONDARY_ENV" "GROTH16_VERIFIER_CONTRACT" "$VERIFIER_ADDRESS"
-    update_env_var "$SECONDARY_ENV" "PITCHLAKE_CLIENT" "$PITCHLAKE_CLIENT_ADDRESS"
+    update_env_var "$SECONDARY_ENV" "PITCHLAKE_VAULT" "$PITCHLAKE_VAULT_ADDRESS"
     update_env_var "$SECONDARY_ENV" "PITCHLAKE_VERIFIER_CONTRACT" "$PITCHLAKE_VERIFIER_ADDRESS"
 fi
 

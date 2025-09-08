@@ -2,6 +2,11 @@
 version = 1
 
 [[package]]
+name = "corelib_imports"
+version = "0.1.2"
+source = "git+https://github.com/keep-starknet-strange/garaga.git?branch=main#8d65f565b66e125959cacc50b7757d757fd056bd"
+
+[[package]]
 name = "fp"
 version = "0.1.4"
 source = "registry+https://scarbs.xyz/"
@@ -10,7 +15,10 @@ checksum = "sha256:f636c02dfcb0fd321cd865c3ef0d5d352c7e27e4e21a2c3ad5836ab0d2511
 [[package]]
 name = "garaga"
 version = "0.18.2"
-source = "git+https://github.com/keep-starknet-strange/garaga.git?rev=ffb90e5#ffb90e533497121ffa5284c7362dc56fa10b18c6"
+source = "git+https://github.com/keep-starknet-strange/garaga.git?branch=main#8d65f565b66e125959cacc50b7757d757fd056bd"
+dependencies = [
+ "corelib_imports",
+]
 
 [[package]]
 name = "openzeppelin_access"
@@ -56,15 +64,15 @@ dependencies = [
 
 [[package]]
 name = "snforge_scarb_plugin"
-version = "0.48.1"
+version = "0.49.0"
 source = "registry+https://scarbs.xyz/"
-checksum = "sha256:2dd27e8215eea8785b3930e9f452e11b429ca262b1c1fbb071bfc173b9ebc125"
+checksum = "sha256:903150f0e9542e4277d417029eea4c03af0db398b581f9f7ae3ebbdac9afc657"
 
 [[package]]
 name = "snforge_std"
-version = "0.48.1"
+version = "0.49.0"
 source = "registry+https://scarbs.xyz/"
-checksum = "sha256:89f759fa685d48ed0ba7152d2ac2eb168da08dfa8b84b2bee96e203dc5b2413e"
+checksum = "sha256:73d73653cc4356ec51b92a6bec9d8385b20318170c2f2ade7891e5185a0e7e64"
 dependencies = [
  "snforge_scarb_plugin",
 ]

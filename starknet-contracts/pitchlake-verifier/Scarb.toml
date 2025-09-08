@@ -6,16 +6,16 @@ edition = "2023_11"
 # See more keys and their definitions at https://docs.swmansion.com/scarb/docs/reference/manifest.html
 
 [dependencies]
-openzeppelin_upgrades = "2.0.0"
-openzeppelin_access = "2.0.0"
-garaga = { git = "https://github.com/keep-starknet-strange/garaga.git", rev = "ffb90e5" }
-starknet = "2.12.0"
-fp = "0.1.4"
+openzeppelin_upgrades.workspace = true
+openzeppelin_access.workspace = true
+starknet.workspace = true
+fp.workspace = true
+garaga = { git = "https://github.com/keep-starknet-strange/garaga.git", branch = "main" }
 
 [dev-dependencies]
-snforge_std = "0.48.1"
-assert_macros = "2.12.0"
-cairo_test = "2.12.0"
+snforge_std.workspace = true
+assert_macros.workspace = true
+cairo_test.workspace = true
 
 [[target.starknet-contract]]
 casm = true

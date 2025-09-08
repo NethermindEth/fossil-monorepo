@@ -1,20 +1,20 @@
 [package]
 name = "sha2_input"
 version = "0.1.0"
-edition = "2024_07"
+edition = "2023_11"
 
 # See more keys and their definitions at https://docs.swmansion.com/scarb/docs/reference/manifest.html
 
 [dependencies]
-starknet = "2.12.0"
-fp = "0.1.4"
-openzeppelin_upgrades = "2.0.0"
-openzeppelin_access = "2.0.0"
+starknet.workspace = true
+fp.workspace = true
+openzeppelin_upgrades.workspace = true
+openzeppelin_access.workspace = true
 # fossil_store = { git = "https://github.com/OilerNetwork/fossil-light-client.git", package = "fossil_store" }
 
 [dev-dependencies]
-snforge_std = "0.48.1"
-assert_macros = "2.12.0"
+snforge_std.workspace = true
+assert_macros.workspace = true
 
 [[target.starknet-contract]]
 sierra = true
