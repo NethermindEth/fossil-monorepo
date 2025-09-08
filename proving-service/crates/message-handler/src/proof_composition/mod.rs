@@ -24,18 +24,15 @@ use max_return_floating::max_return;
 #[cfg(feature = "mock-proof")]
 use mock_proof_composition_methods::MOCK_PROOF_COMPOSITION_GUEST_ELF;
 #[cfg(feature = "proof-composition")]
-use proof_composition_twap_maxreturn_reserveprice_floating_hashing_methods::{
-    PROOF_COMPOSITION_TWAP_MAXRETURN_RESERVEPRICE_FLOATING_HASHING_GUEST_ELF,
-    PROOF_COMPOSITION_TWAP_MAXRETURN_RESERVEPRICE_FLOATING_HASHING_GUEST_ID,
-};
+use proof_composition_twap_maxreturn_reserveprice_floating_hashing_methods::PROOF_COMPOSITION_TWAP_MAXRETURN_RESERVEPRICE_FLOATING_HASHING_GUEST_ELF;
 #[cfg(feature = "proof-composition")]
 use remove_seasonality_error_bound_floating::remove_seasonality_error_bound;
 #[cfg(any(not(feature = "proof-composition"), feature = "mock-proof"))]
 use risc0_zkvm::Receipt;
-#[cfg(feature = "proof-composition")]
-use risc0_zkvm::{ExecutorEnv, ProverOpts, Receipt, ReceiptKind, default_prover};
 #[cfg(feature = "mock-proof")]
 use risc0_zkvm::{ExecutorEnv, ProverOpts, VerifierContext, default_prover};
+#[cfg(feature = "proof-composition")]
+use risc0_zkvm::{ExecutorEnv, Receipt, default_prover};
 #[cfg(feature = "proof-composition")]
 use simulate_price_verify_position_floating::simulate_price_verify_position;
 #[cfg(feature = "proof-composition")]
@@ -124,14 +121,33 @@ impl ProofProvider for BonsaiProofProvider {
     ) -> Result<Receipt> {
         #[cfg(feature = "proof-composition")]
         {
+            use crate::hashing::HashingProvider;
+            use crate::services::hashing_service::HashingService;
             use starknet_handler::{config::load_starknet_config, provider::StarknetProvider};
 
-            // Use new starknet-handler instead of HashingProvider
+            // Initialize StarkNet provider
             let config = load_starknet_config()?;
             let provider = StarknetProvider::new(config)?;
 
+            // Initialize HashingService for hash availability validation
+            let hashing_provider = HashingProvider::from_env()
+                .map_err(|e| eyre!("Failed to initialize HashingProvider: {}", e))?;
+            let hashing_service = HashingService::new(hashing_provider, 5760, 180);
+
             // Get the overall range covering all calculations for fee fetching
             let (overall_start, overall_end) = timestamp_ranges.overall_range();
+
+            // Run hash preparation before proof generation
+            tracing::info!(
+                "🔧 Running hash preparation for timestamp range: {} to {}",
+                overall_start,
+                overall_end
+            );
+            hashing_service
+                .run(overall_start as u64)
+                .await
+                .map_err(|e| eyre!("Hash preparation failed: {}", e))?;
+            tracing::info!("✅ Hash preparation completed successfully");
 
             // Fetch fees using the new starknet-handler
             let fee_data = provider
@@ -228,28 +244,14 @@ impl ProofProvider for BonsaiProofProvider {
 
             // Remove seasonality error bound
             let remove_seasonality_error_bound_input = RemoveSeasonalityErrorBoundFloatingInput {
-                avg_hourly_gas_fee: res.clone(),
-                positions: res.clone(),
-                pt: res.clone().into_iter().map(|(_, value)| value).collect(),
-                pt_1: res.clone().into_iter().map(|(_, value)| value).collect(),
-                gradient_tolerance,
-                de_seasonalised_detrended_log_base_fee: res
-                    .clone()
-                    .into_iter()
-                    .map(|(_, value)| value)
-                    .collect(),
-                n_periods,
-                num_paths,
-                season_param: res.clone().into_iter().map(|(_, value)| value).collect(),
-                twap_7d: res.clone().into_iter().map(|(_, value)| value).collect(),
-                slope: 0.05,
-                intercept: 1.5,
-                reserve_price: 2.5,
-                floating_point_tolerance,
-                reserve_price_tolerance,
-                twap_tolerance: 5.0,
-                twap_result: 1.25,
-                max_return: 0.3,
+                data: data.clone(),
+                slope: res.slope,
+                intercept: res.intercept,
+                de_seasonalised_detrended_log_base_fee: convert_array1_to_dvec(
+                    res.de_seasonalised_detrended_log_base_fee.clone(),
+                ),
+                season_param: convert_array1_to_dvec(res.season_param.clone()),
+                tolerance: floating_point_tolerance,
             };
 
             let remove_seasonality_task = tokio::spawn(async move {
@@ -258,28 +260,12 @@ impl ProofProvider for BonsaiProofProvider {
 
             // Calculate PT/PT1 error bound
             let calculate_pt_pt1_input = CalculatePtPt1ErrorBoundFloatingInput {
-                avg_hourly_gas_fee: res.clone().into_iter().map(|(_, value)| value).collect(),
-                positions: res.clone().into_iter().map(|(_, value)| value).collect(),
-                pt: res.clone().into_iter().map(|(_, value)| value).collect(),
-                pt_1: res.clone().into_iter().map(|(_, value)| value).collect(),
-                gradient_tolerance,
-                de_seasonalised_detrended_log_base_fee: res
-                    .clone()
-                    .into_iter()
-                    .map(|(_, value)| value)
-                    .collect(),
-                n_periods,
-                num_paths,
-                season_param: res.clone().into_iter().map(|(_, value)| value).collect(),
-                twap_7d: res.clone().into_iter().map(|(_, value)| value).collect(),
-                slope: 0.05,
-                intercept: 1.5,
-                reserve_price: 2.5,
-                floating_point_tolerance,
-                reserve_price_tolerance,
-                twap_tolerance: 5.0,
-                twap_result: 1.25,
-                max_return: 0.3,
+                de_seasonalised_detrended_log_base_fee: convert_array1_to_dvec(
+                    res.de_seasonalised_detrended_log_base_fee.clone(),
+                ),
+                pt: convert_array1_to_dvec(res.pt.clone()),
+                pt_1: convert_array1_to_dvec(res.pt_1.clone()),
+                tolerance: floating_point_tolerance,
             };
 
             let calculate_pt_pt1_task = tokio::spawn(async move {
@@ -288,28 +274,9 @@ impl ProofProvider for BonsaiProofProvider {
 
             // TWAP 7D error bound
             let add_twap_7d_input = AddTwap7dErrorBoundFloatingInput {
-                avg_hourly_gas_fee: res.clone().into_iter().map(|(_, value)| value).collect(),
-                positions: res.clone().into_iter().map(|(_, value)| value).collect(),
-                pt: res.clone().into_iter().map(|(_, value)| value).collect(),
-                pt_1: res.clone().into_iter().map(|(_, value)| value).collect(),
-                gradient_tolerance,
-                de_seasonalised_detrended_log_base_fee: res
-                    .clone()
-                    .into_iter()
-                    .map(|(_, value)| value)
-                    .collect(),
-                n_periods,
-                num_paths,
-                season_param: res.clone().into_iter().map(|(_, value)| value).collect(),
-                twap_7d: res.clone().into_iter().map(|(_, value)| value).collect(),
-                slope: 0.05,
-                intercept: 1.5,
-                reserve_price: 2.5,
-                floating_point_tolerance,
-                reserve_price_tolerance,
-                twap_tolerance: 5.0,
-                twap_result: 1.25,
-                max_return: 0.3,
+                data: data.clone(),
+                twap_7d: res.twap_7d.clone(),
+                tolerance: floating_point_tolerance,
             };
 
             let add_twap_7d_task =
@@ -317,28 +284,24 @@ impl ProofProvider for BonsaiProofProvider {
 
             // Simulate price verify position
             let simulate_price_input = SimulatePriceVerifyPositionInput {
-                avg_hourly_gas_fee: res.clone().into_iter().map(|(_, value)| value).collect(),
-                positions: res.clone().into_iter().map(|(_, value)| value).collect(),
-                pt: res.clone().into_iter().map(|(_, value)| value).collect(),
-                pt_1: res.clone().into_iter().map(|(_, value)| value).collect(),
+                start_timestamp: overall_start,
+                end_timestamp: overall_end,
+                positions: res.positions.clone(),
+                pt: convert_array1_to_dvec(res.pt.clone()),
+                pt_1: convert_array1_to_dvec(res.pt_1.clone()),
                 gradient_tolerance,
-                de_seasonalised_detrended_log_base_fee: res
-                    .clone()
-                    .into_iter()
-                    .map(|(_, value)| value)
-                    .collect(),
+                de_seasonalised_detrended_log_base_fee: convert_array1_to_dvec(
+                    res.de_seasonalised_detrended_log_base_fee.clone(),
+                ),
                 n_periods,
                 num_paths,
-                season_param: res.clone().into_iter().map(|(_, value)| value).collect(),
-                twap_7d: res.clone().into_iter().map(|(_, value)| value).collect(),
-                slope: 0.05,
-                intercept: 1.5,
-                reserve_price: 2.5,
-                floating_point_tolerance,
-                reserve_price_tolerance,
-                twap_tolerance: 5.0,
-                twap_result: 1.25,
-                max_return: 0.3,
+                season_param: convert_array1_to_dvec(res.season_param.clone()),
+                twap_7d: res.twap_7d.clone(),
+                slope: res.slope,
+                intercept: res.intercept,
+                reserve_price: res.reserve_price,
+                tolerance: floating_point_tolerance,
+                data_length: 2160,
             };
 
             let simulate_price_task =
@@ -360,28 +323,28 @@ impl ProofProvider for BonsaiProofProvider {
             // Compose proofs
             let composition_input = ProofCompositionInput {
                 data_8_months: data_8_months.clone(),
-                data_8_months_hash: hashing_res.poseidon_hash,
+                data_8_months_hash: hashing_res.hash,
                 start_timestamp: overall_start,
                 end_timestamp: overall_end,
-                positions: res.into_iter().map(|(_, value)| value).collect(),
-                pt: convert_array1_to_dvec(&receipts.1.1.pt),
-                pt_1: convert_array1_to_dvec(&receipts.1.1.pt_1),
+                positions: res.positions.clone(),
+                pt: convert_array1_to_dvec(res.pt.clone()),
+                pt_1: convert_array1_to_dvec(res.pt_1.clone()),
                 gradient_tolerance,
                 de_seasonalised_detrended_log_base_fee: convert_array1_to_dvec(
-                    &receipts.0.1.de_seasonalised_detrended_log_base_fee,
+                    res.de_seasonalised_detrended_log_base_fee.clone(),
                 ),
                 n_periods,
                 num_paths,
-                season_param: convert_array1_to_dvec(&receipts.0.1.season_param),
-                twap_7d: receipts.2.1.twap_7d,
-                slope: receipts.3.1.slope,
-                intercept: receipts.3.1.intercept,
-                reserve_price: receipts.3.1.reserve_price,
+                season_param: convert_array1_to_dvec(res.season_param.clone()),
+                twap_7d: res.twap_7d.clone(),
+                slope: res.slope,
+                intercept: res.intercept,
+                reserve_price: res.reserve_price,
                 floating_point_tolerance,
                 reserve_price_tolerance,
                 twap_tolerance: 1.0,
                 twap_result: twap_original,
-                max_return: max_return_res.max_return,
+                max_return: max_return_res.1,
             };
 
             // Log ProofCompositionInput details for verification
@@ -464,13 +427,13 @@ impl ProofProvider for BonsaiProofProvider {
             }
 
             // Generate the composed proof
-            let env = ExecutorEnv::builder()
-                .write(&composition_input)
-                .unwrap()
-                .build()
-                .unwrap();
-
             let receipt = task::spawn_blocking(move || {
+                let env = ExecutorEnv::builder()
+                    .write(&composition_input)
+                    .unwrap()
+                    .build()
+                    .unwrap();
+
                 default_prover().prove(
                     env,
                     PROOF_COMPOSITION_TWAP_MAXRETURN_RESERVEPRICE_FLOATING_HASHING_GUEST_ELF,
@@ -634,13 +597,14 @@ impl BonsaiProofProvider {
             .map(|v| v.to_lowercase() == "true")
             .unwrap_or(false);
 
-        let verifier_contract_address =
-            std::env::var("PITCHLAKE_VERIFIER_CONTRACT").unwrap_or_else(|_| "0x0".to_string());
+        let verifier_contract_address = std::env::var("PITCHLAKE_VERIFIER_CONTRACT")
+            .map_err(|_| eyre!("PITCHLAKE_VERIFIER_CONTRACT environment variable is required"))?;
 
         let verifier_config = ProofVerifierConfig {
             verify_onchain,
             verifier_contract_address: verifier_contract_address.clone(),
             risc0_config,
+            job_request: None,
         };
 
         // Create integrated verifier

@@ -592,20 +592,15 @@ impl StarknetProvider {
         &self,
         verifier_address: &str,
         proof: Vec<Felt>,
+        pitchlake_job_request: PitchLakeJobRequest,
     ) -> Result<Felt> {
         debug!(
             verifier_address,
             proof_length = proof.len(),
+            vault_address = ?pitchlake_job_request.vault_address,
+            timestamp = pitchlake_job_request.timestamp,
             "Verifying proof onchain"
         );
-
-        // Create PitchLakeJobRequest with default values
-        // TODO: These should be configurable or derived from actual job context
-        let pitchlake_job_request = PitchLakeJobRequest {
-            vault_address: Felt::from_hex("0x0").unwrap(), // Default vault address
-            timestamp: 1672531200u64,                      // Default timestamp (2023-01-01)
-            program_id: Felt::from_hex("0x504954434c5f4c414b455f5631").unwrap(), // 'PITCH_LAKE_V1'
-        };
 
         let account = self.create_account()?;
         account

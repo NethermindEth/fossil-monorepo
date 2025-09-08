@@ -264,7 +264,7 @@ async fn send_proof_onchain(
     calldata: Vec<starknet_crypto::Felt>,
     verifier_address: &str,
 ) -> Result<starknet_crypto::Felt> {
-    use tracing::{debug, info};
+    use tracing::{debug, info, warn};
 
     debug!(
         "Starting onchain proof verification with {} calldata elements",
@@ -290,9 +290,24 @@ async fn send_proof_onchain(
         verifier_address
     );
 
+    // Create default job request from environment
+    let vault_address = std::env::var("PITCHLAKE_VAULT").unwrap_or_else(|_| {
+        warn!("PITCHLAKE_VAULT not set, using 0x0");
+        "0x0".to_string()
+    });
+
+    let job_request = starknet_handler::account::PitchLakeJobRequest {
+        vault_address: starknet_crypto::Felt::from_hex(&vault_address).unwrap_or_else(|_| {
+            warn!("Invalid PITCHLAKE_VAULT format, using 0x0");
+            starknet_crypto::Felt::from_hex("0x0").unwrap()
+        }),
+        timestamp: 1672531200u64, // Default timestamp (2023-01-01)
+        program_id: starknet_crypto::Felt::from_hex("0x504954434c5f4c414b455f5631").unwrap(), // 'PITCH_LAKE_V1'
+    };
+
     // Verify proof onchain
     let tx_hash = provider
-        .verify_proof_onchain(verifier_address, calldata)
+        .verify_proof_onchain(verifier_address, calldata, job_request)
         .await
         .map_err(|e| eyre::eyre!("Onchain proof verification failed: {}", e))?;
 

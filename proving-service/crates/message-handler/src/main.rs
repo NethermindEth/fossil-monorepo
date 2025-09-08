@@ -43,39 +43,6 @@ mod no_op {
     }
 }
 
-#[cfg(any(feature = "proof-composition", feature = "mock-proof"))]
-mod disabled_provider {
-    use async_trait::async_trait;
-    use eyre::{Result, eyre};
-    use message_handler::proof_composition::{ProofProvider, ProofTimestampRanges};
-    use risc0_zkvm::Receipt;
-
-    #[derive(Debug, Clone)]
-    pub struct NoOpProofProvider;
-
-    impl NoOpProofProvider {
-        // pub const fn new() -> Self {
-        //     Self
-        // }
-    }
-
-    #[async_trait]
-    impl ProofProvider for NoOpProofProvider {
-        async fn generate_proofs_from_data(
-            &self,
-            _timestamp_ranges: ProofTimestampRanges,
-        ) -> Result<Receipt> {
-            Err(eyre!(
-                "Proof functionality is disabled. Set ENABLE_PROOF=true and enable either the 'proof-composition' or 'mock-proof' feature to use this functionality."
-            ))
-        }
-
-        fn is_disabled(&self) -> bool {
-            true
-        }
-    }
-}
-
 // Create a very simple mock proof provider that doesn't use any external libraries
 // This is useful for testing when we want to avoid the complexity of the full mock-proof feature
 mod simple_mock {
