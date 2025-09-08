@@ -7,11 +7,10 @@ use fp::UFixedPoint123x128StorePacking;
 pub use universal_ecip::UniversalECIP;
 pub mod fixtures;
 pub mod pitchlake_verifier;
-pub use pitchlake_verifier::PitchLakeVerifier;
+//pub use pitchlake_verifier::PitchLakeVerifier;
 pub mod mocks {
     pub mod pitchlake_client;
 }
-pub use mocks::pitchlake_client::MockPitchLakeClient;
 
 // Constants for byte sizes and offsets
 const U64_SIZE: usize = 8;
@@ -33,16 +32,12 @@ pub struct PitchLakeJobRequest {
 
 #[derive(Drop, Debug, Copy, PartialEq, Serde)]
 pub struct Journal {
-    pub data_8_months_hash: [u32; 8],
-    pub start_timestamp: u64,
-    pub end_timestamp: u64,
-    pub reserve_price: felt252,
-    pub floating_point_tolerance: felt252,
-    pub reserve_price_tolerance: felt252,
-    pub twap_tolerance: felt252,
-    pub gradient_tolerance: felt252,
-    pub twap_result: felt252,
-    pub max_return: felt252,
+    data_8_months_hash: [u32; 8], // 32 bytes total, as 8 u32 values
+    start_timestamp: u64, // 8 bytes - Required for time bounds
+    end_timestamp: u64, // 8 bytes - Required for time bounds
+    reserve_price: felt252, // 32 bytes - Primary business output
+    twap_result: felt252, // 32 bytes - Key financial metric
+    max_return: felt252 // 32 bytes - Risk management metric
 }
 
 #[derive(Drop, Debug, Copy, PartialEq, Serde)]
@@ -134,20 +129,20 @@ pub fn decode_journal(journal_bytes: Span<u8>) -> Journal {
     let (reserve_price, byte_offset) = parse_packed_fixed_point(journal_bytes, byte_offset);
 
     // Parse floating_point_tolerance (8 bytes)
-    let (floating_point_tolerance, byte_offset) = parse_packed_fixed_point(
-        journal_bytes, byte_offset,
-    );
+    //let (floating_point_tolerance, byte_offset) = parse_packed_fixed_point(
+    //    journal_bytes, byte_offset,
+    //);
 
-    // Parse reserve_price_tolerance (8 bytes)
-    let (reserve_price_tolerance, byte_offset) = parse_packed_fixed_point(
-        journal_bytes, byte_offset,
-    );
+    //// Parse reserve_price_tolerance (8 bytes)
+    //let (reserve_price_tolerance, byte_offset) = parse_packed_fixed_point(
+    //    journal_bytes, byte_offset,
+    //);
 
-    // Parse twap_tolerance (8 bytes)
-    let (twap_tolerance, byte_offset) = parse_packed_fixed_point(journal_bytes, byte_offset);
+    //// Parse twap_tolerance (8 bytes)
+    //let (twap_tolerance, byte_offset) = parse_packed_fixed_point(journal_bytes, byte_offset);
 
-    // Parse gradient_tolerance (8 bytes)
-    let (gradient_tolerance, byte_offset) = parse_packed_fixed_point(journal_bytes, byte_offset);
+    //// Parse gradient_tolerance (8 bytes)
+    //let (gradient_tolerance, byte_offset) = parse_packed_fixed_point(journal_bytes, byte_offset);
 
     // Parse twap_result (8 bytes)
     let (twap_result, byte_offset) = parse_packed_fixed_point(journal_bytes, byte_offset);
@@ -156,16 +151,7 @@ pub fn decode_journal(journal_bytes: Span<u8>) -> Journal {
     let (max_return, _) = parse_packed_fixed_point(journal_bytes, byte_offset);
 
     Journal {
-        data_8_months_hash,
-        start_timestamp,
-        end_timestamp,
-        reserve_price,
-        floating_point_tolerance,
-        reserve_price_tolerance,
-        twap_tolerance,
-        gradient_tolerance,
-        twap_result,
-        max_return,
+        data_8_months_hash, start_timestamp, end_timestamp, reserve_price, twap_result, max_return,
     }
 }
 
@@ -269,10 +255,10 @@ mod tests {
         pub start_timestamp: u64,
         pub end_timestamp: u64,
         pub reserve_price: u256,
-        pub floating_point_tolerance: u256,
-        pub reserve_price_tolerance: u256,
-        pub twap_tolerance: u256,
-        pub gradient_tolerance: u256,
+        //pub floating_point_tolerance: u256,
+        //pub reserve_price_tolerance: u256,
+        //pub twap_tolerance: u256,
+        //pub gradient_tolerance: u256,
         pub twap_result: u256,
         pub max_return: u256,
     }
@@ -298,37 +284,38 @@ mod tests {
         assert_eq!(
             SP::unpack(journal.reserve_price).get_fractional(), expected_journal.reserve_price.low,
         );
-        assert_eq!(
-            SP::unpack(journal.floating_point_tolerance).get_integer(),
-            expected_journal.floating_point_tolerance.high,
-        );
-        assert_eq!(
-            SP::unpack(journal.floating_point_tolerance).get_fractional(),
-            expected_journal.floating_point_tolerance.low,
-        );
-        assert_eq!(
-            SP::unpack(journal.reserve_price_tolerance).get_integer(),
-            expected_journal.reserve_price_tolerance.high,
-        );
-        assert_eq!(
-            SP::unpack(journal.reserve_price_tolerance).get_fractional(),
-            expected_journal.reserve_price_tolerance.low,
-        );
-        assert_eq!(
-            SP::unpack(journal.twap_tolerance).get_integer(), expected_journal.twap_tolerance.high,
-        );
-        assert_eq!(
-            SP::unpack(journal.twap_tolerance).get_fractional(),
-            expected_journal.twap_tolerance.low,
-        );
-        assert_eq!(
-            SP::unpack(journal.gradient_tolerance).get_integer(),
-            expected_journal.gradient_tolerance.high,
-        );
-        assert_eq!(
-            SP::unpack(journal.gradient_tolerance).get_fractional(),
-            expected_journal.gradient_tolerance.low,
-        );
+        //assert_eq!(
+        //    SP::unpack(journal.floating_point_tolerance).get_integer(),
+        //    expected_journal.floating_point_tolerance.high,
+        //);
+        //assert_eq!(
+        //    SP::unpack(journal.floating_point_tolerance).get_fractional(),
+        //    expected_journal.floating_point_tolerance.low,
+        //);
+        //assert_eq!(
+        //    SP::unpack(journal.reserve_price_tolerance).get_integer(),
+        //    expected_journal.reserve_price_tolerance.high,
+        //);
+        //assert_eq!(
+        //    SP::unpack(journal.reserve_price_tolerance).get_fractional(),
+        //    expected_journal.reserve_price_tolerance.low,
+        //);
+        //assert_eq!(
+        //    SP::unpack(journal.twap_tolerance).get_integer(),
+        //    expected_journal.twap_tolerance.high,
+        //);
+        //assert_eq!(
+        //    SP::unpack(journal.twap_tolerance).get_fractional(),
+        //    expected_journal.twap_tolerance.low,
+        //);
+        //assert_eq!(
+        //    SP::unpack(journal.gradient_tolerance).get_integer(),
+        //    expected_journal.gradient_tolerance.high,
+        //);
+        //assert_eq!(
+        //    SP::unpack(journal.gradient_tolerance).get_fractional(),
+        //    expected_journal.gradient_tolerance.low,
+        //);
         assert_eq!(
             SP::unpack(journal.twap_result).get_integer(), expected_journal.twap_result.high,
         );
@@ -355,10 +342,10 @@ mod tests {
             start_timestamp: 1708833600,
             end_timestamp: 1716609600,
             reserve_price: u256 { high: 2436485959, low: 159863518606830028081101360966223790080 },
-            floating_point_tolerance: u256 { high: 0, low: 3402823669209384912995114146594816 },
-            reserve_price_tolerance: u256 { high: 5, low: 0 },
-            twap_tolerance: u256 { high: 1, low: 0 },
-            gradient_tolerance: u256 { high: 0, low: 17014118346046924117642026945517453312 },
+            //floating_point_tolerance: u256 { high: 0, low: 3402823669209384912995114146594816 },
+            //reserve_price_tolerance: u256 { high: 5, low: 0 },
+            //twap_tolerance: u256 { high: 1, low: 0 },
+            //gradient_tolerance: u256 { high: 0, low: 17014118346046924117642026945517453312 },
             twap_result: u256 { high: 14346521680, low: 192471954174812891655089835803777433600 },
             max_return: u256 { high: 1, low: 183365823839893747160194852195351396352 },
         }

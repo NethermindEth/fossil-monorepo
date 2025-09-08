@@ -21,7 +21,7 @@ pub mod PitchLakeVerifier {
         IRisc0Groth16VerifierBN254Dispatcher, IRisc0Groth16VerifierBN254DispatcherTrait,
     };
     use pitchlake_verifier::mocks::pitchlake_client::{
-        IFossilClientDispatcher, IFossilClientDispatcherTrait,
+        IPitchLakeVaultDispatcher, IPitchLakeVaultDispatcherTrait,
     };
     use pitchlake_verifier::{PitchLakeJobRequest, decode_journal};
 
@@ -35,7 +35,6 @@ pub mod PitchLakeVerifier {
 
     // Upgradeable
     impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
-
 
     #[storage]
     struct Storage {
@@ -62,10 +61,6 @@ pub mod PitchLakeVerifier {
         start_timestamp: u64,
         end_timestamp: u64,
         reserve_price: felt252,
-        floating_point_tolerance: felt252,
-        reserve_price_tolerance: felt252,
-        twap_tolerance: felt252,
-        gradient_tolerance: felt252,
         twap_result: felt252,
         max_return: felt252,
     }
@@ -74,7 +69,6 @@ pub mod PitchLakeVerifier {
     fn constructor(
         ref self: ContractState,
         verifier_address: starknet::ContractAddress,
-        //pitchlake_client_address: starknet::ContractAddress, // @dev can omit this
         owner: starknet::ContractAddress,
     ) {
         self
@@ -108,14 +102,14 @@ pub mod PitchLakeVerifier {
             journal.start_timestamp.serialize(ref job_result_data);
             journal.end_timestamp.serialize(ref job_result_data);
             journal.reserve_price.serialize(ref job_result_data);
-            journal.floating_point_tolerance.serialize(ref job_result_data);
-            journal.reserve_price_tolerance.serialize(ref job_result_data);
-            journal.twap_tolerance.serialize(ref job_result_data);
-            journal.gradient_tolerance.serialize(ref job_result_data);
+            //journal.floating_point_tolerance.serialize(ref job_result_data);
+            //journal.reserve_price_tolerance.serialize(ref job_result_data);
+            //journal.twap_tolerance.serialize(ref job_result_data);
+            //journal.gradient_tolerance.serialize(ref job_result_data);
             journal.twap_result.serialize(ref job_result_data);
             journal.max_return.serialize(ref job_result_data);
 
-            let pitchlake_vault: IFossilClientDispatcher = IFossilClientDispatcher {
+            let pitchlake_vault = IPitchLakeVaultDispatcher {
                 contract_address: pitchlake_job_request.vault_address,
             };
 
@@ -128,10 +122,10 @@ pub mod PitchLakeVerifier {
                         start_timestamp: journal.start_timestamp,
                         end_timestamp: journal.end_timestamp,
                         reserve_price: journal.reserve_price,
-                        floating_point_tolerance: journal.floating_point_tolerance,
-                        reserve_price_tolerance: journal.reserve_price_tolerance,
-                        twap_tolerance: journal.twap_tolerance,
-                        gradient_tolerance: journal.gradient_tolerance,
+                        //floating_point_tolerance: journal.floating_point_tolerance,
+                        //reserve_price_tolerance: journal.reserve_price_tolerance,
+                        //twap_tolerance: journal.twap_tolerance,
+                        //gradient_tolerance: journal.gradient_tolerance,
                         twap_result: journal.twap_result,
                         max_return: journal.max_return,
                     },

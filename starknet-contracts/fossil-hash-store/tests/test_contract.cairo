@@ -1,3 +1,4 @@
+use core::ops::AddAssign;
 use openzeppelin_upgrades::interface::{IUpgradeableDispatcher, IUpgradeableDispatcherTrait};
 use sha2_input::{ISha2InputDispatcher, ISha2InputDispatcherTrait};
 use snforge_std::{
@@ -18,11 +19,11 @@ fn deploy_contract_sha2_input(
 }
 
 fn fossil_store() -> starknet::ContractAddress {
-    starknet::contract_address_const::<'FOSSIL_STORE_ADDRESS'>()
+    'FOSSIL_STORE_ADDRESS'.try_into().unwrap()
 }
 
 fn owner() -> starknet::ContractAddress {
-    starknet::contract_address_const::<'OWNER_ADDRESS'>()
+    'OWNER_ADDRESS'.try_into().unwrap()
 }
 
 #[test]
@@ -118,7 +119,7 @@ fn test_should_be_able_to_set_fossil_store_by_owner() {
     assert(address_before == fossil_store(), 'invalid fossil store address');
 
     start_cheat_caller_address(contract_address, owner());
-    let new_fossil_store = starknet::contract_address_const::<'NEW_FOSSIL_STORE_ADDRESS'>();
+    let new_fossil_store = 'NEW_FOSSIL_STORE_ADDRESS'.try_into().unwrap();
     dispatcher.set_fossil_store(new_fossil_store);
 
     let address_after = dispatcher.get_fossil_store();
@@ -163,4 +164,3 @@ fn test_should_fail_to_upgrade_by_non_owner() {
     let dispatcher = IUpgradeableDispatcher { contract_address };
     dispatcher.upgrade(new_class_hash);
 }
-

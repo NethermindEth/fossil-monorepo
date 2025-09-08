@@ -225,7 +225,6 @@ pub const ic: [G1Point; 6] = [
     },
 ];
 
-
 pub const precomputed_lines: [G2Line; 176] = [
     G2Line {
         r0a0: u288 {
