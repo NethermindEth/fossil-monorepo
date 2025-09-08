@@ -1,0 +1,108 @@
+# Local integration testing compose file for fossil-monorepo
+# Self-contained setup with local Katana instance instead of external fossil-network services
+services:
+  # Katana Local Testnet
+  katana:
+    image: ghcr.io/dojoengine/katana:v1.6.3
+    ports:
+      - "5050:5050"
+    networks:
+      - local-network
+    command: ["katana", "--http.addr", "0.0.0.0", "--http.port", "5050", "--dev", "--block-time", "6000"]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-X", "POST", "-H", "Content-Type: application/json", "-d", '{"jsonrpc":"2.0","method":"starknet_chainId","params":[],"id":1}', "http://localhost:5050"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Proving Service PostgreSQL (port 5433 to avoid conflicts with external indexer)
+  proving_service_db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5435:5432"
+    networks:
+      - local-network
+    volumes:
+      - proving_service_local_data:/var/lib/postgresql/data
+      - ./proving-service/tests/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Offchain Processor PostgreSQL (port 5434)
+  offchain_processor_db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5434:5432"
+    networks:
+      - local-network
+    volumes:
+      - offchain_processor_local_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # LocalStack for SQS (AWS emulation)
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4567:4566"
+    networks:
+      - local-network
+    environment:
+      - SERVICES=sqs
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    volumes:
+      - localstack_local_data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD", "awslocal", "sqs", "list-queues"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Mock Contract Deployer - deploys to local Katana
+  mock-contract-deployer:
+    image: fossil-deploy:latest
+    networks:
+      - local-network
+    volumes:
+      - ./proving-service/mock_contracts:/app
+    env_file:
+      - ./proving-service/mock_contracts/.env.local
+    stdin_open: true
+    tty: true
+    command:
+      [
+        "sh",
+        "-c",
+        "chmod +x scripts/deploy-mock-hash-storage.sh && ./scripts/deploy-mock-hash-storage.sh",
+      ]
+    restart: "no"
+    depends_on:
+      katana:
+        condition: service_healthy
+    profiles:
+      - deploy
+
+networks:
+  local-network:
+    driver: bridge
+
+volumes:
+  proving_service_local_data:
+  offchain_processor_local_data:
+  localstack_local_data:
