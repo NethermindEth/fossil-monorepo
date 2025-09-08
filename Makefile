@@ -173,9 +173,9 @@ integration-clean: ## Stop integration testing services and remove volumes.
 	docker compose -f docker-compose.integration.yml down -v
 
 .PHONY: integration-deploy-contracts
-integration-deploy-contracts: ## Deploy mock contracts to external Katana instance.
-	@echo "🔧 Deploying mock contracts to external Katana..."
-	docker compose -f docker-compose.integration.yml --profile deploy up mock-contract-deployer
+integration-deploy-contracts: ## Deploy contracts to external Katana instance.
+	@echo "🔧 Deploying contracts to external Katana..."
+	docker compose -f docker-compose.integration.yml --profile deploy up contract-deployer
 
 .PHONY: integration-test
 integration-test: ## Run full integration test suite with external services.
@@ -188,6 +188,41 @@ integration-test: ## Run full integration test suite with external services.
 .PHONY: integration-logs
 integration-logs: ## View logs from integration services.
 	docker compose -f docker-compose.integration.yml logs -f
+
+##@ Local Integration Testing
+
+.PHONY: local-integration-up
+local-integration-up: ## Start local integration testing services with Katana.
+	@echo "🚀 Starting local integration testing services..."
+	@echo "📡 This includes a local Katana testnet on port 5050"
+	docker compose -f docker-compose.local.yml up -d katana proving_service_db offchain_processor_db localstack
+	@echo "✅ Local integration services started"
+	@echo "💡 To deploy mock contracts: make local-integration-deploy-contracts"
+
+.PHONY: local-integration-down
+local-integration-down: ## Stop local integration testing services.
+	docker compose -f docker-compose.local.yml down
+
+.PHONY: local-integration-clean
+local-integration-clean: ## Stop local integration testing services and remove volumes.
+	docker compose -f docker-compose.local.yml down -v
+
+.PHONY: local-integration-deploy-contracts
+local-integration-deploy-contracts: ## Deploy contracts to local Katana instance.
+	@echo "🔧 Deploying contracts to local Katana..."
+	docker compose -f docker-compose.local.yml --profile deploy up contract-deployer
+
+.PHONY: local-integration-test
+local-integration-test: ## Run full integration test suite with local services.
+	@echo "🧪 Running local integration tests..."
+	@echo "💡 Using local Katana testnet and databases"
+	make ps-test
+	make op-test
+	@echo "✅ Local integration tests completed"
+
+.PHONY: local-integration-logs
+local-integration-logs: ## View logs from local integration services.
+	docker compose -f docker-compose.local.yml logs -f
 
 ##@ Code Coverage
 

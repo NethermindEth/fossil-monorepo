@@ -6,10 +6,10 @@ services:
     image: postgres:16
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres  
+      POSTGRES_PASSWORD: postgres
       POSTGRES_DB: postgres
     ports:
-      - "5433:5432"
+      - "5435:5432"
     networks:
       - fossil-network
       - internal
@@ -28,7 +28,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: postgres  
+      POSTGRES_DB: postgres
     ports:
       - "5434:5432"
     networks:
@@ -63,18 +63,25 @@ services:
       timeout: 5s
       retries: 5
 
-  # Mock Contract Deployer - deploys to external Katana
-  mock-contract-deployer:
-    image: deploy
+  # Contract Deployer - deploys to external Katana
+  contract-deployer:
+    image: fossil-deploy:latest
     networks:
       - fossil-network
     volumes:
-      - ./proving-service/mock_contracts:/app
-    env_file:
-      - ./proving-service/mock_contracts/.env.local
+      - ./starknet-contracts:/app/starknet-contracts
+      - ./scripts:/app/scripts
+      - ./.env.docker:/app/.env.docker
+      - ./.env.local:/app/.env.local
+    working_dir: /app
     stdin_open: true
     tty: true
-    command: [ "sh", "-c", "chmod +x scripts/deploy-mock-hash-storage.sh && ./scripts/deploy-mock-hash-storage.sh" ]
+    command:
+      [
+        "sh",
+        "-c",
+        "chmod +x scripts/deploy-starknet.sh && ./scripts/deploy-starknet.sh docker",
+      ]
     restart: "no"
     profiles:
       - deploy
@@ -88,5 +95,5 @@ networks:
 
 volumes:
   proving_service_data:
-  offchain_processor_data: 
+  offchain_processor_data:
   localstack_data:

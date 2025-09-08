@@ -92,9 +92,17 @@ export RUST_LOG="${RUST_LOG:-debug}"
 
 log_info "Environment variables loaded from $ENV_FILE"
 
+# Validate required environment variables
+if [ -z "$PITCHLAKE_VAULT" ]; then
+    log_error "PITCHLAKE_VAULT environment variable is not set!"
+    log_error "Please ensure PITCHLAKE_VAULT is defined in $ENV_FILE"
+    exit 1
+fi
+
 # Log key environment variables to verify they're loaded correctly
 log_info "Key environment variables:"
 log_info "  - PITCHLAKE_VERIFIER_CONTRACT: ${PITCHLAKE_VERIFIER_CONTRACT:-NOT_SET}"
+log_info "  - PITCHLAKE_VAULT: ${PITCHLAKE_VAULT:-NOT_SET}"
 log_info "  - STARKNET_RPC_URL: ${STARKNET_RPC_URL:-NOT_SET}"
 log_info "  - BONSAI_API_KEY: ${BONSAI_API_KEY:+***SET***}"
 log_info "  - FOSSIL_STORE_ADDRESS: ${FOSSIL_STORE_ADDRESS:-NOT_SET}"
@@ -102,12 +110,12 @@ log_info "  - FOSSIL_STORE_ADDRESS: ${FOSSIL_STORE_ADDRESS:-NOT_SET}"
 # Check if integration services are running
 log_info "Checking integration services..."
 
-if ! docker ps | grep -q "offchain-processor-offchain_processor_db-1"; then
+if ! docker ps | grep -q "fossil-monorepo-offchain_processor_db-1"; then
     log_error "Offchain Processor DB not running. Please start with: docker compose -f docker-compose.integration.yml up -d"
     exit 1
 fi
 
-if ! docker ps | grep -q "sqs-localstack"; then
+if ! docker ps | grep -q "fossil-monorepo-localstack-1"; then
     log_error "LocalStack SQS not running. Please start with: docker compose -f docker-compose.integration.yml up -d"
     exit 1
 fi
@@ -132,7 +140,7 @@ log_info "Environment configuration complete for $ENV_TYPE"
 
 # Setup SQS queue if needed
 log_info "Setting up SQS queue..."
-docker exec sqs-localstack awslocal sqs create-queue --queue-name fossilQueue 2>/dev/null || log_warn "Queue may already exist"
+docker exec fossil-monorepo-localstack-1 awslocal sqs create-queue --queue-name fossilQueue 2>/dev/null || log_warn "Queue may already exist"
 
 # Start proving-service HTTP API with mock proof features
 log_info "Starting proving-service HTTP API on port 3001 with mock proof features..."
@@ -229,19 +237,19 @@ log_info "Generated API key: $API_KEY"
 # Send test request to offchain-processor
 log_info "Sending test request to offchain-processor..."
 
-TEST_REQUEST='{
-  "identifiers": ["0x50495443485f4c414b455f5631"],
-  "params": {
-    "twap": [1672531200, 1672574400],
-    "volatility": [1672531200, 1672574400],
-    "reserve_price": [1672531200, 1672574400]
+TEST_REQUEST="{
+  \"identifiers\": [\"0x50495443485f4c414b455f5631\"],
+  \"params\": {
+    \"twap\": [1672531200, 1672574400],
+    \"volatility\": [1672531200, 1672574400],
+    \"reserve_price\": [1672531200, 1672574400]
   },
-  "client_info": {
-    "client_address": "0x018df581fe0ee497a4a3595cf62aea0bafa7ba1a54a7dcbafca37bfada67c718",
-    "vault_address": "0x07b0110e7230a20881e57804d68e640777f4b55b487321556682e550f93fec7c",
-    "timestamp": 1741243059
+  \"client_info\": {
+    \"client_address\": \"0x018df581fe0ee497a4a3595cf62aea0bafa7ba1a54a7dcbafca37bfada67c718\",
+    \"vault_address\": \"$PITCHLAKE_VAULT\",
+    \"timestamp\": 1741243059
   }
-}'
+}"
 
 RESPONSE=$(curl -s -X POST http://localhost:3000/pricing_data \
   -H "Content-Type: application/json" \
@@ -313,19 +321,19 @@ log_info "=== Testing RISC0 Mock Proof Generation ==="
 # Send a specific request that should trigger RISC0 proof generation
 log_info "Sending request to trigger RISC0 proof generation in message-handler..."
 
-RISC0_TEST_REQUEST='{
-  "identifiers": ["RISC0_MOCK_PROOF_TEST"],
-  "params": {
-    "twap": [1672531200, 1672617600],
-    "volatility": [1672531200, 1672617600], 
-    "reserve_price": [1672531200, 1672617600]
+RISC0_TEST_REQUEST="{
+  \"identifiers\": [\"RISC0_MOCK_PROOF_TEST\"],
+  \"params\": {
+    \"twap\": [1672531200, 1672617600],
+    \"volatility\": [1672531200, 1672617600], 
+    \"reserve_price\": [1672531200, 1672617600]
   },
-  "client_info": {
-    "client_address": "0x018df581fe0ee497a4a3595cf62aea0bafa7ba1a54a7dcbafca37bfada67c718",
-    "vault_address": "0x07b0110e7230a20881e57804d68e640777f4b55b487321556682e550f93fec7c",
-    "timestamp": 1741243059
+  \"client_info\": {
+    \"client_address\": \"0x018df581fe0ee497a4a3595cf62aea0bafa7ba1a54a7dcbafca37bfada67c718\",
+    \"vault_address\": \"$PITCHLAKE_VAULT\",
+    \"timestamp\": 1741243059
   }
-}'
+}"
 
 RISC0_RESPONSE=$(curl -s -X POST http://localhost:3000/pricing_data \
   -H "Content-Type: application/json" \
@@ -343,7 +351,7 @@ if [ ! -z "$RISC0_JOB_ID" ]; then
     # Monitor RISC0 job for longer since proof generation takes time with backoff
     log_info "Monitoring RISC0 proof generation job (this may take several minutes)..."
     log_info "Waiting for Bonsai proof generation to complete and calldata to be generated..."
-    RISC0_MAX_RETRIES=60  # Increased to 60 retries (up to 10 minutes)
+    RISC0_MAX_RETRIES=240  # Increased to 240 retries (up to 40+ minutes with backoff)
     RISC0_RETRY_COUNT=0
     BACKOFF_BASE=5  # Start with 5 second intervals
     
@@ -351,13 +359,24 @@ if [ ! -z "$RISC0_JOB_ID" ]; then
         RISC0_STATUS_RESPONSE=$(curl -s http://localhost:3000/job_status/$RISC0_JOB_ID)
         RISC0_STATUS=$(echo $RISC0_STATUS_RESPONSE | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
         
-        # Calculate current wait time with backoff (5s, 10s, 15s, max 30s)
+        # Calculate current wait time with backoff (5s, 10s, 15s, max 60s)
         CURRENT_WAIT=$(( BACKOFF_BASE * ((RISC0_RETRY_COUNT / 10) + 1) ))
-        if [ $CURRENT_WAIT -gt 30 ]; then
-            CURRENT_WAIT=30
+        if [ $CURRENT_WAIT -gt 60 ]; then
+            CURRENT_WAIT=60
         fi
         
         log_info "RISC0 job status (attempt $((RISC0_RETRY_COUNT + 1))/$RISC0_MAX_RETRIES): $RISC0_STATUS (waiting ${CURRENT_WAIT}s)"
+        
+        # Show progress indicator for long waits
+        if [ $RISC0_RETRY_COUNT -gt 30 ] && [ $((RISC0_RETRY_COUNT % 20)) -eq 0 ]; then
+            log_info "⏳ Still waiting for proof generation to complete... This is normal for Bonsai API calls"
+            if [ -f "message-handler.log" ]; then
+                RECENT_ACTIVITY=$(tail -50 message-handler.log | grep -i "bonsai\|risc0\|proof" | tail -3)
+                if [ ! -z "$RECENT_ACTIVITY" ]; then
+                    log_info "📋 Recent activity detected - proof generation likely in progress"
+                fi
+            fi
+        fi
         
         # Check message handler logs for proof calldata generation in real-time
         if [ -f "message-handler.log" ]; then
@@ -396,7 +415,7 @@ if [ ! -z "$RISC0_JOB_ID" ]; then
             
             # Monitor logs for proof completion markers
             log_info "Monitoring logs for proof generation completion markers..."
-            PROOF_COMPLETION_TIMEOUT=60
+            PROOF_COMPLETION_TIMEOUT=180  # Increased to 3 minutes
             PROOF_WAIT_COUNT=0
             PROOF_COMPLETE=false
             
@@ -404,11 +423,12 @@ if [ ! -z "$RISC0_JOB_ID" ]; then
                 # Check for proof completion indicators
                 if [ -f "message-handler.log" ]; then
                     # Look for Step 2 (onchain verification) or proof completion messages
-                    STEP2_FOUND=$(grep -i "Step.*2.*Verifying\|onchain.*verification\|proof.*verified.*onchain" message-handler.log 2>/dev/null | wc -l)
-                    CALLDATA_FOUND=$(grep -i "Generated.*proof calldata\|proof.*calldata.*elements" message-handler.log 2>/dev/null | wc -l)
+                    STEP2_FOUND=$(grep -i "Step.*2.*Verifying\|onchain.*verification.*successful\|proof.*verified.*onchain" message-handler.log 2>/dev/null | wc -l)
+                    CALLDATA_FOUND=$(grep -i "Generated.*proof calldata\|proof.*calldata.*elements\|calldata.*length.*[0-9]" message-handler.log 2>/dev/null | wc -l)
+                    TX_HASH_FOUND=$(grep -i "tx_hash.*=\|transaction.*hash\|Proof onchain verification successful" message-handler.log 2>/dev/null | wc -l)
                     
-                    if [ $STEP2_FOUND -gt 0 ] || [ $CALLDATA_FOUND -gt 0 ]; then
-                        log_info "✅ Proof completion markers detected in logs"
+                    if [ $STEP2_FOUND -gt 0 ] || [ $CALLDATA_FOUND -gt 0 ] || [ $TX_HASH_FOUND -gt 0 ]; then
+                        log_info "✅ Proof completion markers detected in logs (Step2: $STEP2_FOUND, Calldata: $CALLDATA_FOUND, TxHash: $TX_HASH_FOUND)"
                         PROOF_COMPLETE=true
                         break
                     fi
@@ -423,8 +443,8 @@ if [ ! -z "$RISC0_JOB_ID" ]; then
             fi
             
             # Additional wait to ensure all logging is flushed
-            log_info "Waiting additional 10 seconds for log flushing..."
-            sleep 10
+            log_info "Waiting additional 30 seconds for log flushing..."
+            sleep 30
             
             # Get detailed result to check for proof data
             RISC0_RESULT=$(curl -s http://localhost:3000/job_result/$RISC0_JOB_ID \
@@ -444,7 +464,14 @@ if [ ! -z "$RISC0_JOB_ID" ]; then
     if [ $RISC0_RETRY_COUNT -eq $RISC0_MAX_RETRIES ]; then
         log_warn "⚠️  RISC0 proof generation monitoring timed out after $RISC0_MAX_RETRIES attempts"
         log_warn "Final status: $RISC0_STATUS"
+        log_warn "This timeout does not mean the proof failed - it may still be processing in the background"
         log_warn "Check message-handler.log for RISC0 proof generation details"
+        
+        # Show recent activity even on timeout
+        if [ -f "message-handler.log" ]; then
+            log_info "📋 Recent activity at timeout:"
+            tail -20 message-handler.log | grep -i "proof\|risc0\|bonsai\|calldata\|starknet\|verification" | tail -10
+        fi
     fi
 else
     log_warn "⚠️  Failed to create RISC0 test job"
@@ -487,16 +514,17 @@ if [ -f "message-handler.log" ]; then
         log_info "📝 On-chain Verification Found:"
         echo "$ONCHAIN_LOGS" | tail -10
         
-        # Extract transaction hash from starknet-handler logs
-        TX_HASH=$(echo "$ONCHAIN_LOGS" | grep -oE "tx_hash=0x[a-fA-F0-9]+" | sed 's/tx_hash=//' | tail -1)
+        # Extract transaction hash from "Proof verified onchain with transaction hash:" line
+        TX_HASH=$(echo "$ONCHAIN_LOGS" | sed 's/\[[0-9;]*m//g' | grep -oE "transaction hash: 0x[a-fA-F0-9]+" | grep -oE "0x[a-fA-F0-9]+" | tail -1)
         if [ ! -z "$TX_HASH" ]; then
-            log_info "💎 Transaction Hash: $TX_HASH"
-        else
-            # Fallback to general hex pattern
-            TX_HASH=$(echo "$ONCHAIN_LOGS" | grep -oE "0x[a-fA-F0-9]{64}" | tail -1)
-            if [ ! -z "$TX_HASH" ]; then
+            # Verify it's not the contract address
+            if [ "$TX_HASH" != "$PITCHLAKE_VERIFIER_CONTRACT" ]; then
                 log_info "💎 Transaction Hash: $TX_HASH"
+            else
+                log_info "⚠️  No valid transaction hash found (found contract address instead)"
             fi
+        else
+            log_info "⚠️  Transaction hash not found in logs"
         fi
     else
         log_warn "⚠️  No on-chain verification logs found yet"
@@ -552,16 +580,17 @@ if [ ! -z "$RISC0_JOB_ID" ] && [ "$RISC0_STATUS" = "Completed" ]; then
     
     if [ ! -z "$ONCHAIN_VERIFICATION" ]; then
         log_info "   - ✅ On-chain verification completed"
-        # Try to extract transaction hash from starknet-handler logs
-        FINAL_TX_HASH=$(echo "$ONCHAIN_VERIFICATION" | grep -oE "tx_hash=0x[a-fA-F0-9]+" | sed 's/tx_hash=//' | tail -1)
+        # Try to extract transaction hash from "Proof verified onchain with transaction hash:" line
+        FINAL_TX_HASH=$(echo "$ONCHAIN_VERIFICATION" | sed 's/\[[0-9;]*m//g' | grep -oE "transaction hash: 0x[a-fA-F0-9]+" | grep -oE "0x[a-fA-F0-9]+" | tail -1)
         if [ ! -z "$FINAL_TX_HASH" ]; then
-            log_info "   - 💎 Transaction Hash: $FINAL_TX_HASH"
-        else
-            # Fallback to general hex pattern
-            FINAL_TX_HASH=$(echo "$ONCHAIN_VERIFICATION" | grep -oE "0x[a-fA-F0-9]{64}" | tail -1)
-            if [ ! -z "$FINAL_TX_HASH" ]; then
+            # Verify it's not the contract address
+            if [ "$FINAL_TX_HASH" != "$PITCHLAKE_VERIFIER_CONTRACT" ]; then
                 log_info "   - 💎 Transaction Hash: $FINAL_TX_HASH"
+            else
+                log_info "   - ⚠️  Transaction hash extraction found contract address instead of tx hash"
             fi
+        else
+            log_info "   - ⚠️  Transaction hash not found in logs"
         fi
     else
         log_warn "   - ⚠️  On-chain verification status unclear - check logs above"
