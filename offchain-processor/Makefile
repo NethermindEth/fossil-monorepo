@@ -16,12 +16,12 @@ setup-rust: ## Install Rust and toolchains
 	else \
 		echo "✅ Rust already installed"; \
 	fi
-	@if ! rustup toolchain list | grep -q "nightly"; then \
-		echo "Installing Rust nightly..."; \
-		rustup toolchain install nightly; \
-		rustup default nightly; \
+	@if ! rustup toolchain list | grep -q "stable"; then \
+		echo "Installing Rust stable..."; \
+		rustup toolchain install stable; \
+		rustup default stable; \
 	else \
-		echo "✅ Rust nightly already installed"; \
+		echo "✅ Rust stable already installed"; \
 	fi
 
 .PHONY: setup-postgres

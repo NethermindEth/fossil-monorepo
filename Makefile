@@ -4,28 +4,101 @@
 
 .PHONY: setup
 setup: ## Install all dependencies and set up the complete development environment
-	@echo "🔧 Setting up complete development environment..."
-	@echo "Installing Rust..."
+	@echo "🚀 Setting up Fossil Monorepo development environment..."
+	@echo ""
+	@echo "1️⃣  Checking Docker..."
+	@if ! command -v docker &> /dev/null; then \
+		echo "   ❌ Docker is not installed!"; \
+		echo "   Please install Docker Desktop from https://www.docker.com/products/docker-desktop/"; \
+		echo "   After installation, make sure Docker is running and try again."; \
+		exit 1; \
+	else \
+		echo "   ✅ Docker is installed"; \
+	fi
+	@if ! docker info &> /dev/null; then \
+		echo "   ❌ Docker daemon is not running!"; \
+		echo "   Please start Docker Desktop and try again."; \
+		exit 1; \
+	else \
+		echo "   ✅ Docker daemon is running"; \
+	fi
+	@echo ""
+	@echo "2️⃣  Installing Rust..."
 	@if ! command -v rustup &> /dev/null; then \
 		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; \
+		. $$HOME/.cargo/env; \
 	fi
-	@if ! rustup toolchain list | grep -q "nightly"; then \
-		rustup toolchain install nightly; \
-		rustup default nightly; \
+	@rustup toolchain install stable
+	@rustup default stable
+	@rustup component add rustfmt clippy
+	@echo "   ✅ Rust stable installed"
+	@echo ""
+	@echo "3️⃣  Installing RISC Zero..."
+	@if ! command -v rzup &> /dev/null; then \
+		curl -L https://risczero.com/install | bash; \
+		. $$HOME/.cargo/env; \
+		$$HOME/.risc0/bin/rzup install; \
+	else \
+		$$HOME/.risc0/bin/rzup install; \
 	fi
-	rustup component add rustfmt clippy
-	rustup component add rustfmt clippy --toolchain nightly
-	@echo "Installing coverage tools..."
-	cargo install cargo-tarpaulin
-	rustup component add llvm-tools-preview
-	@if ! command -v grcov &> /dev/null; then \
-		cargo install grcov; \
+	@echo "   ✅ RISC Zero installed"
+	@echo ""
+	@echo "4️⃣  Checking asdf version manager..."
+	@if ! command -v asdf &> /dev/null; then \
+		echo "   ❌ asdf is not installed!"; \
+		echo ""; \
+		echo "   Please install asdf by following the instructions at:"; \
+		echo "   👉 https://asdf-vm.com/guide/getting-started.html"; \
+		echo ""; \
+		echo "   Quick install for macOS/Linux:"; \
+		echo "   1. git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.14.0"; \
+		echo "   2. Add to your shell profile (~/.bashrc or ~/.zshrc):"; \
+		echo "      . \"$$HOME/.asdf/asdf.sh\""; \
+		echo "   3. Restart your terminal"; \
+		echo "   4. Run 'make setup' again"; \
+		exit 1; \
+	else \
+		echo "   ✅ asdf is installed"; \
 	fi
-	@echo "Setting up Proving Service..."
-	cd proving-service && make setup-dev-env
-	@echo "Setting up Offchain Processor..."
-	cd offchain-processor && make setup-platform
-	@echo "✅ Complete development environment ready!"
+	@asdf plugin add scarb 2>/dev/null || true
+	@asdf plugin add starknet-foundry 2>/dev/null || true
+	@asdf plugin add starkli 2>/dev/null || true
+	@echo ""
+	@echo "5️⃣  Installing StarkNet tools from .tool-versions..."
+	@asdf install
+	@echo "   ✅ Installed versions from .tool-versions:"
+	@echo "      - Scarb 2.12.1"
+	@echo "      - StarkNet Foundry 0.49.0"
+	@echo "      - Starkli 0.4.2"
+	@echo ""
+	@echo "6️⃣  Setting up environment files..."
+	@if [ ! -f .env.local ]; then \
+		cp .env.example .env.local; \
+		echo "   ✅ Created .env.local from .env.example"; \
+	else \
+		echo "   ✅ .env.local already exists"; \
+	fi
+	@if [ ! -f .env.docker ]; then \
+		cp .env.example .env.docker; \
+		sed -i.bak 's|STARKNET_RPC_URL=http://localhost:5050|STARKNET_RPC_URL=http://katana:5050|g' .env.docker; \
+		sed -i.bak 's|OFFCHAIN_PROCESSOR_DATABASE_URL=postgresql://postgres:postgres@localhost:5434/postgres|OFFCHAIN_PROCESSOR_DATABASE_URL=postgresql://postgres:postgres@offchain_processor_db:5432/postgres|g' .env.docker; \
+		sed -i.bak 's|PROVING_SERVICE_DATABASE_URL=postgresql://postgres:postgres@localhost:5435/postgres|PROVING_SERVICE_DATABASE_URL=postgresql://postgres:postgres@proving_service_db:5432/postgres|g' .env.docker; \
+		sed -i.bak 's|AWS_ENDPOINT_URL=http://localhost:4567|AWS_ENDPOINT_URL=http://localstack:4566|g' .env.docker; \
+		sed -i.bak 's|SQS_QUEUE_URL=http://localhost:4567/000000000000/fossilQueue|SQS_QUEUE_URL=http://localstack:4566/000000000000/fossilQueue|g' .env.docker; \
+		sed -i.bak 's|PROVING_SERVICE_URL=http://127.0.0.1:3001|PROVING_SERVICE_URL=http://proving-service-api:3001|g' .env.docker; \
+		rm -f .env.docker.bak; \
+		echo "   ✅ Created .env.docker with Docker service URLs"; \
+	else \
+		echo "   ✅ .env.docker already exists"; \
+	fi
+	@echo ""
+	@echo "✅ Setup complete! You can now run:"
+	@echo "   make dev-up    - Start the development environment"
+	@echo "   make dev-down  - Stop the development environment"
+	@echo ""
+	@echo "💡 Note: You may need to restart your shell or run:"
+	@echo "   source ~/.asdf/asdf.sh"
+	@echo "   to use the StarkNet tools immediately."
 
 ##@ Development
 
