@@ -29,8 +29,8 @@ setup: ## Install all dependencies and set up the complete development environme
 
 ##@ Development
 
-.PHONY: up
-up: ## Start all local development services
+.PHONY: dev-up
+dev-up: ## Start all local development services
 	@echo "🚀 Starting local development services..."
 	docker-compose -f docker-compose.local.yml up -d
 	@echo "✅ Services started:"
@@ -39,8 +39,8 @@ up: ## Start all local development services
 	@echo "  🗄️  Databases: Proving Service (5435), Offchain Processor (5434)"
 	@echo "  ☁️  LocalStack: http://localhost:4567"
 
-.PHONY: down
-down: ## Stop services and clean up (removes volumes)
+.PHONY: dev-down
+dev-down: ## Stop services and clean up (removes volumes)
 	@echo "🛑 Stopping and cleaning up..."
 	docker-compose -f docker-compose.local.yml down -v
 	@echo "✅ Environment cleaned"
@@ -56,6 +56,12 @@ build: ## Build all projects in release mode
 	cd proving-service && cargo build --release
 	cd offchain-processor && cargo build --release
 	@echo "✅ Build complete"
+
+.PHONY: build-message-handler-image
+build-message-handler-image: ## Build message-handler Docker image with pre-compiled mock-proof binary
+	@echo "🔧 Building message-handler Docker image with mock-proof features..."
+	./scripts/build-message-handler-image.sh
+	@echo "✅ Message handler image ready: fossil-message-handler:with-files"
 
 .PHONY: test
 test: ## Run all tests
