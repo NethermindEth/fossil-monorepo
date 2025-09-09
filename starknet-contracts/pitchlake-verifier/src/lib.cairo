@@ -57,6 +57,23 @@ pub struct AvgFees {
     pub avg_fee: felt252,
 }
 
+// Helper function to safely parse u64 with bounds checking
+fn safe_parse_u64(journal_bytes: Span<u8>, mut byte_offset: usize) -> (u64, usize) {
+    let mut value: u64 = 0;
+    let mut byte_idx = 0;
+    while byte_idx < U64_SIZE {
+        if byte_offset + byte_idx >= journal_bytes.len() {
+            // If we run out of bytes, return what we have parsed so far
+            break;
+        }
+        let current_byte: u64 = (*journal_bytes.at(byte_offset + byte_idx)).into();
+        let shifted_byte: u64 = BitShift::shl(current_byte, (8 * byte_idx).into());
+        value += shifted_byte;
+        byte_idx += 1;
+    }
+    (value, byte_offset + U64_SIZE)
+}
+
 pub fn decode_journal(journal_bytes: Span<u8>) -> Journal {
     // Parse data_8_months_hash (32 bytes total, as 8 u32 values)
     // First u32 (bytes 0-3)
@@ -112,113 +129,47 @@ pub fn decode_journal(journal_bytes: Span<u8>) -> Journal {
 
     // Parse start_timestamp (8 bytes)
     let mut byte_offset = 32; // After data_8_months_hash
-    let mut start_timestamp: u64 = 0;
-    let mut byte_idx = 0;
-    while byte_idx < U64_SIZE {
-        let current_byte: u64 = (*journal_bytes.at(byte_offset + byte_idx)).into();
-        let shifted_byte: u64 = BitShift::shl(current_byte, (8 * byte_idx).into());
-        start_timestamp += shifted_byte;
-        byte_idx += 1;
-    }
+    let (start_timestamp, byte_offset) = safe_parse_u64(journal_bytes, byte_offset);
 
     // Parse end_timestamp (8 bytes)
-    byte_offset += U64_SIZE;
-    let mut end_timestamp: u64 = 0;
-    let mut byte_idx = 0;
-    while byte_idx < U64_SIZE {
-        let current_byte: u64 = (*journal_bytes.at(byte_offset + byte_idx)).into();
-        let shifted_byte: u64 = BitShift::shl(current_byte, (8 * byte_idx).into());
-        end_timestamp += shifted_byte;
-        byte_idx += 1;
-    }
+    let (end_timestamp, byte_offset) = safe_parse_u64(journal_bytes, byte_offset);
 
     // Parse reserve_price timestamp range (16 bytes)
-    byte_offset += U64_SIZE;
-    let mut reserve_price_start_timestamp: u64 = 0;
-    let mut byte_idx = 0;
-    while byte_idx < U64_SIZE {
-        let current_byte: u64 = (*journal_bytes.at(byte_offset + byte_idx)).into();
-        let shifted_byte: u64 = BitShift::shl(current_byte, (8 * byte_idx).into());
-        reserve_price_start_timestamp += shifted_byte;
-        byte_idx += 1;
-    }
+    let (reserve_price_start_timestamp, byte_offset) = safe_parse_u64(journal_bytes, byte_offset);
+    let (reserve_price_end_timestamp, byte_offset) = safe_parse_u64(journal_bytes, byte_offset);
 
-    byte_offset += U64_SIZE;
-    let mut reserve_price_end_timestamp: u64 = 0;
-    let mut byte_idx = 0;
-    while byte_idx < U64_SIZE {
-        let current_byte: u64 = (*journal_bytes.at(byte_offset + byte_idx)).into();
-        let shifted_byte: u64 = BitShift::shl(current_byte, (8 * byte_idx).into());
-        reserve_price_end_timestamp += shifted_byte;
-        byte_idx += 1;
-    }
-
-    // Parse reserve_price (8 bytes)
-    let (reserve_price, mut byte_offset) = parse_packed_fixed_point(journal_bytes, byte_offset);
+    // Parse reserve_price (as hex string)
+    let (reserve_price, byte_offset) = safe_parse_packed_fixed_point(journal_bytes, byte_offset);
 
     // Parse twap timestamp range (16 bytes)
-    let mut twap_start_timestamp: u64 = 0;
-    let mut byte_idx = 0;
-    while byte_idx < U64_SIZE {
-        let current_byte: u64 = (*journal_bytes.at(byte_offset + byte_idx)).into();
-        let shifted_byte: u64 = BitShift::shl(current_byte, (8 * byte_idx).into());
-        twap_start_timestamp += shifted_byte;
-        byte_idx += 1;
-    }
-    byte_offset += U64_SIZE;
+    let (twap_start_timestamp, byte_offset) = safe_parse_u64(journal_bytes, byte_offset);
+    let (twap_end_timestamp, byte_offset) = safe_parse_u64(journal_bytes, byte_offset);
 
-    let mut twap_end_timestamp: u64 = 0;
-    let mut byte_idx = 0;
-    while byte_idx < U64_SIZE {
-        let current_byte: u64 = (*journal_bytes.at(byte_offset + byte_idx)).into();
-        let shifted_byte: u64 = BitShift::shl(current_byte, (8 * byte_idx).into());
-        twap_end_timestamp += shifted_byte;
-        byte_idx += 1;
-    }
-    byte_offset += U64_SIZE;
-
-    // Parse twap_result (8 bytes)
-    let (twap_result, mut byte_offset) = parse_packed_fixed_point(journal_bytes, byte_offset);
+    // Parse twap_result (as hex string)
+    let (twap_result, byte_offset) = safe_parse_packed_fixed_point(journal_bytes, byte_offset);
 
     // Parse max_return timestamp range (16 bytes)
-    let mut max_return_start_timestamp: u64 = 0;
-    let mut byte_idx = 0;
-    while byte_idx < U64_SIZE {
-        let current_byte: u64 = (*journal_bytes.at(byte_offset + byte_idx)).into();
-        let shifted_byte: u64 = BitShift::shl(current_byte, (8 * byte_idx).into());
-        max_return_start_timestamp += shifted_byte;
-        byte_idx += 1;
-    }
-    byte_offset += U64_SIZE;
+    let (max_return_start_timestamp, byte_offset) = safe_parse_u64(journal_bytes, byte_offset);
+    let (max_return_end_timestamp, byte_offset) = safe_parse_u64(journal_bytes, byte_offset);
 
-    let mut max_return_end_timestamp: u64 = 0;
-    let mut byte_idx = 0;
-    while byte_idx < U64_SIZE {
-        let current_byte: u64 = (*journal_bytes.at(byte_offset + byte_idx)).into();
-        let shifted_byte: u64 = BitShift::shl(current_byte, (8 * byte_idx).into());
-        max_return_end_timestamp += shifted_byte;
-        byte_idx += 1;
-    }
-    byte_offset += U64_SIZE;
+    // Parse max_return (as hex string)
+    let (max_return, byte_offset) = safe_parse_packed_fixed_point(journal_bytes, byte_offset);
 
-    // Parse max_return (8 bytes)
-    let (max_return, mut byte_offset) = parse_packed_fixed_point(journal_bytes, byte_offset);
-
-    // Parse floating_point_tolerance (8 bytes)
-    let (floating_point_tolerance, mut byte_offset) = parse_packed_fixed_point(
+    // Parse floating_point_tolerance (as hex string)
+    let (floating_point_tolerance, byte_offset) = safe_parse_packed_fixed_point(
         journal_bytes, byte_offset,
     );
 
-    // Parse reserve_price_tolerance (8 bytes)
-    let (reserve_price_tolerance, byte_offset) = parse_packed_fixed_point(
+    // Parse reserve_price_tolerance (as hex string)
+    let (reserve_price_tolerance, byte_offset) = safe_parse_packed_fixed_point(
         journal_bytes, byte_offset,
     );
 
-    // Parse twap_tolerance (8 bytes)
-    let (twap_tolerance, byte_offset) = parse_packed_fixed_point(journal_bytes, byte_offset);
+    // Parse twap_tolerance (as hex string)
+    let (twap_tolerance, byte_offset) = safe_parse_packed_fixed_point(journal_bytes, byte_offset);
 
-    // Parse gradient_tolerance (8 bytes)
-    let (gradient_tolerance, _) = parse_packed_fixed_point(journal_bytes, byte_offset);
+    // Parse gradient_tolerance (as hex string)
+    let (gradient_tolerance, _) = safe_parse_packed_fixed_point(journal_bytes, byte_offset);
 
     Journal {
         data_8_months_hash,
@@ -238,6 +189,42 @@ pub fn decode_journal(journal_bytes: Span<u8>) -> Journal {
         twap_tolerance,
         gradient_tolerance,
     }
+}
+
+// Helper function to safely parse packed fixed point with bounds checking
+fn safe_parse_packed_fixed_point(
+    journal_bytes: Span<u8>, mut byte_offset: usize,
+) -> (felt252, usize) {
+    // Check if we have enough bytes for the minimum structure
+    if byte_offset + U32_SIZE + HEX_PREFIX_SIZE + HEX_HASH_SIZE > journal_bytes.len() {
+        // Return default value if not enough bytes
+        return (0, byte_offset + U32_SIZE + HEX_PREFIX_SIZE + HEX_HASH_SIZE);
+    }
+
+    byte_offset += U32_SIZE; // Skip length indicator (66, 0, 0, 0)
+    byte_offset += HEX_PREFIX_SIZE; // Skip "0x" prefix
+    let mut value: u256 = 0;
+    let mut hex_idx = byte_offset;
+    let hex_end = byte_offset + HEX_HASH_SIZE;
+    loop {
+        if hex_idx >= hex_end || hex_idx >= journal_bytes.len() {
+            break;
+        }
+
+        let shifted_hash: u256 = BitShift::shl(value, 4);
+        let hex_byte: u256 = (*journal_bytes.at(hex_idx)).into();
+        let hex_base: u256 = if hex_byte < 58 { // '0'-'9' vs 'a'-'f'
+            ASCII_0 // ASCII '0'
+        } else {
+            ASCII_A_OFFSET // ASCII 'a' - 10
+        };
+        value = shifted_hash + hex_byte - hex_base;
+        hex_idx += 1;
+    }
+    byte_offset += HEX_HASH_WITH_PREFIX_SIZE;
+
+    let felt_value: felt252 = value.try_into().unwrap();
+    (felt_value, byte_offset)
 }
 
 // Helper function to parse 8 bytes into a UFixedPoint123x128 value

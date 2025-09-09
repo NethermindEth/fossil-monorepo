@@ -60,9 +60,19 @@ pub mod PitchLakeVerifier {
         data_8_months_hash: [u32; 8],
         start_timestamp: u64,
         end_timestamp: u64,
+        reserve_price_start_timestamp: u64,
+        reserve_price_end_timestamp: u64,
         reserve_price: felt252,
+        twap_start_timestamp: u64,
+        twap_end_timestamp: u64,
         twap_result: felt252,
+        max_return_start_timestamp: u64,
+        max_return_end_timestamp: u64,
         max_return: felt252,
+        floating_point_tolerance: felt252,
+        reserve_price_tolerance: felt252,
+        twap_tolerance: felt252,
+        gradient_tolerance: felt252,
     }
 
     #[constructor]
@@ -99,14 +109,15 @@ pub mod PitchLakeVerifier {
             pitchlake_job_request.program_id.serialize(ref job_request_data);
 
             let mut job_result_data: Array<felt252> = array![];
-            journal.start_timestamp.serialize(ref job_result_data);
-            journal.end_timestamp.serialize(ref job_result_data);
+
+            journal.reserve_price_start_timestamp.serialize(ref job_result_data);
+            journal.reserve_price_end_timestamp.serialize(ref job_result_data);
             journal.reserve_price.serialize(ref job_result_data);
-            //journal.floating_point_tolerance.serialize(ref job_result_data);
-            //journal.reserve_price_tolerance.serialize(ref job_result_data);
-            //journal.twap_tolerance.serialize(ref job_result_data);
-            //journal.gradient_tolerance.serialize(ref job_result_data);
+            journal.twap_start_timestamp.serialize(ref job_result_data);
+            journal.twap_end_timestamp.serialize(ref job_result_data);
             journal.twap_result.serialize(ref job_result_data);
+            journal.max_return_start_timestamp.serialize(ref job_result_data);
+            journal.max_return_end_timestamp.serialize(ref job_result_data);
             journal.max_return.serialize(ref job_result_data);
 
             let pitchlake_vault = IPitchLakeVaultDispatcher {
@@ -121,13 +132,19 @@ pub mod PitchLakeVerifier {
                         data_8_months_hash: journal.data_8_months_hash,
                         start_timestamp: journal.start_timestamp,
                         end_timestamp: journal.end_timestamp,
+                        reserve_price_start_timestamp: journal.reserve_price_start_timestamp,
+                        reserve_price_end_timestamp: journal.reserve_price_end_timestamp,
                         reserve_price: journal.reserve_price,
-                        //floating_point_tolerance: journal.floating_point_tolerance,
-                        //reserve_price_tolerance: journal.reserve_price_tolerance,
-                        //twap_tolerance: journal.twap_tolerance,
-                        //gradient_tolerance: journal.gradient_tolerance,
+                        twap_start_timestamp: journal.twap_start_timestamp,
+                        twap_end_timestamp: journal.twap_end_timestamp,
                         twap_result: journal.twap_result,
+                        max_return_start_timestamp: journal.max_return_start_timestamp,
+                        max_return_end_timestamp: journal.max_return_end_timestamp,
                         max_return: journal.max_return,
+                        floating_point_tolerance: journal.floating_point_tolerance,
+                        reserve_price_tolerance: journal.reserve_price_tolerance,
+                        twap_tolerance: journal.twap_tolerance,
+                        gradient_tolerance: journal.gradient_tolerance,
                     },
                 );
         }
