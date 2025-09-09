@@ -63,8 +63,42 @@ services:
       timeout: 5s
       retries: 5
 
+  # Offchain Processor Service
+  offchain-processor:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.offchain-processor
+    image: fossil-offchain-processor:latest
+    depends_on:
+      offchain_processor_db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@offchain_processor_db:5432/postgres
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      RUST_LOG: info
+      SERVER_PORT: 3000
+    ports:
+      - "3000:3000"
+    networks:
+      - fossil-network
+      - internal
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
   # Contract Deployer - deploys to external Katana
   contract-deployer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.deploy
     image: fossil-deploy:latest
     networks:
       - fossil-network

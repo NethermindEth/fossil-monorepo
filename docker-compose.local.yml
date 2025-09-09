@@ -74,29 +74,94 @@ services:
       timeout: 5s
       retries: 5
 
-  # Mock Contract Deployer - deploys to local Katana
-  mock-contract-deployer:
+  # Proving Service HTTP API
+  proving-service-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.proving-service-api
+    image: fossil-proving-service-api:latest
+    depends_on:
+      proving_service_db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    env_file:
+      - .env.docker
+    environment:
+      PROVING_SERVICE_DATABASE_URL: postgres://postgres:postgres@proving_service_db:5432/postgres
+      DATABASE_URL: postgres://postgres:postgres@proving_service_db:5432/postgres
+      AWS_ENDPOINT_URL: http://localstack:4566
+      SQS_QUEUE_URL: http://localstack:4566/000000000000/fossilQueue
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      RUST_LOG: info
+      SERVER_PORT: 3001
+    ports:
+      - "3001:3001"
+    networks:
+      - local-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Offchain Processor Service
+  offchain-processor:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.offchain-processor
+    image: fossil-offchain-processor:latest
+    depends_on:
+      offchain_processor_db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    environment:
+      OFFCHAIN_PROCESSOR_DATABASE_URL: postgres://postgres:postgres@offchain_processor_db:5432/postgres
+      DATABASE_URL: postgres://postgres:postgres@offchain_processor_db:5432/postgres
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      RUST_LOG: info
+      SERVER_PORT: 3000
+    ports:
+      - "3000:3000"
+    networks:
+      - local-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Contract Deployer - deploys to external Katana
+  contract-deployer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.deploy
     image: fossil-deploy:latest
     networks:
       - local-network
     volumes:
-      - ./proving-service/mock_contracts:/app
-    env_file:
-      - ./proving-service/mock_contracts/.env.local
+      - ./starknet-contracts:/app/starknet-contracts
+      - ./scripts:/app/scripts
+      - ./.env.docker:/app/.env.docker
+      - ./.env.local:/app/.env.local
+    working_dir: /app
     stdin_open: true
     tty: true
     command:
       [
         "sh",
         "-c",
-        "chmod +x scripts/deploy-mock-hash-storage.sh && ./scripts/deploy-mock-hash-storage.sh",
+        "chmod +x scripts/deploy-starknet.sh && ./scripts/deploy-starknet.sh docker",
       ]
     restart: "no"
-    depends_on:
-      katana:
-        condition: service_healthy
-    profiles:
-      - deploy
 
 networks:
   local-network:
