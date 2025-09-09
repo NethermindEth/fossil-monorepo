@@ -1,4 +1,3 @@
-use core::ops::AddAssign;
 use openzeppelin_upgrades::interface::{IUpgradeableDispatcher, IUpgradeableDispatcherTrait};
 use sha2_input::{ISha2InputDispatcher, ISha2InputDispatcherTrait};
 use snforge_std::{
@@ -6,7 +5,6 @@ use snforge_std::{
     start_cheat_caller_address, start_mock_call, store,
 };
 use starknet::ContractAddress;
-use starknet::class_hash::class_hash_const;
 
 fn deploy_contract_sha2_input(
     owner: starknet::ContractAddress, fossil_store: starknet::ContractAddress,
@@ -136,7 +134,7 @@ fn test_should_fail_to_set_fossil_store_by_non_owner() {
     let address_before = dispatcher.get_fossil_store();
     assert(address_before == fossil_store(), 'invalid fossil store address');
 
-    let new_fossil_store = starknet::contract_address_const::<'NEW_FOSSIL_STORE_ADDRESS'>();
+    let new_fossil_store: ContractAddress = 'NEW_FOSSIL_STORE_ADDRESS'.try_into().unwrap();
     dispatcher.set_fossil_store(new_fossil_store);
 }
 
@@ -160,7 +158,7 @@ fn test_should_be_able_to_upgrade_by_owner() {
 fn test_should_fail_to_upgrade_by_non_owner() {
     let contract_address = deploy_contract_sha2_input(owner(), fossil_store());
 
-    let new_class_hash = class_hash_const::<'Sha2InputNew'>();
+    let new_class_hash: starknet::ClassHash = 'Sha2InputNew'.try_into().unwrap();
     let dispatcher = IUpgradeableDispatcher { contract_address };
     dispatcher.upgrade(new_class_hash);
 }
