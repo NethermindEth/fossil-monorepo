@@ -321,7 +321,7 @@ mod tests {
         let job_request = super::PitchLakeJobRequest {
             vault_address: Felt::from_str("0x123").unwrap(),
             timestamp: 1672531200u64,
-            program_id: Felt::from_str("0x504954434c5f4c414b455f5631").unwrap(), // 'PITCH_LAKE_V1'
+            program_id: Felt::from_str("0x504954434c4c414b455f5631").unwrap(), // 'PITCH_LAKE_V1'
         };
 
         // Note: This test will fail in real execution since we're using a dummy provider

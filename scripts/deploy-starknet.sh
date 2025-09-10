@@ -297,58 +297,7 @@ echo "  3 Hour Vault: $PITCHLAKE_VAULT_ADDRESS_3H"
 echo "  1 Month Vault: $PITCHLAKE_VAULT_ADDRESS_1M"
 echo
 
-# Initialize vaults with pricing data requests
-echo -e "${YELLOW}${BOLD}Initializing vaults with pricing data...${NC}"
-
-# Initialize 12 minute vault
-echo -e "${BLUE}Fulfilling 12 minute vault pricing request...${NC}"
-sleep 10
-echo "Getting request data from 12 minute vault..."
-REQUEST_DATA_12MIN=$(starkli call $PITCHLAKE_VAULT_ADDRESS_12MIN get_request_to_start_first_round  --rpc $STARKNET_RPC_URL)
-echo "Request data: $REQUEST_DATA_12MIN"
-
-# Extract calldata from response (this mimics the sncast sed/awk processing)
-CALLDATA_12MIN=$(echo "$REQUEST_DATA_12MIN" | grep -o '\[.*\]' | sed 's/\[//;s/\]//' | tr ',' ' ')
-echo "Extracted calldata: $CALLDATA_12MIN"
-
-# sleep 10
-# echo "Invoking fossil callback for 12 minute vault..."
-# starkli invoke $PITCHLAKE_VERIFIER_ADDRESS fossil_callback $CALLDATA_12MIN 0x6 u256:10000000000 0x00 0x0d05 u256:2000000000 0x00 0x00 --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w
-# echo -e "${GREEN}12 minute vault initialized${NC}"
-
-# # Initialize 3 hour vault
-# echo -e "${BLUE}Fulfilling 3 hour vault pricing request...${NC}"
-# sleep 10
-# echo "Getting request data from 3 hour vault..."
-# REQUEST_DATA_3H=$(starkli call $PITCHLAKE_VAULT_ADDRESS_3H get_request_to_start_first_round --rpc $STARKNET_RPC_URL)
-# echo "Request data: $REQUEST_DATA_3H"
-
-# CALLDATA_3H=$(echo "$REQUEST_DATA_3H" | grep -o '\[.*\]' | sed 's/\[//;s/\]//' | tr ',' ' ')
-# echo "Extracted calldata: $CALLDATA_3H"
-
-# sleep 10
-# echo "Invoking fossil callback for 3 hour vault..."
-# starkli invoke $PITCHLAKE_VERIFIER_ADDRESS fossil_callback $CALLDATA_3H 0x6 u256:10000000000 0x00 0x0d05 u256:2000000000 0x00 0x00 --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w
-# echo -e "${GREEN}3 hour vault initialized${NC}"
-
-# # Initialize 1 month vault
-# echo -e "${BLUE}Fulfilling 1 month vault pricing request...${NC}"
-# sleep 10
-# echo "Getting request data from 1 month vault..."
-# REQUEST_DATA_1M=$(starkli call $PITCHLAKE_VAULT_ADDRESS_1M get_request_to_start_first_round --rpc $STARKNET_RPC_URL)
-# echo "Request data: $REQUEST_DATA_1M"
-
-# CALLDATA_1M=$(echo "$REQUEST_DATA_1M" | grep -o '\[.*\]' | sed 's/\[//;s/\]//' | tr ',' ' ')
-# echo "Extracted calldata: $CALLDATA_1M"
-
-# sleep 10
-# echo "Invoking fossil callback for 1 month vault..."
-# starkli invoke $PITCHLAKE_VERIFIER_ADDRESS fossil_callback $CALLDATA_1M 0x6 u256:10000000000 0x00 0x0d05 u256:2000000000 0x00 0x00 --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w
-# echo -e "${GREEN}1 month vault initialized${NC}"
-
-# echo -e "${GREEN}${BOLD}All vaults initialized!${NC}"
-
-echo -e "\n${GREEN}${BOLD}All contracts deployed and initialized!${NC}"
+echo -e "\n${GREEN}${BOLD}All contracts deployed!${NC}"
 
 # Update the environment files with the new addresses
 for env_file in "${ENV_FILES[@]}"; do

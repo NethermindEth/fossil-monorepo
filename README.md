@@ -19,15 +19,7 @@ This installs all dependencies:
 - StarkNet tools (Starkli, Scarb, Starknet Foundry) via asdf
 - Environment file configuration
 
-### 2. Build Message Handler Image
-
-```bash
-make build-message-handler-image
-```
-
-This builds the Docker image with RISC0 guest binaries for proof generation.
-
-### 3. Start Development Stack
+### 2. Start Development Stack
 
 ```bash
 make dev-up
@@ -35,10 +27,10 @@ make dev-up
 
 This starts the complete local development environment:
 1. **Infrastructure**: Katana (StarkNet devnet), PostgreSQL databases, LocalStack (AWS SQS)
-2. **Contract Deployment**: Automatically deploys fresh contracts to Katana
+2. **Contract Deployment**: Automatically deploys fresh contracts to Katana including multiple vault configurations (12min, 3hour, 1month)
 3. **Services**: Offchain Processor, Proving Service API, Message Handler
 
-### 4. Stop Development Stack
+### 3. Stop Development Stack
 
 ```bash
 make dev-down
@@ -62,7 +54,10 @@ For services running inside Docker containers:
 
 ### Key Environment Variables
 - `PITCHLAKE_VERIFIER_CONTRACT` - StarkNet contract for proof verification
-- `PITCHLAKE_VAULT` - Mock vault contract address
+- `PITCHLAKE_VAULT` - Default vault contract address (12-minute rounds)
+- `PITCHLAKE_VAULT_12MIN` - 12-minute vault contract address
+- `PITCHLAKE_VAULT_3H` - 3-hour vault contract address  
+- `PITCHLAKE_VAULT_1M` - 1-month vault contract address
 - `BONSAI_API_KEY` - RISC0 Bonsai API key for proof generation
 - `ENABLE_PROOF=true` - Enable proof generation in message handler
 - `USE_RISC0_INTEGRATION=true` - Use RISC0 for proof generation
@@ -83,6 +78,10 @@ This comprehensive test:
 3. **Basic Job**: Submits a pricing data request
 4. **RISC0 Proof Job**: Tests full proof generation pipeline
 5. **Result Verification**: Checks job completion and results
+
+**Note**: The test script is currently failing due to smart contract L1 data out of range validation. This occurs because the mock proof data doesn't align with the contract's expected data ranges. This will need to be fixed by either:
+- Updating the test request data to match valid L1 ranges
+- Temporarily removing the range check for testing with mock proofs
 
 ### Manual API Testing
 
@@ -112,6 +111,11 @@ curl -X POST "http://localhost:3000/pricing_data" \
     }
   }'
 ```
+
+**Note**: Replace `YOUR_PITCHLAKE_VAULT_ADDRESS` with one of the deployed vault addresses:
+- `PITCHLAKE_VAULT_12MIN` for 12-minute rounds
+- `PITCHLAKE_VAULT_3H` for 3-hour rounds  
+- `PITCHLAKE_VAULT_1M` for 1-month rounds
 
 #### 3. Check Job Status
 ```bash
@@ -153,12 +157,10 @@ docker logs fossil-monorepo-proving-service-api-1 -f
 ## Development Workflow
 
 1. **Make Changes**: Edit code in `proving-service/` or `offchain-processor/`
-2. **Rebuild Images**: Run `make build-message-handler-image` if needed
-3. **Restart Services**: `make dev-down && make dev-up`
-4. **Test Changes**: Run `./test-local-request.sh`
+2. **Restart Services**: `make dev-down && make dev-up`
+3. **Test Changes**: Run `./test-local-request.sh`
 
 ## Troubleshooting
 
 - **Contract address mismatches**: Restart with `make dev-down && make dev-up`
-- **RISC0 binary issues**: Rebuild with `make build-message-handler-image`
 - **Service health issues**: Check logs with `docker logs` commands above

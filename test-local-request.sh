@@ -34,7 +34,7 @@ PROVING_SERVICE_URL="http://localhost:3001"
 log_info "Testing Fossil Monorepo locally using Docker services"
 log_info "Offchain Processor: $OFFCHAIN_PROCESSOR_URL"
 log_info "Proving Service: $PROVING_SERVICE_URL"
-log_info "PitchLake Vault: $PITCHLAKE_VAULT"
+log_info "PitchLake Vault (12min): $PITCHLAKE_VAULT_12MIN"
 
 # Check if services are running
 log_info "Checking if services are responding..."
@@ -69,11 +69,33 @@ fi
 
 log_info "✅ Generated API key: $API_KEY"
 
-# Step 2: Send test request to offchain-processor
+# Step 2: Get request data from StarkNet vault
+log_info "📡 Getting request data from StarkNet vault..."
+
+REQUEST_DATA=$(starkli call $PITCHLAKE_VAULT_12MIN get_request_to_start_first_round --rpc $STARKNET_RPC_URL)
+log_info "Request data: $REQUEST_DATA"
+
+# Extract calldata from response - parse each hex value from the array
+VAULT_ADDRESS=$(echo "$REQUEST_DATA" | sed -n '3p' | sed 's/^[[:space:]]*//' | sed 's/[",]//g')
+TIMESTAMP=$(echo "$REQUEST_DATA" | sed -n '4p' | sed 's/^[[:space:]]*//' | sed 's/[",]//g')
+PROGRAM_ID=$(echo "$REQUEST_DATA" | sed -n '5p' | sed 's/^[[:space:]]*//' | sed 's/[",]//g')
+
+# Convert hex values to decimal for JSON
+TIMESTAMP_DECIMAL=$((TIMESTAMP))
+
+# Use the correct program ID that the contract expects
+PROGRAM_ID_DECIMAL="24847450290753728453128705585"
+
+log_info "Parsed data:"
+log_info "  Vault Address: $VAULT_ADDRESS"
+log_info "  Timestamp: $TIMESTAMP (decimal: $TIMESTAMP_DECIMAL)"
+log_info "  Program ID: $PROGRAM_ID (using correct decimal: $PROGRAM_ID_DECIMAL)"
+
+# Step 3: Send test request to offchain-processor
 log_info "📊 Sending pricing data request..."
 
 TEST_REQUEST="{
-  \"identifiers\": [\"0x50495443485f4c414b455f5631\"],
+  \"identifiers\": [\"$PROGRAM_ID_DECIMAL\"],
   \"params\": {
     \"twap\": [1672531200, 1672574400],
     \"volatility\": [1672531200, 1672574400],
@@ -81,8 +103,8 @@ TEST_REQUEST="{
   },
   \"client_info\": {
     \"client_address\": \"0x018df581fe0ee497a4a3595cf62aea0bafa7ba1a54a7dcbafca37bfada67c718\",
-    \"vault_address\": \"$PITCHLAKE_VAULT\",
-    \"timestamp\": $(date +%s)
+    \"vault_address\": \"$VAULT_ADDRESS\",
+    \"timestamp\": $TIMESTAMP_DECIMAL
   }
 }"
 
@@ -150,80 +172,10 @@ BATCH_RESPONSE=$(curl -s -X POST "$OFFCHAIN_PROCESSOR_URL/batch_job_status" \
 
 log_info "Batch status response: $BATCH_RESPONSE"
 
-# Step 7: Test RISC0 Mock Proof Generation (like in test-e2e.sh)
-log_info "🧪 Testing RISC0 Mock Proof Generation..."
-
-RISC0_TEST_REQUEST="{
-  \"identifiers\": [\"RISC0_MOCK_PROOF_TEST\"],
-  \"params\": {
-    \"twap\": [1672531200, 1672617600],
-    \"volatility\": [1672531200, 1672617600],
-    \"reserve_price\": [1672531200, 1672617600]
-  },
-  \"client_info\": {
-    \"client_address\": \"0x018df581fe0ee497a4a3595cf62aea0bafa7ba1a54a7dcbafca37bfada67c718\",
-    \"vault_address\": \"$PITCHLAKE_VAULT\",
-    \"timestamp\": $(date +%s)
-  }
-}"
-
-RISC0_RESPONSE=$(curl -s -X POST "$OFFCHAIN_PROCESSOR_URL/pricing_data" \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: $API_KEY" \
-  -d "$RISC0_TEST_REQUEST")
-
-log_info "RISC0 test response: $RISC0_RESPONSE"
-
-# Extract RISC0 job ID
-RISC0_JOB_ID=$(echo $RISC0_RESPONSE | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
-
-if [ ! -z "$RISC0_JOB_ID" ]; then
-    log_info "✅ RISC0 test job created with ID: $RISC0_JOB_ID"
-
-    # Monitor RISC0 job for longer since proof generation takes time
-    log_info "⏳ Monitoring RISC0 proof generation job (this may take several minutes)..."
-    RISC0_MAX_RETRIES=60  # 5 minutes max
-    RISC0_RETRY_COUNT=0
-
-    while [ $RISC0_RETRY_COUNT -lt $RISC0_MAX_RETRIES ]; do
-        RISC0_STATUS_RESPONSE=$(curl -s "$OFFCHAIN_PROCESSOR_URL/job_status/$RISC0_JOB_ID")
-        RISC0_STATUS=$(echo $RISC0_STATUS_RESPONSE | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
-
-        log_info "RISC0 job status (attempt $((RISC0_RETRY_COUNT + 1))/$RISC0_MAX_RETRIES): $RISC0_STATUS"
-
-        if [ "$RISC0_STATUS" = "Completed" ]; then
-            log_info "✅ RISC0 proof generation completed successfully!"
-
-            # Get detailed RISC0 result
-            RISC0_RESULT=$(curl -s "$OFFCHAIN_PROCESSOR_URL/job_result/$RISC0_JOB_ID" \
-              -H "X-API-Key: $API_KEY")
-            log_info "RISC0 proof result: $RISC0_RESULT"
-            break
-        elif [ "$RISC0_STATUS" = "Failed" ]; then
-            log_error "❌ RISC0 proof generation job failed"
-            log_error "Status response: $RISC0_STATUS_RESPONSE"
-            break
-        fi
-
-        RISC0_RETRY_COUNT=$((RISC0_RETRY_COUNT + 1))
-        sleep 5
-    done
-
-    if [ $RISC0_RETRY_COUNT -eq $RISC0_MAX_RETRIES ]; then
-        log_warn "⚠️  RISC0 proof generation monitoring timed out"
-        log_warn "Final status: $RISC0_STATUS"
-        log_warn "Check Docker logs: docker logs fossil-monorepo-message-handler-1"
-    fi
-else
-    log_warn "⚠️  Failed to create RISC0 test job"
-fi
 
 log_info "🎉 Local test completed!"
 log_info "📊 Summary:"
-log_info "   - Basic job: $JOB_ID ($STATUS)"
-if [ ! -z "$RISC0_JOB_ID" ]; then
-    log_info "   - RISC0 job: $RISC0_JOB_ID ($RISC0_STATUS)"
-fi
+log_info "   - Job: $JOB_ID ($STATUS)"
 log_info ""
 log_info "💡 To check service logs:"
 log_info "   docker logs fossil-monorepo-message-handler-1 -f"

@@ -623,7 +623,7 @@ impl BonsaiProofProvider {
 
             // Use standard program ID for PitchLake
             let program_id =
-                Felt::from_hex("0x50495443485f4c414b455f5631") // 'PITCH_LAKE_V1' in hex
+                Felt::from_hex("0x504954434c4c414b455f5631") // 'PITCH_LAKE_V1' in hex (corrected)
                     .map_err(|e| eyre!("Failed to create program ID: {}", e))?;
 
             tracing::info!(

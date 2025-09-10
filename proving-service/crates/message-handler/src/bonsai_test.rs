@@ -304,7 +304,7 @@ async fn send_proof_onchain(
             starknet_crypto::Felt::from_hex("0x0").unwrap()
         }),
         timestamp: 1672531200u64, // Default timestamp (2023-01-01)
-        program_id: starknet_crypto::Felt::from_hex("0x504954434c5f4c414b455f5631").unwrap(), // 'PITCH_LAKE_V1'
+        program_id: starknet_crypto::Felt::from_hex("0x504954434c4c414b455f5631").unwrap(), // 'PITCH_LAKE_V1'
     };
 
     // Verify proof onchain
