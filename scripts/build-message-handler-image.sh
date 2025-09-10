@@ -7,10 +7,28 @@ cd "$(git rev-parse --show-toplevel)"
 # Build the binary locally with mock-proof features
 echo "Building message-handler binary locally with mock-proof features..."
 cd proving-service
-cargo build --release --bin message-handler --features mock-proof,starknet-handler
+cargo build --release --bin message-handler --package message-handler --features mock-proof
 cd ..
 
 echo "Found message-handler binary at: proving-service/target/release/message-handler"
+
+# Find the methods directory that contains the 'out' subdirectory
+METHODS_DIR=""
+for dir in proving-service/target/release/build/mock-proof-composition-methods-*; do
+    if [ -d "$dir/out" ]; then
+        METHODS_DIR="$dir"
+        break
+    fi
+done
+
+if [ -z "$METHODS_DIR" ]; then
+    echo "Error: Could not find mock-proof-composition-methods directory with 'out' subdirectory"
+    echo "Available directories:"
+    ls -la proving-service/target/release/build/mock-proof-composition-methods-*/
+    exit 1
+fi
+
+echo "Found methods directory with out/ subdirectory: $METHODS_DIR"
 
 # Build the Docker image (without copying files yet)
 echo "Building base Docker image..."
@@ -27,6 +45,18 @@ chmod +x proving-service/target/release/message-handler
 # Copy the binary to the container
 echo "Copying binary to container..."
 docker cp proving-service/target/release/message-handler $CONTAINER_ID:/usr/local/bin/message-handler
+
+# Copy RISC0 method ELFs to the container (following MMR script pattern)
+echo "Copying method ELFs to container..."
+if [ -d "$METHODS_DIR/out" ]; then
+    docker cp $METHODS_DIR/out/. $CONTAINER_ID:/app/target/release/build/mock-proof-composition-methods/out/
+else
+    echo "Warning: Method ELFs directory not found at $METHODS_DIR/out"
+    # Create an empty directory to avoid errors
+    mkdir -p tmp_methods_out
+    docker cp tmp_methods_out/. $CONTAINER_ID:/app/target/release/build/mock-proof-composition-methods/out/
+    rm -rf tmp_methods_out
+fi
 
 # Commit the container as the final image directly
 echo "Committing container as final image..."

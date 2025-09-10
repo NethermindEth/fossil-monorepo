@@ -10,7 +10,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
-# The binary will be copied during the build script
+# Create necessary directories for RISC0 methods
+RUN mkdir -p /app/target/release/build/mock-proof-composition-methods/out
+
+# The binary and method ELFs will be copied during the build script
 # using docker cp commands after the container is created
 
 # Set environment variables
