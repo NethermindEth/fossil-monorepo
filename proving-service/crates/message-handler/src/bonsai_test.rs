@@ -72,8 +72,10 @@ fn main() -> Result<()> {
                 0x12345678, 0x23456789, 0x3456789a, 0x456789ab, 0x56789abc, 0x6789abcd, 0x789abcde,
                 0x89abcdef,
             ],
-            start_timestamp: 1672531200, // 2023-01-01
-            end_timestamp: 1704067200,   // 2024-01-01
+            data_8_months_start_timestamp: 1651363200, // 2022-05-01 (8 months earlier)
+            data_8_months_end_timestamp: 1672531200,   // 2023-01-01 (start of analysis period)
+            start_timestamp: 1672531200,               // 2023-01-01
+            end_timestamp: 1704067200,                 // 2024-01-01
             positions: vec![1.0, 2.0, 3.0, 4.0, 5.0],
             pt: DVector::from_vec(vec![0.1, 0.2, 0.3]),
             pt_1: DVector::from_vec(vec![0.2, 0.3, 0.4]),

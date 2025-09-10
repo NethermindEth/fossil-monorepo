@@ -501,6 +501,9 @@ impl ProofProvider for BonsaiProofProvider {
                         0x12345678, 0x23456789, 0x3456789a, 0x456789ab, 0x56789abc, 0x6789abcd,
                         0x789abcde, 0x89abcdef,
                     ], // Mock hash of fee data
+                    data_8_months_start_timestamp: timestamp_ranges.overall_range().0
+                        - 8 * 30 * 24 * 3600, // 8 months before start
+                    data_8_months_end_timestamp: timestamp_ranges.overall_range().0, // Up to the start of analysis period
                     start_timestamp: timestamp_ranges.overall_range().0,
                     end_timestamp: timestamp_ranges.overall_range().1,
                     positions: vec![1.0, 2.0, 3.0, 4.0, 5.0], // Mock positions
@@ -600,11 +603,53 @@ impl BonsaiProofProvider {
         let verifier_contract_address = std::env::var("PITCHLAKE_VERIFIER_CONTRACT")
             .map_err(|_| eyre!("PITCHLAKE_VERIFIER_CONTRACT environment variable is required"))?;
 
+        // Create job_request for onchain verification if needed
+        let job_request = if verify_onchain
+            && !verifier_contract_address.is_empty()
+            && verifier_contract_address != "0x0"
+        {
+            use crate::response_handler::PitchLakeJobRequest;
+            use starknet::core::types::Felt;
+
+            // Get vault address from environment
+            let vault_address_str = std::env::var("PITCHLAKE_VAULT").map_err(|_| {
+                eyre!("PITCHLAKE_VAULT environment variable is required for onchain verification")
+            })?;
+            let vault_address = Felt::from_hex(&vault_address_str)
+                .map_err(|e| eyre!("Invalid vault address format: {}", e))?;
+
+            // Use end timestamp from the ranges as the result timestamp
+            let timestamp = timestamp_ranges.overall_range().1 as u64;
+
+            // Use standard program ID for PitchLake
+            let program_id =
+                Felt::from_hex("0x50495443485f4c414b455f5631") // 'PITCH_LAKE_V1' in hex
+                    .map_err(|e| eyre!("Failed to create program ID: {}", e))?;
+
+            tracing::info!(
+                "🔗 Creating job request for onchain verification: vault={}, timestamp={}, program_id={}",
+                vault_address,
+                timestamp,
+                program_id
+            );
+
+            Some(PitchLakeJobRequest {
+                vault_address,
+                timestamp,
+                program_id,
+            })
+        } else {
+            tracing::info!(
+                "⚠️ Onchain verification disabled or invalid contract address, skipping job_request creation"
+            );
+            None
+        };
+
         let verifier_config = ProofVerifierConfig {
             verify_onchain,
             verifier_contract_address: verifier_contract_address.clone(),
             risc0_config,
-            job_request: None,
+            job_request,
         };
 
         // Create integrated verifier

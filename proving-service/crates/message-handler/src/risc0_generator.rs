@@ -355,6 +355,8 @@ impl Risc0Generator {
                 0x12345678, 0x23456789, 0x3456789a, 0x456789ab, 0x56789abc, 0x6789abcd, 0x789abcde,
                 0x89abcdef,
             ], // Mock hash of fee data
+            data_8_months_start_timestamp: timestamp_ranges.overall_range().0 - 8 * 30 * 24 * 3600, // 8 months before start
+            data_8_months_end_timestamp: timestamp_ranges.overall_range().0, // Up to the start of analysis period
             start_timestamp: timestamp_ranges.overall_range().0,
             end_timestamp: timestamp_ranges.overall_range().1,
             positions: vec![1.0, 2.0, 3.0, 4.0, 5.0], // Mock positions
