@@ -20,7 +20,7 @@ assert_macros.workspace = true
 cairo_test.workspace = true
 
 [[target.starknet-contract]]
-build-external-contracts = ["pitch_lake::vault::contract::Vault"]
+build-external-contracts = ["pitch_lake::vault::contract::Vault", "pitch_lake::option_round::contract::OptionRound"]
 casm = true
 casm-add-pythonic-hints = true
 

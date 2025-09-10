@@ -135,7 +135,7 @@ services:
 
   # Message Handler Background Service
   message-handler:
-    image: fossil-message-handler:with-files
+    image: ametelnethermind/fossil-message-handler
     depends_on:
       proving_service_db:
         condition: service_healthy
@@ -184,7 +184,6 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
-
 
 networks:
   local-network:

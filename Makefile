@@ -108,7 +108,7 @@ dev-up: ## Start all local development services
 	@echo "📋 Step 1: Starting infrastructure services..."
 	docker-compose -f docker-compose.local.yml up -d katana proving_service_db offchain_processor_db localstack
 	@echo "⏳ Waiting for Katana to be healthy..."
-	@timeout=60; while [ $$timeout -gt 0 ]; do \
+	@timeout=60; while [ "$$timeout" -gt 0 ]; do \
 		if docker-compose -f docker-compose.local.yml exec -T katana sh -c 'curl -s -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"starknet_chainId\",\"params\":[],\"id\":1}" http://localhost:5050' > /dev/null 2>&1; then \
 			echo "✅ Katana is healthy"; \
 			break; \
@@ -116,8 +116,8 @@ dev-up: ## Start all local development services
 		echo "   Waiting for Katana... ($$timeout seconds left)"; \
 		sleep 2; \
 		timeout=$$((timeout-2)); \
-	done
-	@if [ $$timeout -le 0 ]; then \
+	done; \
+	if [ "$$timeout" -le 0 ]; then \
 		echo "❌ Timeout waiting for Katana to be healthy"; \
 		exit 1; \
 	fi
