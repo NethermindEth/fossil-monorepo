@@ -7,7 +7,7 @@ setup: ## Install all dependencies and set up the complete development environme
 	@echo "🚀 Setting up Fossil Monorepo development environment..."
 	@echo ""
 	@echo "1️⃣  Checking Docker..."
-	@if ! command -v docker &> /dev/null; then \
+	@if ! command -v docker >/dev/null 2>&1; then \
 		echo "   ❌ Docker is not installed!"; \
 		echo "   Please install Docker Desktop from https://www.docker.com/products/docker-desktop/"; \
 		echo "   After installation, make sure Docker is running and try again."; \
@@ -15,7 +15,7 @@ setup: ## Install all dependencies and set up the complete development environme
 	else \
 		echo "   ✅ Docker is installed"; \
 	fi
-	@if ! docker info &> /dev/null; then \
+	@if ! docker info >/dev/null 2>&1; then \
 		echo "   ❌ Docker daemon is not running!"; \
 		echo "   Please start Docker Desktop and try again."; \
 		exit 1; \
@@ -105,6 +105,25 @@ setup: ## Install all dependencies and set up the complete development environme
 .PHONY: dev-up
 dev-up: ## Start all local development services
 	@echo "🚀 Starting local development services..."
+	@echo "📋 Step 1: Starting infrastructure services..."
+	docker-compose -f docker-compose.local.yml up -d katana proving_service_db offchain_processor_db localstack
+	@echo "⏳ Waiting for Katana to be healthy..."
+	@timeout=60; while [ $$timeout -gt 0 ]; do \
+		if docker-compose -f docker-compose.local.yml exec -T katana sh -c 'curl -s -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"starknet_chainId\",\"params\":[],\"id\":1}" http://localhost:5050' > /dev/null 2>&1; then \
+			echo "✅ Katana is healthy"; \
+			break; \
+		fi; \
+		echo "   Waiting for Katana... ($$timeout seconds left)"; \
+		sleep 2; \
+		timeout=$$((timeout-2)); \
+	done
+	@if [ $$timeout -le 0 ]; then \
+		echo "❌ Timeout waiting for Katana to be healthy"; \
+		exit 1; \
+	fi
+	@echo "🔧 Step 2: Deploying contracts..."
+	docker-compose -f docker-compose.deploy.yml run --rm contract-deployer
+	@echo "🚀 Step 3: Starting application services..."
 	docker-compose -f docker-compose.local.yml up -d
 	@echo "✅ Services started:"
 	@echo "  📡 Katana: http://localhost:5050"
