@@ -134,8 +134,13 @@ dev-up: ## Start all local development services
 .PHONY: dev-down
 dev-down: ## Stop services and clean up (removes volumes)
 	@echo "🛑 Stopping and cleaning up..."
-	docker-compose -f docker-compose.local.yml down -v
-	@echo "✅ Environment cleaned"
+	@echo "📋 Step 1: Stopping application services..."
+	docker-compose -f docker-compose.local.yml down -v --remove-orphans
+	@echo "📋 Step 2: Cleaning up deployment containers..."
+	docker-compose -f docker-compose.deploy.yml down -v --remove-orphans 2>/dev/null || true
+	@echo "📋 Step 3: Removing any remaining networks..."
+	docker network prune -f
+	@echo "✅ Environment completely cleaned"
 
 .PHONY: logs
 logs: ## View logs from all services
