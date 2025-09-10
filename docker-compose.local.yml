@@ -8,9 +8,33 @@ services:
       - "5050:5050"
     networks:
       - local-network
-    command: ["katana", "--http.addr", "0.0.0.0", "--http.port", "5050", "--dev", "--block-time", "6000"]
+    command:
+      [
+        "katana",
+        "--http.addr",
+        "0.0.0.0",
+        "--http.port",
+        "5050",
+        "--dev",
+        "--dev.no-fee",
+        "--dev.no-account-validation",
+        "--block-time",
+        "6000",
+      ]
     healthcheck:
-      test: ["CMD", "curl", "-f", "-X", "POST", "-H", "Content-Type: application/json", "-d", '{"jsonrpc":"2.0","method":"starknet_chainId","params":[],"id":1}', "http://localhost:5050"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "-f",
+          "-X",
+          "POST",
+          "-H",
+          "Content-Type: application/json",
+          "-d",
+          '{"jsonrpc":"2.0","method":"starknet_chainId","params":[],"id":1}',
+          "http://localhost:5050",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -68,8 +92,9 @@ services:
       - AWS_SECRET_ACCESS_KEY=test
     volumes:
       - localstack_local_data:/var/lib/localstack
+      - ./scripts/localstack-init.sh:/etc/localstack/init/ready.d/init-sqs.sh
     healthcheck:
-      test: ["CMD", "awslocal", "sqs", "list-queues"]
+      test: ["CMD", "awslocal", "sqs", "list-queues", "--region", "us-east-1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -116,24 +141,11 @@ services:
         condition: service_healthy
       localstack:
         condition: service_healthy
-      katana:
-        condition: service_healthy
     env_file:
       - .env.docker
     environment:
       PROVING_SERVICE_DATABASE_URL: postgres://postgres:postgres@proving_service_db:5432/postgres
       DATABASE_URL: postgres://postgres:postgres@proving_service_db:5432/postgres
-      AWS_ENDPOINT_URL: http://localstack:4566
-      SQS_QUEUE_URL: http://localstack:4566/000000000000/fossilQueue
-      AWS_REGION: us-east-1
-      AWS_ACCESS_KEY_ID: test
-      AWS_SECRET_ACCESS_KEY: test
-      STARKNET_RPC_URL: http://katana:5050
-      USE_SIMPLE_MOCK: "false"
-      ENABLE_PROOF: "true"
-      VERIFY_PROOFS_ONCHAIN: "true"
-      USE_RISC0_INTEGRATION: "true"
-      RISC0_DEV_MODE: "1"
       RUST_LOG: debug
     networks:
       - local-network
@@ -150,6 +162,8 @@ services:
         condition: service_healthy
       localstack:
         condition: service_healthy
+    env_file:
+      - .env.docker
     environment:
       OFFCHAIN_PROCESSOR_DATABASE_URL: postgres://postgres:postgres@offchain_processor_db:5432/postgres
       DATABASE_URL: postgres://postgres:postgres@offchain_processor_db:5432/postgres
@@ -157,6 +171,7 @@ services:
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: test
       AWS_SECRET_ACCESS_KEY: test
+      PROVING_SERVICE_URL: http://proving-service-api:3001
       RUST_LOG: info
       SERVER_PORT: 3000
     ports:
@@ -170,29 +185,6 @@ services:
       retries: 5
     restart: unless-stopped
 
-  # Contract Deployer - deploys to external Katana
-  contract-deployer:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.deploy
-    image: fossil-deploy:latest
-    networks:
-      - local-network
-    volumes:
-      - ./starknet-contracts:/app/starknet-contracts
-      - ./scripts:/app/scripts
-      - ./.env.docker:/app/.env.docker
-      - ./.env.local:/app/.env.local
-    working_dir: /app
-    stdin_open: true
-    tty: true
-    command:
-      [
-        "sh",
-        "-c",
-        "chmod +x scripts/deploy-starknet.sh && ./scripts/deploy-starknet.sh docker",
-      ]
-    restart: "no"
 
 networks:
   local-network:
