@@ -34,7 +34,7 @@ async fn main() -> Result<()> {
 
     // Create and start the HTTP server
     let app = create_router(queue).await;
-    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], 3001));
+    let addr = std::net::SocketAddr::from(([0, 0, 0, 0], 3001));
     info!("Starting HTTP server on {}", addr);
 
     let server = axum::serve(tokio::net::TcpListener::bind(addr).await?, app);

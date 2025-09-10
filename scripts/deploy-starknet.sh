@@ -111,7 +111,7 @@ fi
 
 # Deploy Sha2Input contract
 echo -e "${YELLOW}Declaring Sha2Input contract...${NC}"
-SHA2INPUT_HASH=$(starkli declare ../target/dev/sha2_input_Sha2Input.contract_class.json --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL --compiler-version 2.9.1 -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
+SHA2INPUT_HASH=$(starkli declare ../target/dev/sha2_input_Sha2Input.contract_class.json --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL  -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
 echo -e "${GREEN}Class hash declared: ${BOLD}$SHA2INPUT_HASH${NC}"
 
 echo -e "${YELLOW}Deploying Sha2Input contract...${NC}"
@@ -132,13 +132,13 @@ fi
 
 # Declare and deploy Universal ECIP contract
 echo -e "${YELLOW}Declaring Universal ECIP contract...${NC}"
-ECIP_HASH=$(starkli declare ../target/dev/pitchlake_verifier_UniversalECIP.contract_class.json --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL --compiler-version 2.9.1 -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
+ECIP_HASH=$(starkli declare ../target/dev/pitchlake_verifier_UniversalECIP.contract_class.json --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
 echo -e "${GREEN}Class hash declared: ${BOLD}$ECIP_HASH${NC}"
 echo
 
 # Declare and deploy Groth16 Verifier contract
 echo -e "${YELLOW}Declaring Groth16 Verifier contract...${NC}"
-VERIFIER_HASH=$(starkli declare ../target/dev/pitchlake_verifier_Risc0Groth16VerifierBN254.contract_class.json --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL --compiler-version 2.9.1 -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
+VERIFIER_HASH=$(starkli declare ../target/dev/pitchlake_verifier_Risc0Groth16VerifierBN254.contract_class.json --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
 echo -e "${GREEN}Class hash declared: ${BOLD}$VERIFIER_HASH${NC}"
 echo
 
@@ -149,7 +149,7 @@ echo
 
 # Declare and deploy MockPitchLakeVault contract
 echo -e "${YELLOW}Declaring MockPitchLakeVault contract...${NC}"
-PITCHLAKE_VAULT_HASH=$(starkli declare ../target/dev/pitchlake_verifier_MockPitchLakeVault.contract_class.json --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL --compiler-version 2.9.1 -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
+PITCHLAKE_VAULT_HASH=$(starkli declare ../target/dev/pitchlake_verifier_MockPitchLakeVault.contract_class.json --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
 echo -e "${GREEN}Class hash declared: ${BOLD}$PITCHLAKE_VAULT_HASH${NC}"
 echo
 
@@ -160,7 +160,7 @@ echo
 
 # Declare and deploy PitchLake Verifier contract
 echo -e "${YELLOW}Declaring PitchLake Verifier contract...${NC}"
-PITCHLAKE_VERIFIER_HASH=$(starkli declare ../target/dev/pitchlake_verifier_PitchLakeVerifier.contract_class.json --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL --compiler-version 2.9.1 -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
+PITCHLAKE_VERIFIER_HASH=$(starkli declare ../target/dev/pitchlake_verifier_PitchLakeVerifier.contract_class.json --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
 echo -e "${GREEN}Class hash declared: ${BOLD}$PITCHLAKE_VERIFIER_HASH${NC}"
 echo
 
