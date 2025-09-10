@@ -10,6 +10,8 @@ openzeppelin_upgrades.workspace = true
 openzeppelin_access.workspace = true
 starknet.workspace = true
 fp.workspace = true
+pitch_lake.workspace = true
+
 garaga = { git = "https://github.com/keep-starknet-strange/garaga.git", branch = "main" }
 
 [dev-dependencies]
@@ -18,6 +20,7 @@ assert_macros.workspace = true
 cairo_test.workspace = true
 
 [[target.starknet-contract]]
+build-external-contracts = ["pitch_lake::vault::contract::Vault"]
 casm = true
 casm-add-pythonic-hints = true
 

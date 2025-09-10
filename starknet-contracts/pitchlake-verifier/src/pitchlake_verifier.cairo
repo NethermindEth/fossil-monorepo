@@ -17,11 +17,9 @@ pub trait IPitchLakeVerifier<TContractState> {
 pub mod PitchLakeVerifier {
     use openzeppelin_access::ownable::OwnableComponent;
     use openzeppelin_upgrades::UpgradeableComponent;
+    use pitch_lake::vault::interface::{IVaultDispatcher, IVaultDispatcherTrait};
     use pitchlake_verifier::groth16_verifier::{
         IRisc0Groth16VerifierBN254Dispatcher, IRisc0Groth16VerifierBN254DispatcherTrait,
-    };
-    use pitchlake_verifier::mocks::pitchlake_client::{
-        IPitchLakeVaultDispatcher, IPitchLakeVaultDispatcherTrait,
     };
     use pitchlake_verifier::{PitchLakeJobRequest, decode_journal};
 
@@ -120,7 +118,7 @@ pub mod PitchLakeVerifier {
             journal.max_return_end_timestamp.serialize(ref job_result_data);
             journal.max_return.serialize(ref job_result_data);
 
-            let pitchlake_vault = IPitchLakeVaultDispatcher {
+            let pitchlake_vault = IVaultDispatcher {
                 contract_address: pitchlake_job_request.vault_address,
             };
 

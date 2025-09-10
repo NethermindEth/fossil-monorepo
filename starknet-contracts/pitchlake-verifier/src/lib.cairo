@@ -8,9 +8,6 @@ pub use universal_ecip::UniversalECIP;
 pub mod fixtures;
 pub mod pitchlake_verifier;
 //pub use pitchlake_verifier::PitchLakeVerifier;
-pub mod mocks {
-    pub mod pitchlake_client;
-}
 
 // Constants for byte sizes and offsets
 const U64_SIZE: usize = 8;

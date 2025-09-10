@@ -149,7 +149,7 @@ echo
 
 # Declare and deploy MockPitchLakeVault contract
 echo -e "${YELLOW}Declaring MockPitchLakeVault contract...${NC}"
-PITCHLAKE_VAULT_HASH=$(starkli declare ../target/dev/pitchlake_verifier_MockPitchLakeVault.contract_class.json --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
+PITCHLAKE_VAULT_HASH=$(starkli declare ../target/dev/pitchlake_verifier_Vault.compiled_contract_class.json --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
 echo -e "${GREEN}Class hash declared: ${BOLD}$PITCHLAKE_VAULT_HASH${NC}"
 echo
 
