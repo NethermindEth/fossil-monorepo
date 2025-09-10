@@ -3,13 +3,16 @@ use std::{sync::Arc, time::Duration};
 use eyre::Result;
 use starknet::{
     accounts::{Account, ExecutionEncoding, SingleOwnerAccount},
-    core::{chain_id, codec::Encode, types::Call},
+    core::{codec::Encode, types::Call},
     macros::selector,
     providers::{JsonRpcClient, jsonrpc::HttpTransport},
     signers::{LocalWallet, SigningKey},
 };
 use starknet_crypto::Felt;
 use tracing::{debug, info, instrument, warn};
+
+/// Katana devnet chain ID
+const KATANA_CHAIN_ID: Felt = Felt::from_raw([0x4b4154414e41, 0, 0, 0]);
 
 /// PitchLakeJobRequest struct matching the Cairo contract definition
 #[derive(Debug, Clone, Encode)]
@@ -44,7 +47,7 @@ impl StarknetAccount {
         let address = felt(account_address)?;
 
         debug!(
-            chain_id = ?chain_id::SEPOLIA,
+            chain_id = ?KATANA_CHAIN_ID,
             encoding = ?ExecutionEncoding::New,
             "Initializing SingleOwnerAccount"
         );
@@ -53,7 +56,7 @@ impl StarknetAccount {
             provider,
             signer,
             address,
-            chain_id::SEPOLIA,
+            KATANA_CHAIN_ID,
             ExecutionEncoding::New,
         );
 
@@ -182,18 +185,25 @@ impl StarknetAccount {
         const MAX_RETRIES: u32 = 3;
         const INITIAL_BACKOFF: Duration = Duration::from_secs(1);
 
-        // Encode proof and PitchLakeJobRequest as separate parameters
+        // Encode parameters using starknet-rs encoding
         let mut calldata = vec![];
-
-        // Encode the proof as parameter 1
-        proof.encode(&mut calldata)?;
-
-        // Encode the PitchLakeJobRequest as parameter 2
-        pitchlake_job_request.encode(&mut calldata)?;
-
         let proof_length = proof.len();
 
-        let selector = selector!("verify_proof");
+        // Encode the proof Vec<Felt> -> [length, ...elements] for Span<felt252>
+        proof.encode(&mut calldata)?;
+
+        // Encode the PitchLakeJobRequest struct -> [field1, field2, field3]
+        pitchlake_job_request.encode(&mut calldata)?;
+
+        debug!(
+            "Calldata constructed: proof_length={}, total_calldata_length={}",
+            proof_length,
+            calldata.len()
+        );
+
+        let selector =
+            Felt::from_hex("0x821b8b00fd9e4b2b57538b4571c0227e80f5dbdbfef0628722b3f06f3188")
+                .unwrap();
         let call = Call {
             selector,
             calldata,

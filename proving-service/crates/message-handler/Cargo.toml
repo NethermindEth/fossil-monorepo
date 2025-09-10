@@ -158,6 +158,7 @@ branch = "main"
 git = "https://github.com/NethermindEth/pitchlake-coprocessor"
 package = "mock-proof-composition-methods"
 optional = true
+default-features = false
 branch = "main" 
 
 [dev-dependencies]
