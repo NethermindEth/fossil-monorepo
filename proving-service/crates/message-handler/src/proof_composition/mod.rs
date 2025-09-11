@@ -324,8 +324,17 @@ impl ProofProvider for BonsaiProofProvider {
             let composition_input = ProofCompositionInput {
                 data_8_months: data_8_months.clone(),
                 data_8_months_hash: hashing_res.hash,
+                data_8_months_start_timestamp: overall_start - 8 * 30 * 24 * 3600, // 8 months before start
+                data_8_months_end_timestamp: overall_start, // Up to the start of analysis period
                 start_timestamp: overall_start,
                 end_timestamp: overall_end,
+                // Specific timestamp ranges for each calculation type
+                twap_start_timestamp: timestamp_ranges.twap.0,
+                twap_end_timestamp: timestamp_ranges.twap.1,
+                reserve_price_start_timestamp: timestamp_ranges.reserve_price.0,
+                reserve_price_end_timestamp: timestamp_ranges.reserve_price.1,
+                max_return_start_timestamp: timestamp_ranges.max_return.0,
+                max_return_end_timestamp: timestamp_ranges.max_return.1,
                 positions: res.positions.clone(),
                 pt: convert_array1_to_dvec(res.pt.clone()),
                 pt_1: convert_array1_to_dvec(res.pt_1.clone()),
@@ -506,6 +515,13 @@ impl ProofProvider for BonsaiProofProvider {
                     data_8_months_end_timestamp: timestamp_ranges.overall_range().0, // Up to the start of analysis period
                     start_timestamp: timestamp_ranges.overall_range().0,
                     end_timestamp: timestamp_ranges.overall_range().1,
+                    // Specific timestamp ranges for each calculation type
+                    twap_start_timestamp: timestamp_ranges.twap.0,
+                    twap_end_timestamp: timestamp_ranges.twap.1,
+                    reserve_price_start_timestamp: timestamp_ranges.reserve_price.0,
+                    reserve_price_end_timestamp: timestamp_ranges.reserve_price.1,
+                    max_return_start_timestamp: timestamp_ranges.max_return.0,
+                    max_return_end_timestamp: timestamp_ranges.max_return.1,
                     positions: vec![1.0, 2.0, 3.0, 4.0, 5.0], // Mock positions
                     pt: DVector::from_vec(vec![0.1, 0.2, 0.3]), // Mock statistical data
                     pt_1: DVector::from_vec(vec![0.2, 0.3, 0.4]),
@@ -618,8 +634,30 @@ impl BonsaiProofProvider {
             let vault_address = Felt::from_hex(&vault_address_str)
                 .map_err(|e| eyre!("Invalid vault address format: {}", e))?;
 
-            // Use end timestamp from the ranges as the result timestamp
-            let timestamp = timestamp_ranges.overall_range().1 as u64;
+            // Calculate max provable timestamp (current time - proving delay)
+            // The vault contract validates that request timestamp <= (now - proving_delay)
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|e| eyre!("Failed to get current timestamp: {}", e))?
+                .as_secs();
+
+            // Get proving delay from environment or use default (120 seconds = 2 minutes)
+            let proving_delay = std::env::var("PROVING_DELAY")
+                .ok()
+                .and_then(|v| v.parse::<u64>().ok())
+                .unwrap_or(120); // Default proving delay from vault contract
+
+            // Add a small buffer (30 seconds) to account for timing between calculation and validation
+            let timing_buffer = 30;
+            let timestamp = now - proving_delay - timing_buffer;
+
+            tracing::info!(
+                "🕐 Timestamp calculation: now={}, proving_delay={}s, buffer={}s, result={}",
+                now,
+                proving_delay,
+                timing_buffer,
+                timestamp
+            );
 
             // Use standard program ID for PitchLake
             let program_id =

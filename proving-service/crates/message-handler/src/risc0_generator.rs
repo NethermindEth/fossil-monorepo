@@ -359,6 +359,13 @@ impl Risc0Generator {
             data_8_months_end_timestamp: timestamp_ranges.overall_range().0, // Up to the start of analysis period
             start_timestamp: timestamp_ranges.overall_range().0,
             end_timestamp: timestamp_ranges.overall_range().1,
+            // Specific timestamp ranges for each calculation type
+            twap_start_timestamp: timestamp_ranges.twap.0,
+            twap_end_timestamp: timestamp_ranges.twap.1,
+            reserve_price_start_timestamp: timestamp_ranges.reserve_price.0,
+            reserve_price_end_timestamp: timestamp_ranges.reserve_price.1,
+            max_return_start_timestamp: timestamp_ranges.max_return.0,
+            max_return_end_timestamp: timestamp_ranges.max_return.1,
             positions: vec![1.0, 2.0, 3.0, 4.0, 5.0], // Mock positions
             pt: DVector::from_vec(vec![0.1, 0.2, 0.3]), // Mock statistical data
             pt_1: DVector::from_vec(vec![0.2, 0.3, 0.4]),
