@@ -83,6 +83,24 @@ PROGRAM_ID=$(echo "$REQUEST_DATA" | sed -n '5p' | sed 's/^[[:space:]]*//' | sed 
 # Convert hex values to decimal for JSON
 TIMESTAMP_DECIMAL=$((TIMESTAMP))
 
+# Get proving delay and calculate max provable timestamp
+PROVING_DELAY_HEX=$(starkli call $PITCHLAKE_VAULT_12MIN get_proving_delay --rpc $STARKNET_RPC_URL | grep -o '0x[0-9a-f]*')
+PROVING_DELAY=$((PROVING_DELAY_HEX))
+
+# Calculate the maximum provable timestamp (current time - proving delay)
+# We'll use this instead of the deployment date for the timestamp validation
+CURRENT_TIMESTAMP=$(date +%s)
+MAX_PROVABLE_TIMESTAMP=$((CURRENT_TIMESTAMP - PROVING_DELAY))
+
+log_info "Timestamp validation:"
+log_info "  Current timestamp: $CURRENT_TIMESTAMP"
+log_info "  Proving delay: $PROVING_DELAY seconds"
+log_info "  Max provable timestamp: $MAX_PROVABLE_TIMESTAMP"
+log_info "  Original request timestamp: $TIMESTAMP_DECIMAL"
+
+# Use the max provable timestamp for the request
+TIMESTAMP_DECIMAL=$MAX_PROVABLE_TIMESTAMP
+
 # Use the correct program ID that the contract expects
 PROGRAM_ID_DECIMAL="24847450290753728453128705585"
 
@@ -91,15 +109,41 @@ log_info "  Vault Address: $VAULT_ADDRESS"
 log_info "  Timestamp: $TIMESTAMP (decimal: $TIMESTAMP_DECIMAL)"
 log_info "  Program ID: $PROGRAM_ID (using correct decimal: $PROGRAM_ID_DECIMAL)"
 
-# Step 3: Send test request to offchain-processor
+# Step 3: Calculate correct timestamp ranges from vault contract
+log_info "🕐 Calculating correct timestamp ranges from vault..."
+
+# Get round duration from vault
+ROUND_DURATION_HEX=$(starkli call $PITCHLAKE_VAULT_12MIN get_round_duration --rpc $STARKNET_RPC_URL | grep -o '0x[0-9a-f]*')
+ROUND_DURATION=$((ROUND_DURATION_HEX))
+
+# Get deployment date from round 1 (since we're starting first round)
+DEPLOYMENT_DATE_HEX=$(starkli call $OPTION_ROUND_12MIN get_deployment_date --rpc $STARKNET_RPC_URL | grep -o '0x[0-9a-f]*')
+UPPER_BOUND=$((DEPLOYMENT_DATE_HEX))
+
+# Calculate the expected timestamp ranges based on vault contract logic
+TWAP_START=$((UPPER_BOUND - ROUND_DURATION))
+TWAP_END=$UPPER_BOUND
+RESERVE_PRICE_START=$((UPPER_BOUND - 3 * ROUND_DURATION))
+RESERVE_PRICE_END=$UPPER_BOUND
+VOLATILITY_START=$RESERVE_PRICE_START
+VOLATILITY_END=$UPPER_BOUND
+
+log_info "Calculated timestamp ranges:"
+log_info "  Round duration: $ROUND_DURATION seconds"
+log_info "  Upper bound: $UPPER_BOUND"
+log_info "  TWAP: [$TWAP_START, $TWAP_END]"
+log_info "  Reserve price: [$RESERVE_PRICE_START, $RESERVE_PRICE_END]"
+log_info "  Volatility: [$VOLATILITY_START, $VOLATILITY_END]"
+
+# Step 4: Send test request to offchain-processor
 log_info "📊 Sending pricing data request..."
 
 TEST_REQUEST="{
   \"identifiers\": [\"$PROGRAM_ID_DECIMAL\"],
   \"params\": {
-    \"twap\": [1672531200, 1672574400],
-    \"volatility\": [1672531200, 1672574400],
-    \"reserve_price\": [1672531200, 1672574400]
+    \"twap\": [$TWAP_START, $TWAP_END],
+    \"volatility\": [$VOLATILITY_START, $VOLATILITY_END],
+    \"reserve_price\": [$RESERVE_PRICE_START, $RESERVE_PRICE_END]
   },
   \"client_info\": {
     \"client_address\": \"0x018df581fe0ee497a4a3595cf62aea0bafa7ba1a54a7dcbafca37bfada67c718\",
@@ -115,7 +159,7 @@ RESPONSE=$(curl -s -X POST "$OFFCHAIN_PROCESSOR_URL/pricing_data" \
 
 log_info "Response: $RESPONSE"
 
-# Step 3: Extract job ID from response
+# Step 5: Extract job ID from response
 JOB_ID=$(echo $RESPONSE | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
 
 if [ -z "$JOB_ID" ]; then
@@ -126,7 +170,7 @@ fi
 
 log_info "✅ Job created with ID: $JOB_ID"
 
-# Step 4: Monitor job status
+# Step 6: Monitor job status
 log_info "👁️  Monitoring job status..."
 MAX_STATUS_RETRIES=30
 STATUS_RETRY_COUNT=0
@@ -155,14 +199,14 @@ if [ $STATUS_RETRY_COUNT -eq $MAX_STATUS_RETRIES ]; then
     log_warn "Final status: $STATUS"
 fi
 
-# Step 5: Get detailed job result
+# Step 7: Get detailed job result
 log_info "📋 Getting detailed job result..."
 RESULT_RESPONSE=$(curl -s "$OFFCHAIN_PROCESSOR_URL/job_result/$JOB_ID" \
   -H "X-API-Key: $API_KEY")
 
 log_info "Detailed result: $RESULT_RESPONSE"
 
-# Step 6: Test batch job status
+# Step 8: Test batch job status
 log_info "📦 Testing batch job status endpoint..."
 BATCH_REQUEST='{"job_ids": ["'$JOB_ID'"]}'
 BATCH_RESPONSE=$(curl -s -X POST "$OFFCHAIN_PROCESSOR_URL/batch_job_status" \
