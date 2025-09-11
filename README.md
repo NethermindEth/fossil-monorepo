@@ -75,13 +75,12 @@ This comprehensive test:
 
 1. **Health Checks**: Verifies all services are responding
 2. **API Key Generation**: Creates authentication token
-3. **Basic Job**: Submits a pricing data request
-4. **RISC0 Proof Job**: Tests full proof generation pipeline
-5. **Result Verification**: Checks job completion and results
-
-**Note**: The test script is currently failing due to smart contract L1 data out of range validation. This occurs because the mock proof data doesn't align with the contract's expected data ranges. This will need to be fixed by either:
-- Updating the test request data to match valid L1 ranges
-- Temporarily removing the range check for testing with mock proofs
+3. **Contract Integration**: Automatically retrieves request data from StarkNet vault contracts
+4. **Timestamp Calculation**: Dynamically calculates valid timestamp ranges based on vault contract parameters
+5. **Pricing Data Request**: Submits properly formatted requests with correct vault addresses and timestamp ranges
+6. **Job Monitoring**: Tracks job status with detailed progress reporting
+7. **Result Verification**: Retrieves and validates job completion and results
+8. **Batch Testing**: Tests batch job status endpoints
 
 ### Manual API Testing
 
@@ -116,6 +115,8 @@ curl -X POST "http://localhost:3000/pricing_data" \
 - `PITCHLAKE_VAULT_12MIN` for 12-minute rounds
 - `PITCHLAKE_VAULT_3H` for 3-hour rounds  
 - `PITCHLAKE_VAULT_1M` for 1-month rounds
+
+**Tip**: The `test-local-request.sh` script automatically calculates valid timestamp ranges and vault addresses by querying the deployed contracts, eliminating the need for manual timestamp calculation.
 
 #### 3. Check Job Status
 ```bash
@@ -157,10 +158,14 @@ docker logs fossil-monorepo-proving-service-api-1 -f
 ## Development Workflow
 
 1. **Make Changes**: Edit code in `proving-service/` or `offchain-processor/`
-2. **Restart Services**: `make dev-down && make dev-up`
-3. **Test Changes**: Run `./test-local-request.sh`
+2. **Restart Services**: `make dev-down && make dev-up` (restarts all services with fresh contracts)
+3. **Test Changes**: Run `./test-local-request.sh` (automatically adapts to new contract deployments)
+4. **Advanced Testing**: Use individual API endpoints for specific component testing
 
 ## Troubleshooting
 
-- **Contract address mismatches**: Restart with `make dev-down && make dev-up`
+- **Contract address mismatches**: Restart with `make dev-down && make dev-up` (deploys fresh contracts)
 - **Service health issues**: Check logs with `docker logs` commands above
+- **Test script failures**: Ensure all services are healthy before running `./test-local-request.sh`
+- **Timestamp validation errors**: The test script automatically calculates valid ranges, but manual requests must use appropriate timestamps relative to contract deployment
+- **API key issues**: Each test run generates a fresh API key; reuse keys from previous runs if needed

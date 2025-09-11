@@ -92,6 +92,9 @@ setup: ## Install all dependencies and set up the complete development environme
 		echo "   ✅ .env.docker already exists"; \
 	fi
 	@echo ""
+	@echo "7️⃣  Building release versions..."
+	@$(MAKE) build
+	@echo ""
 	@echo "✅ Setup complete! You can now run:"
 	@echo "   make dev-up    - Start the development environment"
 	@echo "   make dev-down  - Stop the development environment"
@@ -165,6 +168,12 @@ test: ## Run all tests
 	cd proving-service && make test
 	cd offchain-processor && make test
 	@echo "✅ Tests complete"
+
+.PHONY: pr
+pr: ## Run lints and tests for all projects (use before submitting PRs)
+	cd proving-service && make pr
+	cd offchain-processor && make pr
+	@echo "✅ PR checks complete"
 
 ##@ Help
 
