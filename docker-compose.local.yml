@@ -15,6 +15,8 @@ services:
         "0.0.0.0",
         "--http.port",
         "5050",
+        "--http.cors_origins",
+        "*",
         "--dev",
         "--dev.no-fee",
         "--dev.no-account-validation",
