@@ -4,13 +4,13 @@ members = ["fossil-hash-store", "pitchlake-verifier"]
 [workspace.dependencies]
 starknet = "2.12.1"
 assert_macros = "2.12.1"
-cairo_test  = "2.12.1"
+cairo_test = "2.12.1"
 openzeppelin_upgrades = "2.0.0"
 openzeppelin_access = "2.0.0"
 snforge_std = "0.49.0"
 fp = "0.1.4"
 
-pitch_lake = {git = "https://github.com/OilerNetwork/pitchlake_starknet.git", branch = "feat/fossil-full-ranges"}
+pitch_lake = { git = "https://github.com/OilerNetwork/pitchlake-monorepo.git", rev = "1168593" }
 # pitch_lake = {git = "https://github.com/ametel01/pitchlake_starknet.git", branch = "scarb-updates"}
 
 [[target.starknet-contract]]
@@ -21,7 +21,7 @@ casm-add-pythonic-hints = true
 sort-module-level-items = true
 
 [tool]
-fmt.workspace = true
+workspace = true
 
 [lib]
 casm = true
