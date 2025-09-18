@@ -20,7 +20,7 @@ services:
         "--dev",
         "--dev.no-fee",
         "--dev.no-account-validation",
-        "--block-time",
+        "-b",
         "6000",
       ]
     healthcheck:
@@ -137,7 +137,7 @@ services:
 
   # Message Handler Background Service
   message-handler:
-    image: ametelnethermind/fossil-message-handler
+    image: fossil-message-handler:with-files
     depends_on:
       proving_service_db:
         condition: service_healthy
