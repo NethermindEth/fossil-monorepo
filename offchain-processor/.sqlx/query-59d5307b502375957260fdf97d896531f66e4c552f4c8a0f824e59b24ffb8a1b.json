@@ -1,0 +1,17 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE job_requests\n        SET status = $2, l1_data = $3, on_chain_confirmation = $4, updated_at = CURRENT_TIMESTAMP\n        WHERE job_id = $1\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Varchar",
+        "Jsonb",
+        "Jsonb"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "59d5307b502375957260fdf97d896531f66e4c552f4c8a0f824e59b24ffb8a1b"
+}
