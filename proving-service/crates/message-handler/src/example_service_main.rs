@@ -66,6 +66,8 @@ async fn main() -> Result<()> {
                     reserve_price_end_timestamp: None,
                     max_return_start_timestamp: None,
                     max_return_end_timestamp: None,
+                    vault_address: None,
+                    vault_timestamp: None,
                 }))
                 .await;
             println!("Job dispatched: {result:?}");

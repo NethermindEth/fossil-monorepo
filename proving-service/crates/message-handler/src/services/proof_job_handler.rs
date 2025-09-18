@@ -110,7 +110,7 @@ where
 
             for message in messages {
                 // Log the raw message for debugging
-                debug!("Received message body: {}", message.body);
+                info!("🔍 Raw message received from queue: {}", message.body);
 
                 let job: Job = match serde_json::from_str(&message.body) {
                     Ok(job) => {

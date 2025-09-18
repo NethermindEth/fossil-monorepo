@@ -13,6 +13,8 @@ pub struct RequestProof {
     pub reserve_price_end_timestamp: Option<i64>,
     pub max_return_start_timestamp: Option<i64>,
     pub max_return_end_timestamp: Option<i64>,
+    pub vault_address: Option<String>,
+    pub vault_timestamp: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

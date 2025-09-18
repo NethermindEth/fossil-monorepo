@@ -31,6 +31,7 @@ mod no_op {
         async fn generate_proofs_from_data(
             &self,
             _timestamp_ranges: ProofTimestampRanges,
+            _job_context: Option<&message_handler::services::jobs::RequestProof>,
         ) -> Result<Receipt> {
             Err(eyre!(
                 "Proof functionality is disabled. Set ENABLE_PROOF=true and enable either the 'proof-composition' or 'mock-proof' feature to use this functionality."
@@ -65,6 +66,7 @@ mod simple_mock {
         async fn generate_proofs_from_data(
             &self,
             _timestamp_ranges: ProofTimestampRanges,
+            _job_context: Option<&message_handler::services::jobs::RequestProof>,
         ) -> Result<Receipt> {
             // Just create a fake receipt for testing
             // This doesn't rely on any external crates that might create Tokio runtime issues
