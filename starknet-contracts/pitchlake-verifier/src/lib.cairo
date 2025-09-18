@@ -340,56 +340,51 @@ mod tests {
 
     #[test]
     fn decode_journal_test() {
-        // This test is temporarily disabled until we have proper test data
-        // that matches the new journal structure with separate timestamp ranges
-        // TODO: Create proper test data that matches the expected journal format
+        let journal_bytes = get_journal_bytes();
+        let decoded_journal = decode_journal(journal_bytes);
+        let expected = get_expected_results();
 
-        // For now, let's test that the struct creation works
-        let test_journal = Journal {
-            data_8_months_hash: [1, 2, 3, 4, 5, 6, 7, 8],
-            start_timestamp: 1672531200,
-            end_timestamp: 1704067200,
-            reserve_price_start_timestamp: 1672531200,
-            reserve_price_end_timestamp: 1704067200,
-            reserve_price: 100,
-            twap_start_timestamp: 1672531200,
-            twap_end_timestamp: 1704067200,
-            twap_result: 200,
-            max_return_start_timestamp: 1651363200,
-            max_return_end_timestamp: 1704067200,
-            max_return: 300,
-            floating_point_tolerance: 1,
-            reserve_price_tolerance: 2,
-            twap_tolerance: 3,
-            gradient_tolerance: 4,
-        };
+        // Test data_8_months_hash
+        assert_eq!(decoded_journal.data_8_months_hash, expected.data_8_months_hash);
 
-        // Basic struct verification
-        assert_eq!(test_journal.start_timestamp, 1672531200);
-        assert_eq!(test_journal.reserve_price, 100);
+        // Test timestamps
+        assert_eq!(decoded_journal.start_timestamp, expected.start_timestamp);
+        assert_eq!(decoded_journal.end_timestamp, expected.end_timestamp);
+        assert_eq!(decoded_journal.reserve_price_start_timestamp, expected.reserve_price_start_timestamp);
+        assert_eq!(decoded_journal.reserve_price_end_timestamp, expected.reserve_price_end_timestamp);
+        assert_eq!(decoded_journal.twap_start_timestamp, expected.twap_start_timestamp);
+        assert_eq!(decoded_journal.twap_end_timestamp, expected.twap_end_timestamp);
+        assert_eq!(decoded_journal.max_return_start_timestamp, expected.max_return_start_timestamp);
+        assert_eq!(decoded_journal.max_return_end_timestamp, expected.max_return_end_timestamp);
+
+        // Test financial values (converted to u256 for comparison)
+        assert_eq!(decoded_journal.reserve_price.into(), expected.reserve_price);
+        assert_eq!(decoded_journal.twap_result.into(), expected.twap_result);
+        assert_eq!(decoded_journal.max_return.into(), expected.max_return);
+        assert_eq!(decoded_journal.floating_point_tolerance.into(), expected.floating_point_tolerance);
+        assert_eq!(decoded_journal.reserve_price_tolerance.into(), expected.reserve_price_tolerance);
+        assert_eq!(decoded_journal.twap_tolerance.into(), expected.twap_tolerance);
+        assert_eq!(decoded_journal.gradient_tolerance.into(), expected.gradient_tolerance);
     }
 
     fn get_expected_results() -> TestJournal {
         TestJournal {
-            data_8_months_hash: [
-                305419896, 591751049, 878082202, 1164413355, 1450744508, 1737075661, 2023406814,
-                2309737967,
-            ],
+            data_8_months_hash: [305419896, 591751049, 878082202, 1164413355, 1450744508, 1737075661, 2023406814, 2309737967],
             start_timestamp: 1672531200,
             end_timestamp: 1704067200,
             reserve_price_start_timestamp: 1672531200,
             reserve_price_end_timestamp: 1704067200,
-            reserve_price: u256 { high: 0, low: 0x280000000000000000000000000000 },
+            reserve_price: 0x0000000000000000000000000000000280000000000000000000000000000000,
             twap_start_timestamp: 1672531200,
             twap_end_timestamp: 1704067200,
-            twap_result: u256 { high: 0, low: 0x140000000000000000000000000000 },
-            max_return_start_timestamp: 1651363200,
+            twap_result: 0x0000000000000000000000000000000140000000000000000000000000000000,
+            max_return_start_timestamp: 1672531200,
             max_return_end_timestamp: 1704067200,
-            max_return: u256 { high: 0, low: 0x4ccccccccccccc0000000000000000 },
-            floating_point_tolerance: u256 { high: 0, low: 0x68db8bac710cb40000000000000 },
-            reserve_price_tolerance: u256 { high: 0, low: 0x28f5c28f5c28f60000000000000 },
-            twap_tolerance: u256 { high: 0, low: 0xccccccccccccd0000000000000 },
-            gradient_tolerance: u256 { high: 0, low: 0x4189374bc6a7f0000000000000 },
+            max_return: 0x000000000000000000000000000000004ccccccccccccc000000000000000000,
+            floating_point_tolerance: 0x0000000000000000000000000000000000068db8bac710cb4000000000000000,
+            reserve_price_tolerance: 0x00000000000000000000000000000000028f5c28f5c28f600000000000000000,
+            twap_tolerance: 0x000000000000000000000000000000000ccccccccccccd000000000000000000,
+            gradient_tolerance: 0x00000000000000000000000000000000004189374bc6a7f00000000000000000,
         }
     }
 
@@ -405,7 +400,7 @@ mod tests {
             0, 0, 0, 48, 120, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48,
             48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 49, 52, 48, 48, 48, 48, 48, 48,
             48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48,
-            48, 48, 48, 0, 0, 128, 205, 109, 98, 0, 0, 0, 0, 128, 0, 146, 101, 0, 0, 0, 0, 66, 0, 0,
+            48, 48, 48, 0, 0, 0, 205, 176, 99, 0, 0, 0, 0, 128, 0, 146, 101, 0, 0, 0, 0, 66, 0, 0,
             0, 48, 120, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48,
             48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 52, 99, 99, 99, 99, 99, 99, 99, 99,
             99, 99, 99, 99, 99, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48, 48,
