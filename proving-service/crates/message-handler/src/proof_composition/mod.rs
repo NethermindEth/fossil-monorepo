@@ -1,3 +1,4 @@
+use crate::services::jobs::RequestProof;
 #[cfg(feature = "proof-composition")]
 use add_twap_7d_error_bound_floating::add_twap_7d_error_bound;
 #[cfg(feature = "proof-composition")]
@@ -86,6 +87,7 @@ pub trait ProofProvider {
     async fn generate_proofs_from_data(
         &self,
         timestamp_ranges: ProofTimestampRanges,
+        job_context: Option<&RequestProof>,
     ) -> Result<Receipt>;
 
     fn is_disabled(&self) -> bool {
@@ -118,6 +120,7 @@ impl ProofProvider for BonsaiProofProvider {
     async fn generate_proofs_from_data(
         &self,
         timestamp_ranges: ProofTimestampRanges,
+        job_context: Option<&RequestProof>,
     ) -> Result<Receipt> {
         #[cfg(feature = "proof-composition")]
         {
@@ -487,7 +490,9 @@ impl ProofProvider for BonsaiProofProvider {
 
             if use_risc0_integration {
                 tracing::info!("Using RISC0 integration path via generate_proof_with_risc0");
-                return self.generate_proof_with_risc0(timestamp_ranges).await;
+                return self
+                    .generate_proof_with_risc0(timestamp_ranges, job_context)
+                    .await;
             }
 
             // When only mock-proof is enabled, delegate to the existing mock implementation
@@ -600,6 +605,7 @@ impl BonsaiProofProvider {
     async fn generate_proof_with_risc0(
         &self,
         timestamp_ranges: ProofTimestampRanges,
+        job_context: Option<&RequestProof>,
     ) -> Result<Receipt> {
         use crate::proof_verifier::{IntegratedProofVerifier, ProofVerifier, ProofVerifierConfig};
         use crate::risc0_generator::{Risc0Config, Risc0Generator};
@@ -627,37 +633,85 @@ impl BonsaiProofProvider {
             use crate::response_handler::PitchLakeJobRequest;
             use starknet::core::types::Felt;
 
-            // Get vault address from environment
-            let vault_address_str = std::env::var("PITCHLAKE_VAULT").map_err(|_| {
-                eyre!("PITCHLAKE_VAULT environment variable is required for onchain verification")
-            })?;
-            let vault_address = Felt::from_hex(&vault_address_str)
-                .map_err(|e| eyre!("Invalid vault address format: {}", e))?;
+            // Get vault address and timestamp from job context if available, otherwise from environment
+            let (vault_address, timestamp) = if let Some(job) = job_context {
+                tracing::info!(
+                    "🔍 Debug job context: vault_address={:?}, vault_timestamp={:?}",
+                    job.vault_address, job.vault_timestamp
+                );
+                if let (Some(vault_addr), Some(vault_ts)) =
+                    (&job.vault_address, job.vault_timestamp)
+                {
+                    tracing::info!(
+                        "🔗 Using vault address and timestamp from job context: vault={}, timestamp={}",
+                        vault_addr,
+                        vault_ts
+                    );
+                    let vault_address = Felt::from_hex(vault_addr)
+                        .map_err(|e| eyre!("Invalid vault address format from job: {}", e))?;
+                    (vault_address, vault_ts as u64)
+                } else {
+                    tracing::warn!(
+                        "Job context missing vault information, falling back to environment calculation"
+                    );
+                    // Fallback to environment calculation
+                    let vault_address_str = std::env::var("PITCHLAKE_VAULT").map_err(|_| {
+                        eyre!("PITCHLAKE_VAULT environment variable is required for onchain verification")
+                    })?;
+                    let vault_address = Felt::from_hex(&vault_address_str)
+                        .map_err(|e| eyre!("Invalid vault address format: {}", e))?;
 
-            // Calculate max provable timestamp (current time - proving delay)
-            // The vault contract validates that request timestamp <= (now - proving_delay)
-            let now = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map_err(|e| eyre!("Failed to get current timestamp: {}", e))?
-                .as_secs();
+                    let now = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map_err(|e| eyre!("Failed to get current timestamp: {}", e))?
+                        .as_secs();
+                    let proving_delay = std::env::var("PROVING_DELAY")
+                        .ok()
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .unwrap_or(120);
+                    let timing_buffer = 30;
+                    let timestamp = now - proving_delay - timing_buffer;
 
-            // Get proving delay from environment or use default (120 seconds = 2 minutes)
-            let proving_delay = std::env::var("PROVING_DELAY")
-                .ok()
-                .and_then(|v| v.parse::<u64>().ok())
-                .unwrap_or(120); // Default proving delay from vault contract
+                    tracing::info!(
+                        "🕐 Fallback timestamp calculation: now={}, proving_delay={}s, buffer={}s, result={}",
+                        now,
+                        proving_delay,
+                        timing_buffer,
+                        timestamp
+                    );
+                    (vault_address, timestamp)
+                }
+            } else {
+                tracing::warn!("No job context provided, using environment calculation");
+                // Original environment-based calculation
+                let vault_address_str = std::env::var("PITCHLAKE_VAULT").map_err(|_| {
+                    eyre!(
+                        "PITCHLAKE_VAULT environment variable is required for onchain verification"
+                    )
+                })?;
+                let vault_address = Felt::from_hex(&vault_address_str)
+                    .map_err(|e| eyre!("Invalid vault address format: {}", e))?;
 
-            // Add a small buffer (30 seconds) to account for timing between calculation and validation
-            let timing_buffer = 30;
-            let timestamp = now - proving_delay - timing_buffer;
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map_err(|e| eyre!("Failed to get current timestamp: {}", e))?
+                    .as_secs();
+                let proving_delay = std::env::var("PROVING_DELAY")
+                    .ok()
+                    .and_then(|v| v.parse::<u64>().ok())
+                    .unwrap_or(120);
+                let timing_buffer = 30;
+                let timestamp = now - proving_delay - timing_buffer;
 
-            tracing::info!(
-                "🕐 Timestamp calculation: now={}, proving_delay={}s, buffer={}s, result={}",
-                now,
-                proving_delay,
-                timing_buffer,
-                timestamp
-            );
+                tracing::info!(
+                    "🕐 Environment timestamp calculation: now={}, proving_delay={}s, buffer={}s, result={}",
+                    now,
+                    proving_delay,
+                    timing_buffer,
+                    timestamp
+                );
+                (vault_address, timestamp)
+            };
 
             // Use standard program ID for PitchLake
             let program_id =

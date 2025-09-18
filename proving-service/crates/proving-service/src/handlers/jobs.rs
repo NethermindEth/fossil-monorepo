@@ -42,6 +42,8 @@ pub async fn handle_job_request(
     Json(request): Json<JobRequest>,
 ) -> impl IntoResponse {
     info!("Received job request for group: {}", request.job_group_id);
+    info!("🔍 Debug job request: vault_address={:?}, vault_timestamp={:?}",
+          request.vault_address, request.vault_timestamp);
 
     // Create a single job with ranges for all three components
     // Use job_group_id as the job_id to simplify identification

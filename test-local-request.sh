@@ -83,12 +83,11 @@ PROGRAM_ID=$(echo "$REQUEST_DATA" | sed -n '5p' | sed 's/^[[:space:]]*//' | sed 
 # Convert hex values to decimal for JSON
 TIMESTAMP_DECIMAL=$((TIMESTAMP))
 
-# Get proving delay and calculate max provable timestamp
+# Get proving delay for validation purposes only
 PROVING_DELAY_HEX=$(starkli call $PITCHLAKE_VAULT_12MIN get_proving_delay --rpc $STARKNET_RPC_URL | grep -o '0x[0-9a-f]*')
 PROVING_DELAY=$((PROVING_DELAY_HEX))
 
-# Calculate the maximum provable timestamp (current time - proving delay)
-# We'll use this instead of the deployment date for the timestamp validation
+# Calculate the maximum provable timestamp for reference
 CURRENT_TIMESTAMP=$(date +%s)
 MAX_PROVABLE_TIMESTAMP=$((CURRENT_TIMESTAMP - PROVING_DELAY))
 
@@ -98,8 +97,8 @@ log_info "  Proving delay: $PROVING_DELAY seconds"
 log_info "  Max provable timestamp: $MAX_PROVABLE_TIMESTAMP"
 log_info "  Original request timestamp: $TIMESTAMP_DECIMAL"
 
-# Use the max provable timestamp for the request
-TIMESTAMP_DECIMAL=$MAX_PROVABLE_TIMESTAMP
+# Use the original timestamp from the vault contract - this is what the contract expects
+log_info "Using original timestamp from vault contract as required"
 
 # Use the correct program ID that the contract expects
 PROGRAM_ID_DECIMAL="24847450290753728453128705585"
@@ -138,6 +137,17 @@ log_info "  Volatility: [$VOLATILITY_START, $VOLATILITY_END]"
 # Step 4: Send test request to offchain-processor
 log_info "📊 Sending pricing data request..."
 
+log_info "🔍 Debug: Request data being sent:"
+log_info "  PROGRAM_ID_DECIMAL: $PROGRAM_ID_DECIMAL"
+log_info "  TWAP_START: $TWAP_START"
+log_info "  TWAP_END: $TWAP_END"
+log_info "  VOLATILITY_START: $VOLATILITY_START"
+log_info "  VOLATILITY_END: $VOLATILITY_END"
+log_info "  RESERVE_PRICE_START: $RESERVE_PRICE_START"
+log_info "  RESERVE_PRICE_END: $RESERVE_PRICE_END"
+log_info "  VAULT_ADDRESS: $VAULT_ADDRESS"
+log_info "  TIMESTAMP_DECIMAL: $TIMESTAMP_DECIMAL"
+
 TEST_REQUEST="{
   \"identifiers\": [\"$PROGRAM_ID_DECIMAL\"],
   \"params\": {
@@ -151,6 +161,9 @@ TEST_REQUEST="{
     \"timestamp\": $TIMESTAMP_DECIMAL
   }
 }"
+
+log_info "🔍 Full JSON request:"
+echo "$TEST_REQUEST" | jq .
 
 RESPONSE=$(curl -s -X POST "$OFFCHAIN_PROCESSOR_URL/pricing_data" \
   -H "Content-Type: application/json" \
