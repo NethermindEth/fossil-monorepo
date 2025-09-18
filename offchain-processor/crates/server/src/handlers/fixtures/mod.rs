@@ -44,13 +44,17 @@ impl TestContext {
             .await
             .expect("Failed to create database pool");
 
-        // Create the `job_requests` table with the dynamic JSONB result column.
+        // Create the `job_requests` table with the new schema
         sqlx::query(
             r#"
             CREATE TABLE IF NOT EXISTS job_requests (
                 job_id TEXT PRIMARY KEY,
                 status TEXT NOT NULL CHECK (status IN ('Completed', 'Pending', 'Failed')),
+                vault_address TEXT,
+                expected_timestamp BIGINT,
                 result JSONB, -- Stores dynamic JSON responses
+                l1_data JSONB,
+                on_chain_confirmation JSONB,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP
             )

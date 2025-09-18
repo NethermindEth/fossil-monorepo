@@ -3,6 +3,7 @@ use crate::AppState;
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
+use db_access::models::JobStatus;
 use db_access::queries::get_job_request;
 
 #[axum::debug_handler]
@@ -15,13 +16,33 @@ pub async fn get_job_status(
     match get_job_request(state.offchain_processor_db, &job_id).await {
         Ok(Some(job)) => {
             tracing::info!("Found job status: {:?} for job_id: {}", job.status, job_id);
+
+            let message = match job.status {
+                JobStatus::Pending => {
+                    if job.vault_address.is_some() {
+                        Some(
+                            "Job is pending on-chain confirmation via FossilCallbackSuccess event"
+                                .to_string(),
+                        )
+                    } else {
+                        Some("Job is pending".to_string())
+                    }
+                }
+                JobStatus::Completed => {
+                    if job.l1_data.is_some() {
+                        Some("Job completed with on-chain confirmation".to_string())
+                    } else {
+                        Some("Job completed".to_string())
+                    }
+                }
+                JobStatus::Failed => Some("Job failed".to_string()),
+            };
+
             (
                 StatusCode::OK,
-                Json(GetJobStatusResponseEnum::Success(JobResponse {
-                    job_id: job.job_id,
-                    message: None,
-                    status: Some(job.status),
-                })),
+                Json(GetJobStatusResponseEnum::Success(
+                    JobResponse::from_job_request(&job, message),
+                )),
             )
         }
         Ok(None) => {

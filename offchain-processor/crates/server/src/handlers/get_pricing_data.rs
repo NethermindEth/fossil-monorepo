@@ -12,7 +12,7 @@ use axum::{
 };
 use db_access::{
     models::JobStatus,
-    queries::{create_job_request, get_job_request, update_job_status},
+    queries::{create_job_request_with_vault, get_job_request, update_job_status},
 };
 use eyre::{eyre, Result};
 use reqwest::Client;
@@ -40,7 +40,8 @@ pub async fn get_pricing_data(
 
     tracing::info!("Received pricing data request. {}", context);
 
-    if let Err((status, response)) = validate_request(&payload) {
+    if let Err(boxed_error) = validate_request(&payload) {
+        let (status, response) = *boxed_error;
         tracing::warn!("Invalid request: {:?}. {}", response, context);
         return (status, Json(response));
     }
@@ -70,16 +71,16 @@ pub async fn get_pricing_data(
 }
 
 // Helper to validate the request
-fn validate_request(payload: &PitchLakeJobRequest) -> Result<(), (StatusCode, JobResponse)> {
+fn validate_request(payload: &PitchLakeJobRequest) -> Result<(), Box<(StatusCode, JobResponse)>> {
     if payload.identifiers.is_empty() {
-        return Err((
+        return Err(Box::new((
             StatusCode::BAD_REQUEST,
             JobResponse::new(
                 String::new(),
                 Some("Identifiers cannot be empty.".to_string()),
                 None,
             ),
-        ));
+        )));
     }
     validate_time_ranges(&payload.params)
 }
@@ -141,10 +142,12 @@ async fn handle_new_job_request(
     job_id: String,
     payload: PitchLakeJobRequest,
 ) -> (StatusCode, Json<JobResponse>) {
-    match create_job_request(
+    match create_job_request_with_vault(
         state.offchain_processor_db.clone(),
         &job_id,
         JobStatus::Pending,
+        &payload.client_info.vault_address,
+        payload.client_info.timestamp,
     )
     .await
     {
@@ -153,12 +156,13 @@ async fn handle_new_job_request(
             let offchain_processor_db_clone = state.offchain_processor_db.clone();
             let job_id_clone = job_id.clone();
             let handle = Handle::current();
+            let payload_clone = payload.clone();
 
             tokio::task::spawn_blocking(move || {
                 handle.block_on(process_job(
                     offchain_processor_db_clone,
                     job_id_clone,
-                    payload,
+                    payload_clone,
                 ));
             });
 
@@ -170,6 +174,10 @@ async fn handle_new_job_request(
                         "New job request registered and processing initiated.".to_string(),
                     ),
                     status: Some(JobStatus::Pending),
+                    vault_address: Some(payload.client_info.vault_address.clone()),
+                    expected_timestamp: Some(payload.client_info.timestamp),
+                    l1_data: None,
+                    on_chain_confirmation: None,
                 }),
             )
         }
@@ -259,22 +267,14 @@ async fn process_job(
     tracing::debug!("Payload received: {:?}. {}", payload, context);
 
     let job_result = match call_proving_service(&job_id, &payload).await {
-        Ok(result) => {
-            tracing::info!("Proving service response received. {}", context);
-
-            if let Err(e) = update_job_status(
-                offchain_processor_db.clone(),
-                &job_id,
-                JobStatus::Completed,
-                Some(result.clone()),
-            )
-            .await
-            {
-                tracing::error!("Failed to update job status: {:?}. {}", e, context);
-                return;
-            }
-
-            tracing::info!("Job completed successfully. {}", context);
+        Ok(_result) => {
+            tracing::info!(
+                job_id = %job_id,
+                vault_address = %payload.client_info.vault_address,
+                timestamp = payload.client_info.timestamp,
+                "Proving service completed successfully, awaiting on-chain confirmation via FossilCallbackSuccess event"
+            );
+            // Job stays Pending - will be completed by event monitor
             true
         }
         Err(e) => {
@@ -294,7 +294,10 @@ async fn process_job(
     };
 
     if job_result {
-        tracing::info!("Job processing finished successfully. {}", context);
+        tracing::info!(
+            "Proving service request completed, job remains pending for on-chain confirmation. {}",
+            context
+        );
     } else {
         tracing::error!(
             "Job processing failed. See previous errors for details. {}",
@@ -329,7 +332,9 @@ async fn call_proving_service(
         "max_return": {
             "start_timestamp": payload.params.volatility.0,
             "end_timestamp": payload.params.volatility.1
-        }
+        },
+        "vault_address": payload.client_info.vault_address,
+        "vault_timestamp": payload.client_info.timestamp
     });
 
     tracing::debug!("Sending request to proving service: {:?}", api_payload);
@@ -362,7 +367,7 @@ async fn call_proving_service(
 // Validate the provided time ranges
 fn validate_time_ranges(
     params: &PitchLakeJobRequestParams,
-) -> Result<(), (StatusCode, JobResponse)> {
+) -> Result<(), Box<(StatusCode, JobResponse)>> {
     let validations = [
         ("TWAP", params.twap),
         ("Volatility", params.volatility),
@@ -371,14 +376,14 @@ fn validate_time_ranges(
 
     for (name, (start, end)) in &validations {
         if start >= end {
-            return Err((
+            return Err(Box::new((
                 StatusCode::BAD_REQUEST,
                 JobResponse::new(
                     String::new(),
                     Some(format!("Invalid time range for {} calculation.", name)),
                     None,
                 ),
-            ));
+            )));
         }
     }
     Ok(())
