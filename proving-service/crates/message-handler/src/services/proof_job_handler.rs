@@ -220,7 +220,7 @@ where
                     // Start the proof generation with timeout
                     let proof_result = tokio::time::timeout(
                         timeout_duration,
-                        proof_provider.generate_proofs_from_data(timestamp_ranges),
+                        proof_provider.generate_proofs_from_data(timestamp_ranges, Some(&job)),
                     )
                     .await;
 
@@ -410,6 +410,7 @@ mod tests {
         async fn generate_proofs_from_data(
             &self,
             _timestamp_ranges: ProofTimestampRanges,
+            _job_context: Option<&RequestProof>,
         ) -> Result<Receipt> {
             // Simulate some processing time
             sleep(self.delay).await;
@@ -464,6 +465,8 @@ mod tests {
             reserve_price_end_timestamp: None,
             max_return_start_timestamp: None,
             max_return_end_timestamp: None,
+            vault_address: None,
+            vault_timestamp: None,
         }
     }
 

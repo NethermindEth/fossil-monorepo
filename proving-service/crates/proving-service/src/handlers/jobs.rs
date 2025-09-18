@@ -26,6 +26,8 @@ pub struct JobRequest {
     twap: TimeRange,
     reserve_price: TimeRange,
     max_return: TimeRange,
+    vault_address: Option<String>,
+    vault_timestamp: Option<i64>,
 }
 
 #[derive(Debug, Serialize)]
@@ -57,6 +59,8 @@ pub async fn handle_job_request(
         reserve_price_end_timestamp: Some(request.reserve_price.end_timestamp),
         max_return_start_timestamp: Some(request.max_return.start_timestamp),
         max_return_end_timestamp: Some(request.max_return.end_timestamp),
+        vault_address: request.vault_address,
+        vault_timestamp: request.vault_timestamp,
     });
 
     info!("Dispatching job with ID: {}", job_id);
@@ -168,6 +172,8 @@ mod tests {
                 start_timestamp: 1000,
                 end_timestamp: 2000,
             },
+            vault_address: None,
+            vault_timestamp: None,
         };
 
         // Call the handler with custom implementation
@@ -202,6 +208,8 @@ mod tests {
                 start_timestamp: 1000,
                 end_timestamp: 2000,
             },
+            vault_address: None,
+            vault_timestamp: None,
         };
 
         // Call the handler with custom implementation
@@ -237,6 +245,8 @@ mod tests {
             reserve_price_end_timestamp: Some(request.reserve_price.end_timestamp),
             max_return_start_timestamp: Some(request.max_return.start_timestamp),
             max_return_end_timestamp: Some(request.max_return.end_timestamp),
+            vault_address: None,
+            vault_timestamp: None,
         });
 
         info!("Dispatching job with ID: {}", job_id);
