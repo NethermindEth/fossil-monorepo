@@ -1,8 +1,10 @@
 #![deny(unused_crate_dependencies)]
 use tracing_subscriber as _;
 
+pub mod event_monitor;
 pub mod handlers;
 pub mod middlewares;
+pub mod starknet_provider;
 pub mod types;
 
 // src/lib.rs
