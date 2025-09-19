@@ -26,16 +26,13 @@ pub async fn get_pricing_data(
     State(state): State<AppState>,
     Json(payload): Json<PitchLakeJobRequest>,
 ) -> (StatusCode, Json<JobResponse>) {
-    let identifiers = payload.identifiers.join(",");
     let context = format!(
-        "identifiers=[{}], timestamp={}, twap-range=({},{}), volatility-range=({},{}), reserve_price-range=({},{}), client_address={}, vault_address={}",
-        identifiers,
-        payload.client_info.timestamp,
+        "program_id={}, twap-range=({},{}), max_return-range=({},{}), reserve_price-range=({},{}), vault_address={}",
+        payload.program_id,
         payload.params.twap.0, payload.params.twap.1,
-        payload.params.volatility.0, payload.params.volatility.1,
+        payload.params.max_return.0, payload.params.max_return.1,
         payload.params.reserve_price.0, payload.params.reserve_price.1,
-        payload.client_info.client_address,
-        payload.client_info.vault_address,
+        payload.vault_address,
     );
 
     tracing::info!("Received pricing data request. {}", context);
@@ -46,7 +43,7 @@ pub async fn get_pricing_data(
         return (status, Json(response));
     }
 
-    let job_id = generate_job_id(&payload.identifiers, &payload.params);
+    let job_id = generate_job_id(&payload.program_id, &payload.params);
 
     tracing::info!("Generated job_id: {}. {}", job_id, context);
 
@@ -72,12 +69,12 @@ pub async fn get_pricing_data(
 
 // Helper to validate the request
 fn validate_request(payload: &PitchLakeJobRequest) -> Result<(), Box<(StatusCode, JobResponse)>> {
-    if payload.identifiers.is_empty() {
+    if payload.program_id.is_empty() {
         return Err(Box::new((
             StatusCode::BAD_REQUEST,
             JobResponse::new(
                 String::new(),
-                Some("Identifiers cannot be empty.".to_string()),
+                Some("Program ID cannot be empty.".to_string()),
                 None,
             ),
         )));
@@ -87,22 +84,22 @@ fn validate_request(payload: &PitchLakeJobRequest) -> Result<(), Box<(StatusCode
 
 // Helper to generate a job ID
 fn generate_job_id(
-    #[cfg(test)] identifiers: &[String],
-    #[cfg(not(test))] _identifiers: &[String],
+    #[cfg(test)] program_id: &str,
+    #[cfg(not(test))] _program_id: &str,
     #[cfg(test)] params: &PitchLakeJobRequestParams,
     #[cfg(not(test))] _params: &PitchLakeJobRequestParams,
 ) -> String {
     #[cfg(test)]
     {
-        // In test mode, create a deterministic job ID based on identifiers and params
+        // In test mode, create a deterministic job ID based on program_id and params
         // This ensures tests can predict the job ID
         format!(
             "test-job-{}-{}-{}-{}-{}-{}",
-            identifiers.join("-"),
+            program_id,
             params.twap.0,
             params.twap.1,
-            params.volatility.0,
-            params.volatility.1,
+            params.max_return.0,
+            params.max_return.1,
             params.reserve_price.0
         )
     }
@@ -142,12 +139,17 @@ async fn handle_new_job_request(
     job_id: String,
     payload: PitchLakeJobRequest,
 ) -> (StatusCode, Json<JobResponse>) {
+    let current_timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .expect("Failed to get current timestamp")
+        .as_secs() as i64;
+
     match create_job_request_with_vault(
         state.offchain_processor_db.clone(),
         &job_id,
         JobStatus::Pending,
-        &payload.client_info.vault_address,
-        payload.client_info.timestamp,
+        &payload.vault_address,
+        current_timestamp,
     )
     .await
     {
@@ -174,8 +176,8 @@ async fn handle_new_job_request(
                         "New job request registered and processing initiated.".to_string(),
                     ),
                     status: Some(JobStatus::Pending),
-                    vault_address: Some(payload.client_info.vault_address.clone()),
-                    expected_timestamp: Some(payload.client_info.timestamp),
+                    vault_address: Some(payload.vault_address.clone()),
+                    expected_timestamp: Some(current_timestamp),
                     l1_data: None,
                     on_chain_confirmation: None,
                 }),
@@ -253,14 +255,13 @@ async fn process_job(
     payload: PitchLakeJobRequest,
 ) {
     let context = format!(
-        "job_id={}, identifiers=[{}], twap=({},{}), volatility=({},{}), reserve_price=({},{}), client_address={}, vault_address={}",
+        "job_id={}, program_id={}, twap=({},{}), max_return=({},{}), reserve_price=({},{}), vault_address={}",
         job_id,
-        payload.identifiers.join(","),
+        payload.program_id,
         payload.params.twap.0, payload.params.twap.1,
-        payload.params.volatility.0, payload.params.volatility.1,
+        payload.params.max_return.0, payload.params.max_return.1,
         payload.params.reserve_price.0, payload.params.reserve_price.1,
-        payload.client_info.client_address,
-        payload.client_info.vault_address,
+        payload.vault_address,
     );
 
     tracing::info!("Starting job processing. {}", context);
@@ -270,8 +271,7 @@ async fn process_job(
         Ok(_result) => {
             tracing::info!(
                 job_id = %job_id,
-                vault_address = %payload.client_info.vault_address,
-                timestamp = payload.client_info.timestamp,
+                vault_address = %payload.vault_address,
                 "Proving service completed successfully, awaiting on-chain confirmation via FossilCallbackSuccess event"
             );
             // Job stays Pending - will be completed by event monitor
@@ -330,11 +330,14 @@ async fn call_proving_service(
             "end_timestamp": payload.params.reserve_price.1
         },
         "max_return": {
-            "start_timestamp": payload.params.volatility.0,
-            "end_timestamp": payload.params.volatility.1
+            "start_timestamp": payload.params.max_return.0,
+            "end_timestamp": payload.params.max_return.1
         },
-        "vault_address": payload.client_info.vault_address,
-        "vault_timestamp": payload.client_info.timestamp
+        "vault_address": payload.vault_address,
+        "vault_timestamp": std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("Failed to get current timestamp")
+            .as_secs() as i64
     });
 
     tracing::debug!("Sending request to proving service: {:?}", api_payload);
@@ -370,7 +373,7 @@ fn validate_time_ranges(
 ) -> Result<(), Box<(StatusCode, JobResponse)>> {
     let validations = [
         ("TWAP", params.twap),
-        ("Volatility", params.volatility),
+        ("Max Return", params.max_return),
         ("Reserve Price", params.reserve_price),
     ];
 
@@ -411,7 +414,7 @@ fn _enhanced_error_response(
 mod tests {
     use super::*;
     use crate::handlers::fixtures::TestContext;
-    use crate::types::{ClientInfo, PitchLakeJobRequest, PitchLakeJobRequestParams};
+    use crate::types::{PitchLakeJobRequest, PitchLakeJobRequestParams};
     use axum::http::StatusCode;
 
     #[tokio::test]
@@ -419,17 +422,13 @@ mod tests {
         let ctx = TestContext::new().await;
 
         let payload = PitchLakeJobRequest {
-            identifiers: vec!["test-id".to_string()],
+            program_id: "test-id".to_string(),
             params: PitchLakeJobRequestParams {
                 twap: (0, 100),
-                volatility: (0, 100),
+                max_return: (0, 100),
                 reserve_price: (0, 100),
             },
-            client_info: ClientInfo {
-                client_address: "0x123".to_string(),
-                vault_address: "0x456".to_string(),
-                timestamp: 0,
-            },
+            vault_address: "0x456".to_string(),
         };
 
         let (status, Json(response)) = ctx.get_pricing_data(payload).await;
@@ -447,20 +446,16 @@ mod tests {
         let ctx = TestContext::new().await;
 
         let payload = PitchLakeJobRequest {
-            identifiers: vec!["test-id".to_string()],
+            program_id: "test-id".to_string(),
             params: PitchLakeJobRequestParams {
                 twap: (0, 100),
-                volatility: (0, 100),
+                max_return: (0, 100),
                 reserve_price: (0, 100),
             },
-            client_info: ClientInfo {
-                client_address: "0x123".to_string(),
-                vault_address: "0x456".to_string(),
-                timestamp: 0,
-            },
+            vault_address: "0x456".to_string(),
         };
 
-        let job_id = generate_job_id(&payload.identifiers, &payload.params);
+        let job_id = generate_job_id(&payload.program_id, &payload.params);
         ctx.create_job(&job_id, JobStatus::Pending).await;
 
         let (status, Json(response)) = ctx.get_pricing_data(payload).await;
@@ -478,20 +473,16 @@ mod tests {
         let ctx = TestContext::new().await;
 
         let payload = PitchLakeJobRequest {
-            identifiers: vec!["test-id".to_string()],
+            program_id: "test-id".to_string(),
             params: PitchLakeJobRequestParams {
                 twap: (0, 100),
-                volatility: (0, 100),
+                max_return: (0, 100),
                 reserve_price: (0, 100),
             },
-            client_info: ClientInfo {
-                client_address: "0x123".to_string(),
-                vault_address: "0x456".to_string(),
-                timestamp: 0,
-            },
+            vault_address: "0x456".to_string(),
         };
 
-        let job_id = generate_job_id(&payload.identifiers, &payload.params);
+        let job_id = generate_job_id(&payload.program_id, &payload.params);
         ctx.create_job(&job_id, JobStatus::Completed).await;
 
         let (status, Json(response)) = ctx.get_pricing_data(payload).await;
@@ -509,20 +500,16 @@ mod tests {
         let ctx = TestContext::new().await;
 
         let payload = PitchLakeJobRequest {
-            identifiers: vec!["test-id".to_string()],
+            program_id: "test-id".to_string(),
             params: PitchLakeJobRequestParams {
                 twap: (0, 100),
-                volatility: (0, 100),
+                max_return: (0, 100),
                 reserve_price: (0, 100),
             },
-            client_info: ClientInfo {
-                client_address: "0x123".to_string(),
-                vault_address: "0x456".to_string(),
-                timestamp: 0,
-            },
+            vault_address: "0x456".to_string(),
         };
 
-        let job_id = generate_job_id(&payload.identifiers, &payload.params);
+        let job_id = generate_job_id(&payload.program_id, &payload.params);
         ctx.create_job(&job_id, JobStatus::Failed).await;
 
         let (status, Json(response)) = ctx.get_pricing_data(payload).await;
@@ -540,17 +527,13 @@ mod tests {
         let ctx = TestContext::new().await;
 
         let payload = PitchLakeJobRequest {
-            identifiers: vec!["test-id".to_string()],
+            program_id: "test-id".to_string(),
             params: PitchLakeJobRequestParams {
                 twap: (100, 0), // Invalid range
-                volatility: (0, 100),
+                max_return: (0, 100),
                 reserve_price: (0, 100),
             },
-            client_info: ClientInfo {
-                client_address: "0x123".to_string(),
-                vault_address: "0x456".to_string(),
-                timestamp: 0,
-            },
+            vault_address: "0x456".to_string(),
         };
 
         let (status, Json(response)) = ctx.get_pricing_data(payload).await;
