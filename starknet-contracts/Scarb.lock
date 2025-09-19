@@ -72,7 +72,7 @@ checksum = "sha256:bf799c794139837f397975ffdf6a7ed5032d198bbf70e87a8f44f144a9dfc
 [[package]]
 name = "pitch_lake"
 version = "0.1.0"
-source = "git+https://github.com/ametel01/pitchlake_starknet.git?branch=scarb-updates#6d7d62d7e2b86cb1d0ba5de11df1ccdd21999047"
+source = "git+https://github.com/OilerNetwork/pitchlake-monorepo.git?rev=ea0d326#ea0d3261d87ca1be663ba5c2a9180a5f79841863"
 dependencies = [
  "fp",
  "openzeppelin_access",
