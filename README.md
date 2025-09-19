@@ -97,16 +97,12 @@ curl -X POST "http://localhost:3000/pricing_data" \
   -H "Content-Type: application/json" \
   -H "X-API-Key: YOUR_API_KEY" \
   -d '{
-    "identifiers": ["RISC0_MOCK_PROOF_TEST"],
+    "program_id": "RISC0_MOCK_PROOF_TEST",
+    "vault_address": "YOUR_PITCHLAKE_VAULT_ADDRESS",
     "params": {
       "twap": [1672531200, 1672617600],
-      "volatility": [1672531200, 1672617600], 
+      "max_return": [1672531200, 1672617600],
       "reserve_price": [1672531200, 1672617600]
-    },
-    "client_info": {
-      "client_address": "0x018df581fe0ee497a4a3595cf62aea0bafa7ba1a54a7dcbafca37bfada67c718",
-      "vault_address": "YOUR_PITCHLAKE_VAULT_ADDRESS",
-      "timestamp": 1672574400
     }
   }'
 ```

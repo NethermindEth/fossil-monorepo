@@ -637,7 +637,8 @@ impl BonsaiProofProvider {
             let (vault_address, timestamp) = if let Some(job) = job_context {
                 tracing::info!(
                     "🔍 Debug job context: vault_address={:?}, vault_timestamp={:?}",
-                    job.vault_address, job.vault_timestamp
+                    job.vault_address,
+                    job.vault_timestamp
                 );
                 if let (Some(vault_addr), Some(vault_ts)) =
                     (&job.vault_address, job.vault_timestamp)
