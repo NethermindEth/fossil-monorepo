@@ -145,6 +145,74 @@ dev-down: ## Stop services and clean up (removes volumes)
 	docker network prune -f
 	@echo "✅ Environment completely cleaned"
 
+.PHONY: dev-up-sepolia
+dev-up-sepolia: ## Start services with Sepolia contracts (no deployment)
+	@echo "🚀 Starting services with Sepolia configuration..."
+	@echo "📋 Step 1: Starting infrastructure services (no Katana)..."
+	docker-compose -f docker-compose.local.yml up -d proving_service_db offchain_processor_db localstack
+	@echo "⏳ Waiting for databases to be healthy..."
+	@timeout=60; while [ "$$timeout" -gt 0 ]; do \
+		if docker-compose -f docker-compose.local.yml exec -T proving_service_db sh -c 'pg_isready -U postgres' > /dev/null 2>&1 && \
+		   docker-compose -f docker-compose.local.yml exec -T offchain_processor_db sh -c 'pg_isready -U postgres' > /dev/null 2>&1; then \
+			echo "✅ Databases are healthy"; \
+			break; \
+		fi; \
+		echo "   Waiting for databases... ($$timeout seconds left)"; \
+		sleep 2; \
+		timeout=$$((timeout-2)); \
+	done; \
+	if [ "$$timeout" -le 0 ]; then \
+		echo "❌ Timeout waiting for databases to be healthy"; \
+		exit 1; \
+	fi
+	@echo "⏳ Waiting for LocalStack to be healthy..."
+	@timeout=60; while [ "$$timeout" -gt 0 ]; do \
+		if docker-compose -f docker-compose.local.yml exec -T localstack sh -c 'awslocal sqs list-queues --region us-east-1' > /dev/null 2>&1; then \
+			echo "✅ LocalStack is healthy"; \
+			break; \
+		fi; \
+		echo "   Waiting for LocalStack... ($$timeout seconds left)"; \
+		sleep 2; \
+		timeout=$$((timeout-2)); \
+	done; \
+	if [ "$$timeout" -le 0 ]; then \
+		echo "❌ Timeout waiting for LocalStack to be healthy"; \
+		exit 1; \
+	fi
+	@echo "🚀 Step 2: Starting application services with Sepolia config..."
+	@if [ -f .env.sepolia ]; then \
+		echo "📝 Using .env.sepolia for configuration"; \
+		cp .env.sepolia .env.docker.temp; \
+	elif [ -f .env.local ]; then \
+		echo "📝 Using .env.local for configuration"; \
+		cp .env.local .env.docker.temp; \
+	else \
+		echo "❌ Neither .env.sepolia nor .env.local file found!"; \
+		echo "Please create one of these files with your Sepolia configuration"; \
+		exit 1; \
+	fi
+	@# Keep Sepolia RPC URL as is
+	@sed -i.bak 's|OFFCHAIN_PROCESSOR_DATABASE_URL=postgresql://postgres:postgres@localhost:5434/postgres|OFFCHAIN_PROCESSOR_DATABASE_URL=postgresql://postgres:postgres@offchain_processor_db:5432/postgres|g' .env.docker.temp || true
+	@sed -i.bak 's|PROVING_SERVICE_DATABASE_URL=postgresql://postgres:postgres@localhost:5435/postgres|PROVING_SERVICE_DATABASE_URL=postgresql://postgres:postgres@proving_service_db:5432/postgres|g' .env.docker.temp || true
+	@sed -i.bak 's|AWS_ENDPOINT_URL=http://localhost:4567|AWS_ENDPOINT_URL=http://localstack:4566|g' .env.docker.temp || true
+	@sed -i.bak 's|SQS_QUEUE_URL=http://localhost:4567/000000000000/fossilQueue|SQS_QUEUE_URL=http://localstack:4566/000000000000/fossilQueue|g' .env.docker.temp || true
+	@sed -i.bak 's|PROVING_SERVICE_URL=http://127.0.0.1:3001|PROVING_SERVICE_URL=http://proving-service-api:3001|g' .env.docker.temp || true
+	@rm -f .env.docker.temp.bak
+	@# Temporarily replace .env.docker with our Sepolia config
+	@mv .env.docker .env.docker.backup 2>/dev/null || true
+	@mv .env.docker.temp .env.docker
+	@docker-compose -f docker-compose.local.yml up -d proving-service-api message-handler offchain-processor
+	@# Restore original .env.docker
+	@mv .env.docker .env.docker.temp
+	@mv .env.docker.backup .env.docker 2>/dev/null || true
+	@rm -f .env.docker.temp
+	@echo "✅ Services started with Sepolia configuration:"
+	@echo "  📊 Offchain Processor: http://localhost:3000"
+	@echo "  🔧 Proving Service API: http://localhost:3001"
+	@echo "  🗄️  Databases: Proving Service (5435), Offchain Processor (5434)"
+	@echo "  ☁️  LocalStack: http://localhost:4567"
+	@echo "  🌐 Using Sepolia testnet for StarkNet operations"
+
 .PHONY: logs
 logs: ## View logs from all services
 	docker-compose -f docker-compose.local.yml logs -f
