@@ -1,0 +1,53 @@
+# Use Ubuntu 24.04 (Noble Numbat) which has GLIBC 2.39
+FROM ubuntu:noble
+
+WORKDIR /app
+
+# Install Rust and build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libssl3 \
+    curl \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# Install RISC Zero
+RUN curl -L https://risczero.com/install | bash
+ENV PATH="/root/.risc0/bin:${PATH}"
+RUN /root/.risc0/bin/rzup install
+
+# Copy the source code
+COPY proving-service/ /app/proving-service/
+WORKDIR /app/proving-service
+
+# Build the binary
+RUN cargo build --release --bin message-handler --package message-handler --features mock-proof
+
+# Create necessary directories for RISC0 methods
+RUN mkdir -p /app/target/release/build/mock-proof-composition-methods/out
+
+# Copy the binary to the final location
+RUN cp target/release/message-handler /usr/local/bin/message-handler
+RUN chmod +x /usr/local/bin/message-handler
+
+# Set environment variables
+ENV RUST_LOG=info
+
+# Create wrapper script for message-handler
+RUN printf '%s\n' \
+    '#!/bin/bash' \
+    '' \
+    '# Run the message-handler application' \
+    'exec /usr/local/bin/message-handler "$@"' \
+    > /usr/local/bin/message-handler-wrapper.sh
+
+RUN chmod +x /usr/local/bin/message-handler-wrapper.sh
+
+# Use ENTRYPOINT so it runs even with empty entrypoint/command arrays
+ENTRYPOINT ["/usr/local/bin/message-handler-wrapper.sh"]

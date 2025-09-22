@@ -1,9 +1,33 @@
-# Use Ubuntu 24.04 (Noble Numbat) which has GLIBC 2.39
-FROM ubuntu:noble
+# Build stage
+FROM --platform=linux/amd64 rust:1.88-slim AS builder
 
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install RISC Zero
+RUN curl -L https://risczero.com/install | bash
+ENV PATH="/root/.risc0/bin:${PATH}"
+RUN /root/.risc0/bin/rzup install
+
+# Set working directory
 WORKDIR /app
 
-# Install only the absolutely necessary runtime dependencies
+# Copy proving-service workspace
+COPY proving-service/Cargo.toml ./Cargo.toml
+COPY proving-service/Cargo.lock ./Cargo.lock
+COPY proving-service/crates ./crates
+
+# Build the message-handler with mock-proof features
+RUN cargo build --release --bin message-handler --package message-handler --features mock-proof
+
+# Runtime stage
+FROM --platform=linux/amd64 ubuntu:noble
+
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
@@ -13,8 +37,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Create necessary directories for RISC0 methods
 RUN mkdir -p /app/target/release/build/mock-proof-composition-methods/out
 
-# The binary and method ELFs will be copied during the build script
-# using docker cp commands after the container is created
+# Copy the binary from builder
+COPY --from=builder /app/target/release/message-handler /usr/local/bin/message-handler
+RUN chmod +x /usr/local/bin/message-handler
+
+# Copy RISC0 method ELFs from builder
+COPY --from=builder /app/target/release/build/mock-proof-composition-methods-*/out/. /app/target/release/build/mock-proof-composition-methods/out/
 
 # Set environment variables
 ENV RUST_LOG=info

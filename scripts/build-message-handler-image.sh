@@ -32,11 +32,11 @@ echo "Found methods directory with out/ subdirectory: $METHODS_DIR"
 
 # Build the Docker image (without copying files yet)
 echo "Building base Docker image..."
-docker build -t fossil-message-handler:base -f docker/Dockerfile.message-handler .
+docker build --platform linux/arm64 -t fossil-message-handler:base -f docker/Dockerfile.message-handler .
 
 # Create a temporary container
 echo "Creating temporary container..."
-CONTAINER_ID=$(docker create fossil-message-handler:base)
+CONTAINER_ID=$(docker create --platform linux/arm64 fossil-message-handler:base)
 
 # Make the binary executable locally first
 echo "Making binary executable locally..."
