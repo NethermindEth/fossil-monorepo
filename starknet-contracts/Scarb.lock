@@ -72,7 +72,7 @@ checksum = "sha256:bf799c794139837f397975ffdf6a7ed5032d198bbf70e87a8f44f144a9dfc
 [[package]]
 name = "pitch_lake"
 version = "0.1.0"
-source = "git+https://github.com/OilerNetwork/pitchlake-monorepo.git?branch=issue-7%2Fupdate-job-request-getters#5bafce39f13758a928a7eb8668e888095be9b322"
+source = "git+https://github.com/OilerNetwork/pitchlake-monorepo.git?branch=main#4f4934b785be4c71070261baf3c31b132d1e671d"
 dependencies = [
  "fp",
  "openzeppelin_access",
