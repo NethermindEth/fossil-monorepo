@@ -23,8 +23,8 @@ pub struct PitchLakeJobRequest {
     pub vault_address: starknet::ContractAddress, // Which vault is this request for
     // The timestamp the results are for
     pub timestamp: u64,
-    // 'PITCH_LAKE_V1' (or program hash when proving ?)
-    pub program_id: felt252 // 'PITCH_LAKE_V1'}
+    // 'PITCHLAKE_V1' (or program hash when proving ?)
+    pub program_id: felt252 // 'PITCHLAKE_V1'}
 }
 
 #[derive(Drop, Debug, Copy, PartialEq, Serde)]
