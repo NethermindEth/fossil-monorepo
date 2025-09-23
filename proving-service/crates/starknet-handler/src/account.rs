@@ -19,7 +19,7 @@ const KATANA_CHAIN_ID: Felt = Felt::from_raw([0x4b4154414e41, 0, 0, 0]);
 pub struct PitchLakeJobRequest {
     pub vault_address: Felt,
     pub timestamp: u64,
-    pub program_id: Felt, // 'PITCH_LAKE_V1'
+    pub program_id: Felt, // 'PITCHLAKE_V1'
 }
 
 /// Helper function to convert hex string to Felt (similar to fossil-light-client)
@@ -321,7 +321,7 @@ mod tests {
         let job_request = super::PitchLakeJobRequest {
             vault_address: Felt::from_str("0x123").unwrap(),
             timestamp: 1672531200u64,
-            program_id: Felt::from_str("0x504954434c4c414b455f5631").unwrap(), // 'PITCH_LAKE_V1'
+            program_id: Felt::from_str("0x504954434c4c414b455f5631").unwrap(), // 'PITCHLAKE_V1'
         };
 
         // Note: This test will fail in real execution since we're using a dummy provider

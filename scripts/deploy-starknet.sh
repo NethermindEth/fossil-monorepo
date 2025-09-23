@@ -177,7 +177,7 @@ STRIKE_LEVEL=0                                                                # 
 ROUND_TRANSITION_DURATION=180                                                 # 3 minutes
 AUCTION_DURATION=180                                                          # 3 minutes
 ROUND_DURATION=720                                                            # 12 minutes
-PROGRAM_ID=0x504954434c4c414b455f5631                                         # 'PITCHLAKE_V1' as felt252
+PROGRAM_ID=0x50495443484c414b455f5631                                         # 'PITCHLAKE_V1' as felt252
 PROVING_DELAY=120                                                             # 2 minutes
 
 echo -e "${YELLOW}Deploying PitchLake Vault contract...${NC}"
