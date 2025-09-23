@@ -198,34 +198,8 @@ PITCHLAKE_VAULT_ADDRESS=$(starkli deploy $PITCHLAKE_VAULT_HASH $PITCHLAKE_VERIFI
 echo -e "${GREEN}Contract deployed at: ${BOLD}$PITCHLAKE_VAULT_ADDRESS${NC}"
 echo
 
-# Deploy OptionRound contract
-echo -e "${YELLOW}Deploying OptionRound contract...${NC}"
-# Constructor arguments for OptionRound (using ConstructorArgs struct)
-ROUND_ID=1  # First round
-STRIKE_PRICE=1000000000000000000  # 1 ETH in wei
-CAP_LEVEL=200  # 200% cap level (2x)
-RESERVE_PRICE=100000000000000000  # 0.1 ETH reserve price
-
-echo -e "${BLUE}OptionRound constructor arguments:${NC}"
-echo "  OPTION_ROUND_CLASS_HASH: $OPTION_ROUND_CLASS_HASH"
-echo "  PITCHLAKE_VAULT_ADDRESS: $PITCHLAKE_VAULT_ADDRESS"
-echo "  ROUND_ID: $ROUND_ID"
-echo "  STRIKE_PRICE: $STRIKE_PRICE"
-echo "  CAP_LEVEL: $CAP_LEVEL"
-echo "  RESERVE_PRICE: $RESERVE_PRICE"
-echo "  ROUND_TRANSITION_DURATION: $ROUND_TRANSITION_DURATION"
-echo "  AUCTION_DURATION: $AUCTION_DURATION"
-echo "  ROUND_DURATION: $ROUND_DURATION"
-echo
-
-# Deploy with constructor args: vault_address, round_id, pricing_data.strike_price, pricing_data.cap_level, pricing_data.reserve_price, round_transition_duration, auction_duration, round_duration
-OPTION_ROUND_ADDRESS=$(starkli deploy $OPTION_ROUND_CLASS_HASH $PITCHLAKE_VAULT_ADDRESS $ROUND_ID u256:$STRIKE_PRICE $CAP_LEVEL u256:$RESERVE_PRICE $ROUND_TRANSITION_DURATION $AUCTION_DURATION $ROUND_DURATION --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
-echo -e "${GREEN}OptionRound deployed at: ${BOLD}$OPTION_ROUND_ADDRESS${NC}"
-echo
-
 # Store first vault for reference (12 minute vault)
 PITCHLAKE_VAULT_ADDRESS_12MIN=$PITCHLAKE_VAULT_ADDRESS
-OPTION_ROUND_ADDRESS_12MIN=$OPTION_ROUND_ADDRESS
 
 # Deploy 3 hour vault
 echo -e "${YELLOW}Deploying 3 hour PitchLake Vault contract...${NC}"
@@ -250,13 +224,6 @@ echo
 sleep 5
 PITCHLAKE_VAULT_ADDRESS_3H=$(starkli deploy $PITCHLAKE_VAULT_HASH $PITCHLAKE_VERIFIER_ADDRESS $ETH_ADDRESS $OPTION_ROUND_CLASS_HASH $ALPHA_3H $STRIKE_LEVEL $ROUND_TRANSITION_DURATION_3H $AUCTION_DURATION_3H $ROUND_DURATION_3H $PROGRAM_ID $PROVING_DELAY --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
 echo -e "${GREEN}3 Hour Vault deployed at: ${BOLD}$PITCHLAKE_VAULT_ADDRESS_3H${NC}"
-echo
-
-# Deploy OptionRound for 3 hour vault
-echo -e "${YELLOW}Deploying OptionRound for 3 hour vault...${NC}"
-sleep 5
-OPTION_ROUND_ADDRESS_3H=$(starkli deploy $OPTION_ROUND_CLASS_HASH $PITCHLAKE_VAULT_ADDRESS_3H $ROUND_ID u256:$STRIKE_PRICE $CAP_LEVEL u256:$RESERVE_PRICE $ROUND_TRANSITION_DURATION_3H $AUCTION_DURATION_3H $ROUND_DURATION_3H --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
-echo -e "${GREEN}3 Hour OptionRound deployed at: ${BOLD}$OPTION_ROUND_ADDRESS_3H${NC}"
 echo
 
 # Deploy 1 month vault
@@ -284,11 +251,7 @@ PITCHLAKE_VAULT_ADDRESS_1M=$(starkli deploy $PITCHLAKE_VAULT_HASH $PITCHLAKE_VER
 echo -e "${GREEN}1 Month Vault deployed at: ${BOLD}$PITCHLAKE_VAULT_ADDRESS_1M${NC}"
 echo
 
-# Deploy OptionRound for 1 month vault
-echo -e "${YELLOW}Deploying OptionRound for 1 month vault...${NC}"
 sleep 5
-OPTION_ROUND_ADDRESS_1M=$(starkli deploy $OPTION_ROUND_CLASS_HASH $PITCHLAKE_VAULT_ADDRESS_1M $ROUND_ID u256:$STRIKE_PRICE $CAP_LEVEL u256:$RESERVE_PRICE $ROUND_TRANSITION_DURATION_1M $AUCTION_DURATION_1M $ROUND_DURATION_1M --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
-echo -e "${GREEN}1 Month OptionRound deployed at: ${BOLD}$OPTION_ROUND_ADDRESS_1M${NC}"
 echo
 
 echo -e "${GREEN}${BOLD}All vaults deployed:${NC}"
@@ -314,13 +277,8 @@ for env_file in "${ENV_FILES[@]}"; do
 	update_env_var "$env_file" "PITCHLAKE_VAULT_12MIN" "$PITCHLAKE_VAULT_ADDRESS_12MIN"
 	update_env_var "$env_file" "PITCHLAKE_VAULT_3H" "$PITCHLAKE_VAULT_ADDRESS_3H"
 	update_env_var "$env_file" "PITCHLAKE_VAULT_1M" "$PITCHLAKE_VAULT_ADDRESS_1M"
-	# Option round addresses
-	update_env_var "$env_file" "OPTION_ROUND_12MIN" "$OPTION_ROUND_ADDRESS_12MIN"
-	update_env_var "$env_file" "OPTION_ROUND_3H" "$OPTION_ROUND_ADDRESS_3H"
-	update_env_var "$env_file" "OPTION_ROUND_1M" "$OPTION_ROUND_ADDRESS_1M"
 	# Legacy compatibility (points to 12 min vault)
 	update_env_var "$env_file" "PITCHLAKE_VAULT" "$PITCHLAKE_VAULT_ADDRESS_12MIN"
-	update_env_var "$env_file" "OPTION_ROUND_ADDRESS" "$OPTION_ROUND_ADDRESS_12MIN"
 done
 
 # If in docker mode, sync the addresses to .env.local
@@ -335,13 +293,8 @@ if [ "$ENV_TYPE" = "docker" ] && [ -f "$SECONDARY_ENV" ]; then
 	update_env_var "$SECONDARY_ENV" "PITCHLAKE_VAULT_12MIN" "$PITCHLAKE_VAULT_ADDRESS_12MIN"
 	update_env_var "$SECONDARY_ENV" "PITCHLAKE_VAULT_3H" "$PITCHLAKE_VAULT_ADDRESS_3H"
 	update_env_var "$SECONDARY_ENV" "PITCHLAKE_VAULT_1M" "$PITCHLAKE_VAULT_ADDRESS_1M"
-	# Option round addresses
-	update_env_var "$SECONDARY_ENV" "OPTION_ROUND_12MIN" "$OPTION_ROUND_ADDRESS_12MIN"
-	update_env_var "$SECONDARY_ENV" "OPTION_ROUND_3H" "$OPTION_ROUND_ADDRESS_3H"
-	update_env_var "$SECONDARY_ENV" "OPTION_ROUND_1M" "$OPTION_ROUND_ADDRESS_1M"
 	# Legacy compatibility (points to 12 min vault)
 	update_env_var "$SECONDARY_ENV" "PITCHLAKE_VAULT" "$PITCHLAKE_VAULT_ADDRESS_12MIN"
-	update_env_var "$SECONDARY_ENV" "OPTION_ROUND_ADDRESS" "$OPTION_ROUND_ADDRESS_12MIN"
 fi
 
 # Return to original directory
