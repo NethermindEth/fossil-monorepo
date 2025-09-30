@@ -2,9 +2,9 @@ name: Monorepo CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, handover-updates]
   pull_request:
-    branches: [main]
+    branches: [main, handover-updates]
 
 env:
   CARGO_TERM_COLOR: always
