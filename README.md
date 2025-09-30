@@ -3,7 +3,7 @@
 This repository contains a complete RISC0 proof generation and StarkNet verification system with two main services:
 
 - **Proving Service**: Handles RISC0 proof generation via Bonsai API and StarkNet onchain verification
-- **Offchain Processor**: HTTP API for job management and pricing data requests
+- **Fossil API**: HTTP API for job management and pricing data requests
 
 ## Quick Start
 
@@ -28,7 +28,7 @@ make dev-up
 This starts the complete local development environment:
 1. **Infrastructure**: Katana (StarkNet devnet), PostgreSQL databases, LocalStack (AWS SQS)
 2. **Contract Deployment**: Automatically deploys fresh contracts to Katana including multiple vault configurations (12min, 3hour, 1month)
-3. **Services**: Offchain Processor, Proving Service API, Message Handler
+3. **Services**: Fossil API, Proving Service API, Message Handler
 
 ### 3. Stop Development Stack
 
@@ -133,13 +133,13 @@ curl "http://localhost:3000/job_result/JOB_ID" \
 
 When `make dev-up` is running:
 
-- **Offchain Processor**: http://localhost:3000
-- **Proving Service API**: http://localhost:3001  
+- **Fossil API**: http://localhost:3000
+- **Proving Service API**: http://localhost:3001
 - **Katana StarkNet Devnet**: http://localhost:5050
 - **LocalStack (AWS SQS)**: http://localhost:4567
-- **PostgreSQL Databases**: 
+- **PostgreSQL Databases**:
   - Proving Service: localhost:5435
-  - Offchain Processor: localhost:5434
+  - Fossil API: localhost:5434
 
 ## Monitoring
 
@@ -148,8 +148,8 @@ Check service logs:
 # Message Handler (RISC0 proof generation)
 docker logs fossil-monorepo-message-handler-1 -f
 
-# Offchain Processor (HTTP API)
-docker logs fossil-monorepo-offchain-processor-1 -f
+# Fossil API (HTTP API)
+docker logs fossil-monorepo-fossil-api-1 -f
 
 # Proving Service API
 docker logs fossil-monorepo-proving-service-api-1 -f
@@ -157,7 +157,7 @@ docker logs fossil-monorepo-proving-service-api-1 -f
 
 ## Development Workflow
 
-1. **Make Changes**: Edit code in `proving-service/` or `offchain-processor/`
+1. **Make Changes**: Edit code in `proving-service/` or `fossil-api/`
 2. **Restart Services**: `make dev-down && make dev-up` (restarts all services with fresh contracts)
 3. **Test Changes**: Run `./test-local-request.sh` (automatically adapts to new contract deployments)
 4. **Advanced Testing**: Use individual API endpoints for specific component testing

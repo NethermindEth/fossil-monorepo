@@ -1,5 +1,5 @@
 services:
-  offchain_processor_db:
+  fossil_api_db:
     image: postgres:16
     environment:
       POSTGRES_USER: postgres

@@ -10,10 +10,10 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /app
 
-# Copy offchain-processor workspace
-COPY offchain-processor/Cargo.toml ./
-COPY offchain-processor/crates ./crates
-COPY offchain-processor/.sqlx ./.sqlx
+# Copy fossil-api workspace
+COPY fossil-api/Cargo.toml ./
+COPY fossil-api/crates ./crates
+COPY fossil-api/.sqlx ./.sqlx
 
 # Build the application
 RUN cargo build --release --bin server
@@ -35,7 +35,7 @@ RUN useradd -m -u 1001 appuser
 WORKDIR /app
 
 # Copy the binary from builder
-COPY --from=builder /app/target/release/server /app/offchain-processor
+COPY --from=builder /app/target/release/server /app/fossil-api
 
 # Change ownership to appuser
 RUN chown -R appuser:appuser /app
@@ -51,4 +51,4 @@ HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
     CMD curl -f http://localhost:3000/health || exit 1
 
 # Run the application
-CMD ["./offchain-processor"]
+CMD ["./fossil-api"]

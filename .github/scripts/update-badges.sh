@@ -10,7 +10,7 @@
 #
 # Examples:
 #   ./update-badges.sh --ps-coverage 78.5 --op-coverage 82.3
-#   ./update-badges.sh --ps-lcov proving-service/.coverage/lcov.info --op-lcov offchain-processor/.coverage/lcov.info
+#   ./update-badges.sh --ps-lcov proving-service/.coverage/lcov.info --op-lcov fossil-api/.coverage/lcov.info
 #   ./update-badges.sh --ps-coverage 78.5 # Only update PS badge
 #
 # If no parameters are provided, the script will use default values for demonstration.
@@ -52,11 +52,11 @@ done
 extract_coverage_from_lcov() {
   local lcov_file=$1
   local coverage=""
-  
+
   if [ -f "$lcov_file" ]; then
     local coverage_pct=$(grep -m 1 "LF:" "$lcov_file" | awk '{print $2}')
     local coverage_hit=$(grep -m 1 "LH:" "$lcov_file" | awk '{print $2}')
-    
+
     if [ -n "$coverage_pct" ] && [ -n "$coverage_hit" ] && [ "$coverage_pct" -gt 0 ]; then
       coverage=$(awk "BEGIN { printf \"%.1f\", ($coverage_hit / $coverage_pct) * 100 }")
       echo "Extracted coverage: $coverage%"
@@ -64,7 +64,7 @@ extract_coverage_from_lcov() {
   else
     echo "LCOV file not found: $lcov_file"
   fi
-  
+
   echo "$coverage"
 }
 
@@ -120,17 +120,17 @@ update_badge() {
   local component=$1
   local badge_url=$2
   local readme_path=$3
-  
+
   if [ -z "$badge_url" ]; then
     echo "No badge URL provided for $component, skipping $readme_path"
     return
   fi
-  
+
   if [ ! -f "$readme_path" ]; then
     echo "README file not found: $readme_path"
     return
   fi
-  
+
   echo "Updating $component badge in $readme_path"
   sed -i".bak" "s|\\[${component}-coverage-badge\\]:.*|[${component}-coverage-badge]: $badge_url|g" "$readme_path"
   rm -f "${readme_path}.bak"
@@ -144,6 +144,6 @@ fi
 
 # Update project-specific READMEs
 [ -n "$PS_BADGE_URL" ] && [ -f "proving-service/README.md" ] && update_badge "ps" "$PS_BADGE_URL" "proving-service/README.md"
-[ -n "$OP_BADGE_URL" ] && [ -f "offchain-processor/README.md" ] && update_badge "op" "$OP_BADGE_URL" "offchain-processor/README.md"
+[ -n "$OP_BADGE_URL" ] && [ -f "fossil-api/README.md" ] && update_badge "op" "$OP_BADGE_URL" "fossil-api/README.md"
 
 echo "README files have been updated"

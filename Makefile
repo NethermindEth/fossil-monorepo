@@ -81,7 +81,7 @@ setup: ## Install all dependencies and set up the complete development environme
 	@if [ ! -f .env.docker ]; then \
 		cp .env.example .env.docker; \
 		sed -i.bak 's|STARKNET_RPC_URL=http://localhost:5050|STARKNET_RPC_URL=http://katana:5050|g' .env.docker; \
-		sed -i.bak 's|OFFCHAIN_PROCESSOR_DATABASE_URL=postgresql://postgres:postgres@localhost:5434/postgres|OFFCHAIN_PROCESSOR_DATABASE_URL=postgresql://postgres:postgres@offchain_processor_db:5432/postgres|g' .env.docker; \
+		sed -i.bak 's|OFFCHAIN_PROCESSOR_DATABASE_URL=postgresql://postgres:postgres@localhost:5434/postgres|OFFCHAIN_PROCESSOR_DATABASE_URL=postgresql://postgres:postgres@fossil_api_db:5432/postgres|g' .env.docker; \
 		sed -i.bak 's|PROVING_SERVICE_DATABASE_URL=postgresql://postgres:postgres@localhost:5435/postgres|PROVING_SERVICE_DATABASE_URL=postgresql://postgres:postgres@proving_service_db:5432/postgres|g' .env.docker; \
 		sed -i.bak 's|AWS_ENDPOINT_URL=http://localhost:4567|AWS_ENDPOINT_URL=http://localstack:4566|g' .env.docker; \
 		sed -i.bak 's|SQS_QUEUE_URL=http://localhost:4567/000000000000/fossilQueue|SQS_QUEUE_URL=http://localstack:4566/000000000000/fossilQueue|g' .env.docker; \
@@ -109,7 +109,7 @@ setup: ## Install all dependencies and set up the complete development environme
 dev-up: ## Start all local development services
 	@echo "🚀 Starting local development services..."
 	@echo "📋 Step 1: Starting infrastructure services..."
-	docker-compose -f docker-compose.local.yml up -d katana proving_service_db offchain_processor_db localstack
+	docker-compose -f docker-compose.local.yml up -d katana proving_service_db fossil_api_db localstack
 	@echo "⏳ Waiting for Katana to be healthy..."
 	@timeout=60; while [ "$$timeout" -gt 0 ]; do \
 		if docker-compose -f docker-compose.local.yml exec -T katana sh -c 'curl -s -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"starknet_chainId\",\"params\":[],\"id\":1}" http://localhost:5050' > /dev/null 2>&1; then \
@@ -130,8 +130,8 @@ dev-up: ## Start all local development services
 	docker-compose -f docker-compose.local.yml up -d
 	@echo "✅ Services started:"
 	@echo "  📡 Katana: http://localhost:5050"
-	@echo "  📊 Offchain Processor: http://localhost:3000"
-	@echo "  🗄️  Databases: Proving Service (5435), Offchain Processor (5434)"
+	@echo "  📊 Fossil API: http://localhost:3000"
+	@echo "  🗄️  Databases: Proving Service (5435), Fossil API (5434)"
 	@echo "  ☁️  LocalStack: http://localhost:4567"
 
 .PHONY: dev-down
@@ -154,7 +154,7 @@ logs: ## View logs from all services
 .PHONY: build
 build: ## Build all projects in release mode
 	cd proving-service && cargo build --release
-	cd offchain-processor && cargo build --release
+	cd fossil-api && cargo build --release
 	@echo "✅ Build complete"
 
 .PHONY: build-message-handler-image
@@ -166,13 +166,13 @@ build-message-handler-image: ## Build message-handler Docker image with pre-comp
 .PHONY: test
 test: ## Run all tests
 	cd proving-service && make test
-	cd offchain-processor && make test
+	cd fossil-api && make test
 	@echo "✅ Tests complete"
 
 .PHONY: pr
 pr: ## Run lints and tests for all projects (use before submitting PRs)
 	cd proving-service && make pr
-	cd offchain-processor && make pr
+	cd fossil-api && make pr
 	@echo "✅ PR checks complete"
 
 ##@ Help

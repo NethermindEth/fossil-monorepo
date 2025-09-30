@@ -28,23 +28,23 @@ log_error() {
 source .env.local
 
 # Use local URLs (services running via make dev-up)
-OFFCHAIN_PROCESSOR_URL="http://localhost:3000"
+FOSSIL_API_URL="http://localhost:3000"
 PROVING_SERVICE_URL="http://localhost:3001"
 
 log_info "Testing Fossil Monorepo locally using Docker services"
-log_info "Offchain Processor: $OFFCHAIN_PROCESSOR_URL"
+log_info "Fossil API: $FOSSIL_API_URL"
 log_info "Proving Service: $PROVING_SERVICE_URL"
 log_info "PitchLake Vault (12min): $PITCHLAKE_VAULT_12MIN"
 
 # Check if services are running
 log_info "Checking if services are responding..."
 
-if ! curl -s "$OFFCHAIN_PROCESSOR_URL/health" > /dev/null 2>&1; then
-    log_error "Offchain Processor not responding at $OFFCHAIN_PROCESSOR_URL"
+if ! curl -s "$FOSSIL_API_URL/health" > /dev/null 2>&1; then
+    log_error "Fossil API not responding at $FOSSIL_API_URL"
     log_error "Make sure you've run: make dev-up"
     exit 1
 fi
-log_info "✅ Offchain Processor is healthy"
+log_info "✅ Fossil API is healthy"
 
 if ! curl -s "$PROVING_SERVICE_URL/health" > /dev/null 2>&1; then
     log_error "Proving Service not responding at $PROVING_SERVICE_URL"
@@ -55,7 +55,7 @@ log_info "✅ Proving Service is healthy"
 
 # Step 1: Generate API key
 log_info "🔑 Generating API key..."
-API_KEY_RESPONSE=$(curl -s -X POST "$OFFCHAIN_PROCESSOR_URL/api_key" \
+API_KEY_RESPONSE=$(curl -s -X POST "$FOSSIL_API_URL/api_key" \
   -H "Content-Type: application/json" \
   -d '{"name": "local_test_key"}')
 
@@ -134,7 +134,7 @@ log_info "  TWAP: [$TWAP_START, $TWAP_END]"
 log_info "  Reserve price: [$RESERVE_PRICE_START, $RESERVE_PRICE_END]"
 log_info "  Volatility: [$VOLATILITY_START, $VOLATILITY_END]"
 
-# Step 4: Send test request to offchain-processor
+# Step 4: Send test request to fossil-api
 log_info "📊 Sending pricing data request..."
 
 log_info "🔍 Debug: Request data being sent:"
@@ -165,7 +165,7 @@ TEST_REQUEST="{
 log_info "🔍 Full JSON request:"
 echo "$TEST_REQUEST" | jq .
 
-RESPONSE=$(curl -s -X POST "$OFFCHAIN_PROCESSOR_URL/pricing_data" \
+RESPONSE=$(curl -s -X POST "$FOSSIL_API_URL/pricing_data" \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $API_KEY" \
   -d "$TEST_REQUEST")
@@ -189,7 +189,7 @@ MAX_STATUS_RETRIES=30
 STATUS_RETRY_COUNT=0
 
 while [ $STATUS_RETRY_COUNT -lt $MAX_STATUS_RETRIES ]; do
-    STATUS_RESPONSE=$(curl -s "$OFFCHAIN_PROCESSOR_URL/job_status/$JOB_ID")
+    STATUS_RESPONSE=$(curl -s "$FOSSIL_API_URL/job_status/$JOB_ID")
     STATUS=$(echo $STATUS_RESPONSE | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
 
     log_info "Job status (attempt $((STATUS_RETRY_COUNT + 1))/$MAX_STATUS_RETRIES): $STATUS"
@@ -214,7 +214,7 @@ fi
 
 # Step 7: Get detailed job result
 log_info "📋 Getting detailed job result..."
-RESULT_RESPONSE=$(curl -s "$OFFCHAIN_PROCESSOR_URL/job_result/$JOB_ID" \
+RESULT_RESPONSE=$(curl -s "$FOSSIL_API_URL/job_result/$JOB_ID" \
   -H "X-API-Key: $API_KEY")
 
 log_info "Detailed result: $RESULT_RESPONSE"
@@ -222,7 +222,7 @@ log_info "Detailed result: $RESULT_RESPONSE"
 # Step 8: Test batch job status
 log_info "📦 Testing batch job status endpoint..."
 BATCH_REQUEST='{"job_ids": ["'$JOB_ID'"]}'
-BATCH_RESPONSE=$(curl -s -X POST "$OFFCHAIN_PROCESSOR_URL/batch_job_status" \
+BATCH_RESPONSE=$(curl -s -X POST "$FOSSIL_API_URL/batch_job_status" \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $API_KEY" \
   -d "$BATCH_REQUEST")
@@ -236,5 +236,5 @@ log_info "   - Job: $JOB_ID ($STATUS)"
 log_info ""
 log_info "💡 To check service logs:"
 log_info "   docker logs fossil-monorepo-message-handler-1 -f"
-log_info "   docker logs fossil-monorepo-offchain-processor-1 -f"
+log_info "   docker logs fossil-monorepo-fossil-api-1 -f"
 log_info "   docker logs fossil-monorepo-proving-service-api-1 -f"

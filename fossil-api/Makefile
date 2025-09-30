@@ -26,11 +26,11 @@ setup-rust: ## Install Rust and toolchains
 
 .PHONY: setup-postgres
 setup-postgres: ## Set up PostgreSQL for development
-	docker compose -f docker-compose.test.yml up -d offchain_processor_db
+	docker compose -f docker-compose.test.yml up -d fossil_api_db
 
 .PHONY: setup-localstack
 setup-localstack: ## Set up LocalStack for AWS services
-	@echo "LocalStack not needed for offchain-processor"
+	@echo "LocalStack not needed for fossil-api"
 
 .PHONY: setup-coverage
 setup-coverage: ## Install coverage tools.
@@ -47,15 +47,15 @@ setup-coverage: ## Install coverage tools.
 
 .PHONY: setup-foundry
 setup-foundry: ## Set up Foundry
-	@echo "Foundry not needed for offchain-processor"
+	@echo "Foundry not needed for fossil-api"
 
 .PHONY: setup-risc0
 setup-risc0: ## Set up RISC0
-	@echo "RISC0 not needed for offchain-processor"
+	@echo "RISC0 not needed for fossil-api"
 
 .PHONY: setup-starknet
 setup-starknet: ## Set up Starknet
-	@echo "Starknet/Scarb not needed for offchain-processor"
+	@echo "Starknet/Scarb not needed for fossil-api"
 
 .PHONY: setup-platform
 setup-platform: ## Set up platform dependencies
@@ -113,7 +113,7 @@ coverage-dir: ## Create coverage directory if it doesn't exist
 .PHONY: coverage
 coverage: coverage-dir ## Run tests with code coverage and generate HTML report.
 	@rustup component add llvm-tools-preview
-	docker compose -f docker-compose.test.yml up -d offchain_processor_db &&\
+	docker compose -f docker-compose.test.yml up -d fossil_api_db &&\
 	{ CARGO_INCREMENTAL=0 \
 	RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
 	LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \

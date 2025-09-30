@@ -61,8 +61,8 @@ services:
       timeout: 5s
       retries: 5
 
-  # Offchain Processor PostgreSQL (port 5434)
-  offchain_processor_db:
+  # Fossil API PostgreSQL (port 5434)
+  fossil_api_db:
     image: postgres:16
     environment:
       POSTGRES_USER: postgres
@@ -73,7 +73,7 @@ services:
     networks:
       - local-network
     volumes:
-      - offchain_processor_local_data:/var/lib/postgresql/data
+      - fossil_api_local_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -153,22 +153,22 @@ services:
       - local-network
     restart: unless-stopped
 
-  # Offchain Processor Service
+  # Fossil API Service
   fossil-api:
     build:
       context: .
-      dockerfile: docker/Dockerfile.offchain-processor
-    image: fossil-offchain-processor:latest
+      dockerfile: docker/Dockerfile.fossil-api
+    image: fossil-api:latest
     depends_on:
-      offchain_processor_db:
+      fossil_api_db:
         condition: service_healthy
       localstack:
         condition: service_healthy
     env_file:
       - .env.docker
     environment:
-      OFFCHAIN_PROCESSOR_DATABASE_URL: postgres://postgres:postgres@offchain_processor_db:5432/postgres
-      DATABASE_URL: postgres://postgres:postgres@offchain_processor_db:5432/postgres
+      OFFCHAIN_PROCESSOR_DATABASE_URL: postgres://postgres:postgres@fossil_api_db:5432/postgres
+      DATABASE_URL: postgres://postgres:postgres@fossil_api_db:5432/postgres
       AWS_ENDPOINT_URL: http://localstack:4566
       AWS_REGION: us-east-1
       AWS_ACCESS_KEY_ID: test
@@ -193,5 +193,5 @@ networks:
 
 volumes:
   proving_service_local_data:
-  offchain_processor_local_data:
+  fossil_api_local_data:
   localstack_local_data:
