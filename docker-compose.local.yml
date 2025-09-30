@@ -154,7 +154,7 @@ services:
     restart: unless-stopped
 
   # Offchain Processor Service
-  offchain-processor:
+  fossil-api:
     build:
       context: .
       dockerfile: docker/Dockerfile.offchain-processor
