@@ -38,7 +38,7 @@ Thumbs.db
 
 # Project specific
 proving-service/target/
-offchain-processor/target/
+fossil-api/target/
 
 # Common system files
 .DS_Store
@@ -54,7 +54,7 @@ crates/mmr-accumulator/db-instances/
 zkvm/.bonsai-env
 zkvm/.bonsay-env
 changes.diff
-offchain-processor/tarpaulin-report.html
+fossil-api/tarpaulin-report.html
 
 proving-service/mock_contracts/.env.katana
 

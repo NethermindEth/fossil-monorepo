@@ -3,19 +3,19 @@
 ## Project Overview
 This document outlines the detailed plan for completing Milestone 2 tasks for the Fossil monorepo. The codebase consists of two main services:
 - **Proving Service**: Handles proof generation and verification with SQS message queuing
-- **Offchain Processor**: Processes offchain data and interfaces with PitchLake (PL)
+- **Fossil API**: Processes offchain data and interfaces with PitchLake (PL)
 
 ## Task Analysis and Implementation Plan
 
 ### 1. External API endpoints (for PL) - 1 day
 
 **Current State:**
-- Offchain Processor has existing API endpoints at `offchain-processor/crates/server/src/lib.rs:47-71`
+- Fossil API has existing API endpoints at `fossil-api/crates/server/src/lib.rs:47-71`
 - Current endpoints: `/pricing_data` (POST, secured), `/health` (GET), `/api_key` (POST), `/job_status/{job_id}` (GET)
 - PitchLake integration exists in `get_pricing_data.rs:306-360` via HTTP calls
 
 **Implementation Plan:**
-- **File Locations**: `offchain-processor/crates/server/src/handlers/get_pricing_data.rs`, `offchain-processor/crates/server/src/lib.rs`
+- **File Locations**: `fossil-api/crates/server/src/handlers/get_pricing_data.rs`, `fossil-api/crates/server/src/lib.rs`
 - Review and enhance existing `/pricing_data` endpoint for PL requirements
 - Add any missing external endpoints needed for PL integration
 - Ensure proper error handling and response formats for external consumers
@@ -33,7 +33,7 @@ This document outlines the detailed plan for completing Milestone 2 tasks for th
 - Mock contracts exist in `proving-service/mock_contracts/` for StarkNet integration
 
 **Implementation Plan:**
-- **File Locations**: Create new module in `offchain-processor/crates/` or `proving-service/crates/`
+- **File Locations**: Create new module in `fossil-api/crates/` or `proving-service/crates/`
 - Implement blockchain client integration (likely Ethereum/StarkNet based on mock contracts)
 - Add chain reading functionality to fetch fee data and hashes
 - Integrate with existing database models for storing chain data
@@ -107,7 +107,7 @@ This document outlines the detailed plan for completing Milestone 2 tasks for th
 - No direct result callback to PitchLake found
 
 **Implementation Plan:**
-- **File Locations**: New callback handler in `proving-service/crates/message-handler/src/`, `offchain-processor/crates/server/src/handlers/`
+- **File Locations**: New callback handler in `proving-service/crates/message-handler/src/`, `fossil-api/crates/server/src/handlers/`
 - Implement result callback system to notify PitchLake of completion
 - Add webhook/callback endpoints for proof completion
 - Integrate with job status tracking system
@@ -128,7 +128,7 @@ This document outlines the detailed plan for completing Milestone 2 tasks for th
 **Implementation Plan:**
 - **File Locations**: `tests/` directory, integration test modules
 - Create comprehensive E2E test suites covering full workflow
-- Test PitchLake → Offchain Processor → Proving Service → Bonsai flow
+- Test PitchLake → Fossil API → Proving Service → Bonsai flow
 - Add performance and load testing
 - Implement test data generation and cleanup
 - Add CI/CD pipeline integration tests
@@ -162,7 +162,7 @@ This document outlines the detailed plan for completing Milestone 2 tasks for th
 **Current State:**
 - Dockerfiles exist for both services:
   - Proving Service: `proving-service/docker/Dockerfile`
-  - Offchain Processor: `offchain-processor/crates/server/Dockerfile`
+  - Fossil API: `fossil-api/crates/server/Dockerfile`
 - Docker Compose files for development and testing
 
 **Implementation Plan:**
