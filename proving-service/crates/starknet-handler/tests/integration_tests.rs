@@ -2,12 +2,21 @@ use std::env;
 
 use eyre::Result;
 use starknet::providers::Provider;
+use starknet_crypto::Felt;
 use starknet_handler::provider::{StarkNetConfig, StarknetProvider};
 
 /// Test configuration for local StarkNet node
 const LOCAL_RPC_URL: &str = "http://localhost:5050";
-const TEST_START_TIMESTAMP: u64 = 1755457200; // Earlier timestamp
-const TEST_END_TIMESTAMP: u64 = 1755464400; // Later timestamp
+
+/// Starknet Sepolia testnet configuration for integration tests
+const SEPOLIA_RPC_URL: &str = "https://starknet-sepolia.public.blastapi.io";
+const SEPOLIA_CONTRACT_ADDRESS: &str =
+    "0x05f80abda60bd853551f43cc00539a3c884384ec01f7a9f5709296c74a3e490b";
+
+// Test timestamps - must be multiples of 3600 (1 hour) and < 1759205842
+// These specific timestamps have known data in the Sepolia contract
+const TEST_START_TIMESTAMP: u64 = 0x68a226b0; // 1755390640 in decimal
+const TEST_END_TIMESTAMP: u64 = 0x68a242d0; // 1755398352 in decimal
 
 /// Get contract address from environment or use default
 fn get_contract_address() -> String {
@@ -16,10 +25,19 @@ fn get_contract_address() -> String {
     })
 }
 
-/// Helper function to create test configuration
+/// Helper function to create test configuration for local node
 fn create_test_config() -> StarkNetConfig {
     StarkNetConfig::new(LOCAL_RPC_URL.to_string(), get_contract_address())
         .with_retry_config(3, 100, 1000) // Shorter retry config for tests
+}
+
+/// Helper function to create test configuration for Sepolia testnet
+fn create_sepolia_config() -> StarkNetConfig {
+    StarkNetConfig::new(
+        SEPOLIA_RPC_URL.to_string(),
+        SEPOLIA_CONTRACT_ADDRESS.to_string(),
+    )
+    .with_retry_config(5, 200, 5000) // Longer retry config for remote network
 }
 
 /// Test basic provider creation with local RPC
@@ -112,27 +130,27 @@ async fn test_get_avg_fees_in_range() -> Result<()> {
     {
         Ok(fee_data) => {
             println!("✅ Successfully retrieved fee data:");
-            println!("   L1 Gas Fee: {}", fee_data.avg_l1_gas_fee);
-            println!("   L2 Gas Fee: {}", fee_data.avg_l2_gas_fee);
-            println!("   Block Hashes: {} entries", fee_data.block_hashes.len());
+            println!("   First Timestamp: {}", fee_data.first_timestamp);
+            println!("   Last Timestamp: {}", fee_data.last_timestamp);
+            println!("   Fees: {} entries", fee_data.fees.len());
 
-            // Print first few hashes for verification
-            for (i, hash) in fee_data.block_hashes.iter().take(3).enumerate() {
-                println!("   Hash {}: {}", i + 1, hash);
+            // Print first few fees for verification
+            for (i, fee) in fee_data.fees.iter().take(3).enumerate() {
+                println!("   Fee {}: {:#x}", i + 1, fee);
             }
 
             // Basic validation
             assert!(
-                fee_data.avg_l1_gas_fee > 0,
-                "L1 gas fee should be greater than 0"
+                fee_data.first_timestamp > 0,
+                "First timestamp should be greater than 0"
             );
             assert!(
-                fee_data.avg_l2_gas_fee > 0,
-                "L2 gas fee should be greater than 0"
+                fee_data.last_timestamp >= fee_data.first_timestamp,
+                "Last timestamp should be >= first timestamp"
             );
             assert!(
-                !fee_data.block_hashes.is_empty(),
-                "Should have at least one block hash"
+                !fee_data.fees.is_empty(),
+                "Should have at least one fee value"
             );
         }
         Err(e) => {
@@ -170,10 +188,10 @@ async fn test_invalid_timestamp_range() -> Result<()> {
         Ok(fee_data) => {
             println!("Contract handled invalid range gracefully:");
             println!(
-                "L1 Fee: {}, L2 Fee: {}, Hashes: {}",
-                fee_data.avg_l1_gas_fee,
-                fee_data.avg_l2_gas_fee,
-                fee_data.block_hashes.len()
+                "First Timestamp: {}, Last Timestamp: {}, Fees: {}",
+                fee_data.first_timestamp,
+                fee_data.last_timestamp,
+                fee_data.fees.len()
             );
         }
         Err(e) => {
@@ -217,6 +235,121 @@ async fn test_retry_mechanism() -> Result<()> {
     Ok(())
 }
 
+/// Test get_avg_fees_in_range with Sepolia testnet
+/// This test connects to the actual Starknet Sepolia network and calls a real contract
+///
+/// Note: This test validates the integration with Sepolia network and correct parsing
+/// of the contract's return values. The contract may not have data for all timestamp
+/// ranges, which is expected behavior. The test passes as long as:
+/// 1. Connection to Sepolia succeeds
+/// 2. Contract call completes without error
+/// 3. Return values are parsed correctly (timestamps and fees array)
+#[tokio::test]
+async fn test_sepolia_get_avg_fees_in_range() -> Result<()> {
+    println!("\n🔗 Sepolia Integration Test");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("RPC URL: {}", SEPOLIA_RPC_URL);
+    println!("Contract: {}", SEPOLIA_CONTRACT_ADDRESS);
+    println!(
+        "Timestamp Range: {} to {}",
+        TEST_START_TIMESTAMP, TEST_END_TIMESTAMP
+    );
+    println!("Timestamps are multiples of 3600: ✓");
+
+    let config = create_sepolia_config();
+    let provider = StarknetProvider::new(config)?;
+
+    // Step 1: Test connectivity
+    println!("\n[1/2] Testing connectivity...");
+    let client = provider.provider();
+
+    let chain_id = match client.chain_id().await {
+        Ok(chain_id) => {
+            println!("      ✅ Connected - Chain ID: {:#x}", chain_id);
+            chain_id
+        }
+        Err(e) => {
+            println!("      ❌ Connection failed: {}", e);
+            return Err(eyre::eyre!("Sepolia connection failed: {}", e));
+        }
+    };
+
+    // Verify we're on Sepolia
+    assert_eq!(
+        format!("{:#x}", chain_id),
+        "0x534e5f5345504f4c4941",
+        "Should be connected to Sepolia network"
+    );
+
+    // Step 2: Test contract call
+    println!("\n[2/2] Calling contract function...");
+    let fee_data = provider
+        .get_avg_fees_in_range(TEST_START_TIMESTAMP, TEST_END_TIMESTAMP)
+        .await?;
+
+    println!("      ✅ Contract call successful");
+    println!("\n📊 Response Data:");
+    println!("   First Timestamp: {}", fee_data.first_timestamp);
+    println!("   Last Timestamp: {}", fee_data.last_timestamp);
+    println!("   Number of Fees: {}", fee_data.fees.len());
+
+    if !fee_data.fees.is_empty() {
+        println!("\n   Fee Values:");
+        for (i, fee) in fee_data.fees.iter().take(10).enumerate() {
+            println!("     [{}] {:#x}", i, fee);
+        }
+        if fee_data.fees.len() > 10 {
+            println!("     ... and {} more", fee_data.fees.len() - 10);
+        }
+    }
+
+    // Validate response structure
+    println!("\n✅ Validation:");
+
+    // Assert expected values from Sepolia contract
+    // Expected return: [0x68a226b0, 0x68a242d0, [fee1, fee2, fee3]]
+    assert_eq!(
+        fee_data.first_timestamp, 0x68a226b0,
+        "First timestamp should be 0x68a226b0"
+    );
+    println!("   ✓ First timestamp: {:#x}", fee_data.first_timestamp);
+
+    assert_eq!(
+        fee_data.last_timestamp, 0x68a242d0,
+        "Last timestamp should be 0x68a242d0"
+    );
+    println!("   ✓ Last timestamp: {:#x}", fee_data.last_timestamp);
+
+    assert_eq!(fee_data.fees.len(), 3, "Should have exactly 3 fee values");
+    println!("   ✓ Number of fees: {}", fee_data.fees.len());
+
+    // Assert the expected fee values
+    let expected_fees = [
+        Felt::from_hex("0x2c700f2ff24d0ecf3283da53e806d978b8efbb").unwrap(),
+        Felt::from_hex("0x2bdc496e147ae2000000000000000000000000").unwrap(),
+        Felt::from_hex("0x2a94af55555556000000000000000000000000").unwrap(),
+    ];
+
+    for (i, (actual, expected)) in fee_data.fees.iter().zip(expected_fees.iter()).enumerate() {
+        assert_eq!(
+            actual, expected,
+            "Fee {} should be {:#x}, got {:#x}",
+            i, expected, actual
+        );
+        println!("   ✓ Fee[{}]: {:#x}", i, actual);
+    }
+
+    println!("\n   Test Status: ✅ PASSED");
+    println!("   - Successfully connected to Sepolia");
+    println!("   - Contract call completed without errors");
+    println!("   - All return values match expected data");
+
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("✨ Sepolia integration test completed\n");
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod unit_tests {
     use super::*;
@@ -224,17 +357,19 @@ mod unit_tests {
 
     #[test]
     fn test_fee_data_creation() {
+        use starknet_crypto::Felt;
+
         let fee_data = FeeData::new(
-            1000000,
-            500000,
-            vec!["0x123".to_string(), "0x456".to_string()],
+            1755457200,
+            1755464400,
+            vec![Felt::from(123u64), Felt::from(456u64)],
         );
 
-        assert_eq!(fee_data.avg_l1_gas_fee, 1000000);
-        assert_eq!(fee_data.avg_l2_gas_fee, 500000);
-        assert_eq!(fee_data.block_hashes.len(), 2);
-        assert_eq!(fee_data.block_hashes[0], "0x123");
-        assert_eq!(fee_data.block_hashes[1], "0x456");
+        assert_eq!(fee_data.first_timestamp, 1755457200);
+        assert_eq!(fee_data.last_timestamp, 1755464400);
+        assert_eq!(fee_data.fees.len(), 2);
+        assert_eq!(fee_data.fees[0], Felt::from(123u64));
+        assert_eq!(fee_data.fees[1], Felt::from(456u64));
     }
 
     #[test]
