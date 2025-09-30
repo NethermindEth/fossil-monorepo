@@ -116,16 +116,12 @@ curl -X POST http://localhost:3000/pricing_data \
   -H "Content-Type: application/json" \
   -H "X-API-Key: 724a0c8d-9fea-4c7c-97a0-1aea894a283e" \
   -d '{
-    "identifiers": ["0x50495443485f4c414b455f5631"],
+    "program_id": "PITCHLAKE_V1",
+    "vault_address": "0x07b0110e7230a20881e57804d68e640777f4b55b487321556682e550f93fec7c",
     "params": {
       "twap": [1672531200, 1672574400],
-      "volatility": [1672531200, 1672574400],
+      "max_return": [1672531200, 1672574400],
       "reserve_price": [1672531200, 1672574400]
-    },
-    "client_info": {
-      "client_address": "0x018df581fe0ee497a4a3595cf62aea0bafa7ba1a54a7dcbafca37bfada67c718",
-      "vault_address": "0x07b0110e7230a20881e57804d68e640777f4b55b487321556682e550f93fec7c",
-      "timestamp": 1741243059
     }
   }'
 ```
@@ -180,16 +176,12 @@ POST http://localhost:3000/webhook/{job_id}
 Request Format:
 ```json
 {
-  "identifiers": ["0x50495443485f4c414b455f5631"],
+  "program_id": "PITCHLAKE_V1",
+  "vault_address": "0x07b0110e7230a20881e57804d68e640777f4b55b487321556682e550f93fec7c",
   "params": {
     "twap": [1672531200, 1672574400],
-    "volatility": [1672531200, 1672574400],
+    "max_return": [1672531200, 1672574400],
     "reserve_price": [1672531200, 1672574400]
-  },
-  "client_info": {
-    "client_address": "0x018df581fe0ee497a4a3595cf62aea0bafa7ba1a54a7dcbafca37bfada67c718",
-    "vault_address": "0x07b0110e7230a20881e57804d68e640777f4b55b487321556682e550f93fec7c",
-    "timestamp": 1741243059
   }
 }
 ```
@@ -215,7 +207,7 @@ Response:
   "status": "Completed",
   "result": {
     "twap": 123.45,
-    "volatility": 67.89,
+    "max_return": 67.89,
     "reserve_price": 234.56
   },
   "created_at": "2024-01-15T10:30:00Z",

@@ -5,22 +5,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
 pub struct PitchLakeJobRequestParams {
     pub twap: (i64, i64),
-    pub volatility: (i64, i64),
+    pub max_return: (i64, i64),
     pub reserve_price: (i64, i64),
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct PitchLakeJobRequest {
-    pub identifiers: Vec<String>,
+    pub program_id: String,
     pub params: PitchLakeJobRequestParams,
-    pub client_info: ClientInfo, // New field
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct ClientInfo {
-    pub client_address: String,
     pub vault_address: String,
-    pub timestamp: i64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
