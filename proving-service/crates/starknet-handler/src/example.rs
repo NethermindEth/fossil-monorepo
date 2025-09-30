@@ -48,22 +48,19 @@ pub async fn example_usage() -> Result<()> {
     {
         Ok(fee_data) => {
             info!(
-                avg_l1_gas_fee = fee_data.avg_l1_gas_fee,
-                avg_l2_gas_fee = fee_data.avg_l2_gas_fee,
-                num_block_hashes = fee_data.block_hashes.len(),
+                first_timestamp = fee_data.first_timestamp,
+                last_timestamp = fee_data.last_timestamp,
+                num_fees = fee_data.fees.len(),
                 "Successfully retrieved fee data"
             );
 
-            // Print first few block hashes as example
-            for (i, hash) in fee_data.block_hashes.iter().take(5).enumerate() {
-                info!(index = i, block_hash = %hash, "Block hash");
+            // Print first few fees as example
+            for (i, fee) in fee_data.fees.iter().take(5).enumerate() {
+                info!(index = i, fee = %format!("{:#x}", fee), "Fee value");
             }
 
-            if fee_data.block_hashes.len() > 5 {
-                info!(
-                    "... and {} more block hashes",
-                    fee_data.block_hashes.len() - 5
-                );
+            if fee_data.fees.len() > 5 {
+                info!("... and {} more fee values", fee_data.fees.len() - 5);
             }
         }
         Err(e) => {

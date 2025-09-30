@@ -34,32 +34,33 @@ mod tests {
             .expect("Should get mock fee data");
 
         assert_eq!(
-            fee_data.block_hashes.len(),
+            fee_data.fees.len(),
             5760,
             "Should return exactly 5760 mock fee values"
         );
         assert_eq!(
-            fee_data.avg_l1_gas_fee, 1_000_000_000u64,
-            "Should return mock L1 fee"
+            fee_data.first_timestamp, start_timestamp,
+            "Should return start timestamp"
         );
         assert_eq!(
-            fee_data.avg_l2_gas_fee, 500_000_000u64,
-            "Should return mock L2 fee"
+            fee_data.last_timestamp, end_timestamp,
+            "Should return end timestamp"
         );
 
-        // Verify first few values are valid hex
-        for (i, hash) in fee_data.block_hashes.iter().take(10).enumerate() {
+        // Verify first few values are valid Felt objects
+        for (i, fee) in fee_data.fees.iter().take(10).enumerate() {
+            let hex_str = format!("{:#x}", fee);
             assert!(
-                hash.starts_with("0x"),
-                "Hash {} should start with 0x: {}",
+                hex_str.starts_with("0x"),
+                "Fee {} should convert to hex starting with 0x: {}",
                 i,
-                hash
+                hex_str
             );
             assert!(
-                hash.len() > 2,
-                "Hash {} should have content after 0x: {}",
+                hex_str.len() > 2,
+                "Fee {} should have content after 0x: {}",
                 i,
-                hash
+                hex_str
             );
         }
 

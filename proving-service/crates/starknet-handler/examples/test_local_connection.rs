@@ -61,18 +61,18 @@ async fn main() -> Result<()> {
     {
         Ok(fee_data) => {
             println!("🎉 Successfully retrieved fee data!");
-            println!("   Average L1 Gas Fee: {}", fee_data.avg_l1_gas_fee);
-            println!("   Average L2 Gas Fee: {}", fee_data.avg_l2_gas_fee);
-            println!("   Number of Block Hashes: {}", fee_data.block_hashes.len());
+            println!("   First Timestamp: {}", fee_data.first_timestamp);
+            println!("   Last Timestamp: {}", fee_data.last_timestamp);
+            println!("   Number of Fees: {}", fee_data.fees.len());
 
-            // Show first few hashes
-            if !fee_data.block_hashes.is_empty() {
-                println!("   Sample Block Hashes:");
-                for (i, hash) in fee_data.block_hashes.iter().take(3).enumerate() {
-                    println!("     {}: {}", i + 1, hash);
+            // Show first few fees
+            if !fee_data.fees.is_empty() {
+                println!("   Sample Fee Values:");
+                for (i, fee) in fee_data.fees.iter().take(3).enumerate() {
+                    println!("     {}: {:#x}", i + 1, fee);
                 }
-                if fee_data.block_hashes.len() > 3 {
-                    println!("     ... and {} more", fee_data.block_hashes.len() - 3);
+                if fee_data.fees.len() > 3 {
+                    println!("     ... and {} more", fee_data.fees.len() - 3);
                 }
             }
         }
