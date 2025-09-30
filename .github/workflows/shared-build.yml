@@ -35,8 +35,8 @@ jobs:
       - name: Check sqlx metadata for OP
         if: inputs.component == 'op'
         run: |
-          echo "DATABASE_URL=${DATABASE_URL}" 
-          cd offchain-processor && cargo sqlx prepare --workspace --check
+          echo "DATABASE_URL=${DATABASE_URL}"
+          cd fossil-api && cargo sqlx prepare --workspace --check
       
       # Build step
       - name: Build
@@ -44,5 +44,5 @@ jobs:
           if [ "${{ inputs.component }}" == "ps" ]; then
             cd proving-service && cargo build --verbose
           else
-            cd offchain-processor && cargo build --verbose
+            cd fossil-api && cargo build --verbose
           fi 

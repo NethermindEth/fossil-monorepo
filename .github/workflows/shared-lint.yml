@@ -42,7 +42,7 @@ jobs:
           if [ "${{ inputs.component }}" == "ps" ]; then
             cd proving-service && cargo fmt --all -- --check
           else
-            cd offchain-processor && cargo fmt --all -- --check
+            cd fossil-api && cargo fmt --all -- --check
           fi
       
       - name: Run codespell
@@ -50,13 +50,13 @@ jobs:
           if [ "${{ inputs.component }}" == "ps" ]; then
             cd proving-service && codespell
           else
-            cd offchain-processor && codespell --skip="./Makefile" --ignore-words-list="nd,te,ue,Nd,Te,Ue"
+            cd fossil-api && codespell --skip="./Makefile" --ignore-words-list="nd,te,ue,Nd,Te,Ue"
           fi
       
       # OP-specific steps
       - name: Check sqlx data for OP
         if: inputs.component == 'op'
-        run: cd offchain-processor && cargo sqlx prepare --workspace --check || cargo sqlx prepare
+        run: cd fossil-api && cargo sqlx prepare --workspace --check || cargo sqlx prepare
       
       # Clippy for both components with specific settings
       - name: Run clippy
@@ -124,7 +124,7 @@ jobs:
             -W clippy::unwrap_used \
             -W clippy::expect_used
           else
-            cd offchain-processor && cargo +nightly clippy \
+            cd fossil-api && cargo +nightly clippy \
             --no-deps \
             --workspace \
             -- \
