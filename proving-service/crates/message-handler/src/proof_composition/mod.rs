@@ -161,48 +161,26 @@ impl ProofProvider for BonsaiProofProvider {
             // All fees must come from onchain - no padding or artificial generation!
 
             // Validate that we have sufficient onchain data
-            if fee_data.block_hashes.len() < 5760 {
+            if fee_data.fees.len() < 5760 {
                 return Err(eyre!(
                     "Insufficient onchain fee data: got {} values, need exactly 5760 (8 months of hourly data). \
                 Time range: {} to {}. Please ensure the fossil_store contract has sufficient historical data.",
-                    fee_data.block_hashes.len(),
+                    fee_data.fees.len(),
                     overall_start,
                     overall_end
                 ));
             }
 
-            // Convert the first 5760 block hashes to the format expected by the hashing system
-            let raw_input: Vec<String> = fee_data
-                .block_hashes
+            // Take exactly 5760 fee values from the onchain data
+            let raw_input: Vec<Felt> = fee_data
+                .fees
                 .iter()
                 .take(5760) // Take exactly 5760 values
                 .cloned()
                 .collect();
 
-            // Validate that all hashes are valid hex strings
-            for (i, hash) in raw_input.iter().enumerate() {
-                if Felt::from_hex(hash).is_err() {
-                    return Err(eyre!(
-                        "Invalid hex hash at index {}: '{}'. All onchain fee data must be valid hex values.",
-                        i,
-                        hash
-                    ));
-                }
-            }
-
-            // Convert onchain fee data to felts for hashing
-            let mut res = Vec::with_capacity(5760);
-            for hash_str in &raw_input {
-                let felt = Felt::from_hex(hash_str).map_err(|e| {
-                    eyre!(
-                        "Failed to convert onchain fee data '{}' to Felt: {}",
-                        hash_str,
-                        e
-                    )
-                })?;
-                res.push(felt);
-            }
-            let (hashing_receipt, hashing_res) = hash_felts(HashingFeltInput { inputs: res });
+            // Use the fee data directly for hashing (already as Felts)
+            let (hashing_receipt, hashing_res) = hash_felts(HashingFeltInput { inputs: raw_input });
 
             let data_8_months = hashing_res.f64_inputs;
             let data = data_8_months[data_8_months.len().saturating_sub(2160)..].to_vec();
@@ -637,7 +615,8 @@ impl BonsaiProofProvider {
             let (vault_address, timestamp) = if let Some(job) = job_context {
                 tracing::info!(
                     "🔍 Debug job context: vault_address={:?}, vault_timestamp={:?}",
-                    job.vault_address, job.vault_timestamp
+                    job.vault_address,
+                    job.vault_timestamp
                 );
                 if let (Some(vault_addr), Some(vault_ts)) =
                     (&job.vault_address, job.vault_timestamp)
