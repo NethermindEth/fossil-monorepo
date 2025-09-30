@@ -1,0 +1,93 @@
+use db_access::models::JobStatus;
+use serde::{Deserialize, Serialize};
+
+// timestamp ranges for each sub-job calculation
+#[derive(Debug, Default, Deserialize, Serialize, Clone)]
+pub struct PitchLakeJobRequestParams {
+    pub twap: (i64, i64),
+    pub volatility: (i64, i64),
+    pub reserve_price: (i64, i64),
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct PitchLakeJobRequest {
+    pub identifiers: Vec<String>,
+    pub params: PitchLakeJobRequestParams,
+    pub client_info: ClientInfo, // New field
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ClientInfo {
+    pub client_address: String,
+    pub vault_address: String,
+    pub timestamp: i64,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct JobResponse {
+    pub job_id: String,
+    pub message: Option<String>,
+    pub status: Option<JobStatus>,
+    pub vault_address: Option<String>,
+    pub expected_timestamp: Option<i64>,
+    pub l1_data: Option<serde_json::Value>,
+    pub on_chain_confirmation: Option<serde_json::Value>,
+}
+
+impl JobResponse {
+    pub const fn new(job_id: String, message: Option<String>, status: Option<JobStatus>) -> Self {
+        Self {
+            job_id,
+            message,
+            status,
+            vault_address: None,
+            expected_timestamp: None,
+            l1_data: None,
+            on_chain_confirmation: None,
+        }
+    }
+
+    pub fn from_job_request(job: &db_access::models::JobRequest, message: Option<String>) -> Self {
+        Self {
+            job_id: job.job_id.clone(),
+            message,
+            status: Some(job.status.clone()),
+            vault_address: job.vault_address.clone(),
+            expected_timestamp: job.expected_timestamp,
+            l1_data: job.l1_data.clone(),
+            on_chain_confirmation: job.on_chain_confirmation.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ErrorResponse {
+    pub error: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum GetJobStatusResponseEnum {
+    Success(JobResponse),
+    Error(ErrorResponse),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct JobResultResponse {
+    pub job_id: String,
+    pub status: JobStatus,
+    pub result: Option<serde_json::Value>,
+    pub created_at: Option<String>,
+    pub completed_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BatchJobStatusRequest {
+    pub job_ids: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BatchJobStatusResponse {
+    pub jobs: Vec<JobResultResponse>,
+    pub not_found: Vec<String>,
+}
