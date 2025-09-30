@@ -131,8 +131,11 @@ where
 
                 // Only handle RequestProof jobs
                 let job = if let Job::RequestProof(job) = job {
-                    tracing::info!("🔍 Received RequestProof job - vault_address: {:?}, vault_timestamp: {:?}",
-                                  job.vault_address, job.vault_timestamp);
+                    tracing::info!(
+                        "🔍 Received RequestProof job - vault_address: {:?}, vault_timestamp: {:?}",
+                        job.vault_address,
+                        job.vault_timestamp
+                    );
                     job
                 } else {
                     // Delete non-RequestProof messages
