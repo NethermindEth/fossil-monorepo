@@ -17,20 +17,22 @@ use starknet::core::types::U256;
 use starknet_crypto::Felt;
 use tracing::{debug, instrument};
 
-/// Represents the average fees and hash data returned from the fossil_store contract
+/// Represents the fee data returned from the fossil_store contract
+/// The contract returns (first_timestamp, last_timestamp, Array<felt252>)
+/// where the Array contains the actual fee values
 #[derive(Clone, Debug)]
 pub struct FeeData {
-    pub avg_l1_gas_fee: u64,
-    pub avg_l2_gas_fee: u64,
-    pub block_hashes: Vec<String>,
+    pub first_timestamp: u64,
+    pub last_timestamp: u64,
+    pub fees: Vec<Felt>,
 }
 
 impl FeeData {
-    pub fn new(avg_l1_gas_fee: u64, avg_l2_gas_fee: u64, block_hashes: Vec<String>) -> Self {
+    pub fn new(first_timestamp: u64, last_timestamp: u64, fees: Vec<Felt>) -> Self {
         Self {
-            avg_l1_gas_fee,
-            avg_l2_gas_fee,
-            block_hashes,
+            first_timestamp,
+            last_timestamp,
+            fees,
         }
     }
 }
@@ -99,13 +101,13 @@ mod tests {
     #[test]
     fn test_fee_data_creation() {
         let fee_data = FeeData::new(
-            1000000,
-            500000,
-            vec!["0x123".to_string(), "0x456".to_string()],
+            1755457200,
+            1755464400,
+            vec![Felt::from(123u64), Felt::from(456u64)],
         );
 
-        assert_eq!(fee_data.avg_l1_gas_fee, 1000000);
-        assert_eq!(fee_data.avg_l2_gas_fee, 500000);
-        assert_eq!(fee_data.block_hashes.len(), 2);
+        assert_eq!(fee_data.first_timestamp, 1755457200);
+        assert_eq!(fee_data.last_timestamp, 1755464400);
+        assert_eq!(fee_data.fees.len(), 2);
     }
 }

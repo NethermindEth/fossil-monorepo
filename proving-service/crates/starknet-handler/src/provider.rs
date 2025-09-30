@@ -177,7 +177,7 @@ impl StarknetProvider {
     }
 
     /// Calls the get_avg_fees_in_range function on the fossil_store contract
-    /// Returns: (avg_l1_gas_fee: u64, avg_l2_gas_fee: u64, block_hashes: Array<felt252>)
+    /// Returns: (first_timestamp: u64, last_timestamp: u64, fees: Array<felt252>)
     #[instrument(skip(self), level = "debug")]
     pub async fn get_avg_fees_in_range(
         &self,
@@ -195,20 +195,16 @@ impl StarknetProvider {
         if self.config.use_mock_data {
             info!("Using mock data for fee range request");
             let mock_generator = MockFeeDataGenerator::default();
-            let block_hashes = mock_generator.generate_mock_fee_data();
-
-            // Generate mock average fees
-            let avg_l1_gas_fee = 1_000_000_000u64; // 1 gwei
-            let avg_l2_gas_fee = 500_000_000u64; // 0.5 gwei
+            let fees = mock_generator.generate_mock_fee_data_as_felts()?;
 
             info!(
-                avg_l1_gas_fee,
-                avg_l2_gas_fee,
-                num_hashes = block_hashes.len(),
-                "Generated mock average fees and block hashes"
+                first_timestamp = start_timestamp,
+                last_timestamp = end_timestamp,
+                num_fees = fees.len(),
+                "Generated mock fee data"
             );
 
-            return Ok(FeeData::new(avg_l1_gas_fee, avg_l2_gas_fee, block_hashes));
+            return Ok(FeeData::new(start_timestamp, end_timestamp, fees));
         }
 
         self.with_retry("get_avg_fees_in_range", || async {
@@ -230,35 +226,51 @@ impl StarknetProvider {
             // fn get_avg_fees_in_range(
             //     self: @TContractState, start_timestamp: u64, end_timestamp: u64,
             // ) -> (u64, u64, Array<felt252>);
+            // Returns: (first_timestamp, last_timestamp, array_length, ...array_elements)
+            //
+            // Note: Cairo arrays are serialized with a length prefix when returned via RPC
 
-            if data.len() < 2 {
+            if data.len() < 3 {
                 return Err(eyre::eyre!(
-                    "Invalid response data: expected at least 2 elements"
+                    "Invalid response data: expected at least 3 elements (timestamp, timestamp, array_len), got {}",
+                    data.len()
                 ));
             }
 
-            let avg_l1_gas_fee = data[0]
+            let first_timestamp = data[0]
                 .to_u64()
-                .ok_or_else(|| eyre::eyre!("Failed to convert avg_l1_gas_fee to u64"))?;
+                .ok_or_else(|| eyre::eyre!("Failed to convert first_timestamp to u64"))?;
 
-            let avg_l2_gas_fee = data[1]
+            let last_timestamp = data[1]
                 .to_u64()
-                .ok_or_else(|| eyre::eyre!("Failed to convert avg_l2_gas_fee to u64"))?;
+                .ok_or_else(|| eyre::eyre!("Failed to convert last_timestamp to u64"))?;
 
-            // The rest of the data is the Array<felt252> of block hashes
-            let block_hashes: Vec<String> = data[2..]
-                .iter()
-                .map(|felt| format!("{:#x}", felt))
-                .collect();
+            // data[2] is the array length, data[3..] are the actual array elements
+            let array_len = data[2]
+                .to_u64()
+                .ok_or_else(|| eyre::eyre!("Failed to convert array length to u64"))?;
+
+            // Extract the fee array elements (skip first 3: two timestamps + array length)
+            let fees: Vec<Felt> = data[3..].to_vec();
+
+            // Validate that the array length matches the actual number of elements
+            if fees.len() != array_len as usize {
+                warn!(
+                    "Array length mismatch: declared {} but got {} elements",
+                    array_len,
+                    fees.len()
+                );
+            }
 
             info!(
-                avg_l1_gas_fee,
-                avg_l2_gas_fee,
-                num_hashes = block_hashes.len(),
-                "Retrieved average fees and block hashes"
+                first_timestamp,
+                last_timestamp,
+                num_fees = fees.len(),
+                raw_data_len = data.len(),
+                "Retrieved fee data from contract"
             );
 
-            Ok(FeeData::new(avg_l1_gas_fee, avg_l2_gas_fee, block_hashes))
+            Ok(FeeData::new(first_timestamp, last_timestamp, fees))
         })
         .await
     }
@@ -307,18 +319,38 @@ impl StarknetProvider {
                 )
                 .await?;
 
-            // For raw fee data, we expect just the Array<felt252> without the tuple wrapper
-            // This assumes the fossil store interface returns just the fee data
-            if data.is_empty() {
-                return Err(eyre::eyre!("No fee data returned from fossil store"));
+            // Contract returns (first_timestamp: u64, last_timestamp: u64, array_len, ...array_elements)
+            // We only need the array elements for raw fee processing
+            if data.len() < 3 {
+                return Err(eyre::eyre!(
+                    "Invalid response data: expected at least 3 elements (first_ts, last_ts, array_len)"
+                ));
+            }
+
+            let array_len = data[2]
+                .to_u64()
+                .ok_or_else(|| eyre::eyre!("Failed to convert array length to u64"))?;
+
+            // Skip the first three elements (two timestamps + array length) and get the fee array
+            let raw_fees = data[3..].to_vec();
+
+            // Validate that the array length matches
+            if raw_fees.len() != array_len as usize {
+                warn!(
+                    "Array length mismatch in raw fees: declared {} but got {} elements",
+                    array_len,
+                    raw_fees.len()
+                );
             }
 
             info!(
-                num_fees = data.len(),
+                first_timestamp = data[0].to_u64().unwrap_or(0),
+                last_timestamp = data[1].to_u64().unwrap_or(0),
+                num_fees = raw_fees.len(),
                 "Retrieved raw fee data for RISC0 processing"
             );
 
-            Ok(data)
+            Ok(raw_fees)
         })
         .await
     }
