@@ -123,22 +123,27 @@ impl BonsaiProofProvider {
         // The system expects exactly 5760 fee values (8 months of hourly data)
         // All fees must come from onchain - no padding or artificial generation!
 
+        // NOTE: POC LIMITATION - Currently using 2 months (1440 hours) instead of 8 months (5760 hours)
+        // due to limited verified onchain data (block 566272). Production requires full 8 months.
+        const REQUIRED_DATA_POINTS: usize = 1440; // 2 months * 30 days * 24 hours (should be 5760 for 8 months)
+
         // Validate that we have sufficient onchain data
-        if fee_data.fees.len() < 5760 {
+        if fee_data.fees.len() < REQUIRED_DATA_POINTS {
             return Err(eyre!(
-                "Insufficient onchain fee data: got {} values, need exactly 5760 (8 months of hourly data). \
+                "Insufficient onchain fee data: got {} values, need exactly {} (2 months of hourly data for POC, 8 months required for production). \
             Time range: {} to {}. Please ensure the fossil_store contract has sufficient historical data.",
                 fee_data.fees.len(),
+                REQUIRED_DATA_POINTS,
                 overall_start,
                 overall_end
             ));
         }
 
-        // Take exactly 5760 fee values from the onchain data
+        // NOTE: POC LIMITATION - Taking 1440 values (2 months) instead of 5760 (8 months)
         let raw_input: Vec<Felt> = fee_data
             .fees
             .iter()
-            .take(5760) // Take exactly 5760 values
+            .take(REQUIRED_DATA_POINTS)
             .cloned()
             .collect();
 
@@ -265,7 +270,8 @@ impl BonsaiProofProvider {
             intercept: res.intercept,
             reserve_price: res.reserve_price,
             tolerance: floating_point_tolerance,
-            data_length: 2160,
+            // NOTE: POC LIMITATION - Using 720 (1 month) instead of 2160 (3 months) to match available data
+            data_length: 720, // Should be 2160 for production (3 months of hourly data)
         };
         let simulate_price_task =
             tokio::spawn(async move { simulate_price_verify_position(simulate_price_input) });
@@ -304,7 +310,8 @@ impl BonsaiProofProvider {
         ProofCompositionInput {
             data_8_months,
             data_8_months_hash,
-            data_8_months_start_timestamp: overall_start - 8 * 30 * 24 * 3600,
+            // NOTE: POC LIMITATION - Using 2 months instead of 8 months for timestamp calculation
+            data_8_months_start_timestamp: overall_start - 2 * 30 * 24 * 3600, // 2 months before start (should be 8 months)
             data_8_months_end_timestamp: overall_start,
             start_timestamp: overall_start,
             end_timestamp: overall_end,
@@ -412,7 +419,10 @@ impl ProofProvider for BonsaiProofProvider {
             let provider = StarknetProvider::new(config)?;
             let hashing_provider = HashingProvider::from_env()
                 .map_err(|e| eyre!("Failed to initialize HashingProvider: {}", e))?;
-            let hashing_service = HashingService::new(hashing_provider, 5760, 180);
+
+            // NOTE: POC LIMITATION - Using 1440 data points (2 months) instead of 5760 (8 months)
+            // due to limited verified onchain data (block 566272)
+            let hashing_service = HashingService::new(hashing_provider, 1440, 180);
 
             // Get the overall timestamp range
             let (overall_start, overall_end) = timestamp_ranges.overall_range();
@@ -442,6 +452,9 @@ impl ProofProvider for BonsaiProofProvider {
                 Self::fetch_and_validate_fee_data(&provider, overall_start, overall_end).await?;
 
             // Generate basic sub-proofs
+            // NOTE: POC LIMITATION - Variable names reference "8_months" and "3_months" but actually
+            // contain 2 months and 1 month of data respectively due to limited onchain data.
+            // Production requires full 8 months (5760 hours) and 3 months (2160 hours) subset.
             let data_8_months_temp: Vec<f64>;
             let data_3_months: Vec<f64>;
             {
@@ -449,9 +462,12 @@ impl ProofProvider for BonsaiProofProvider {
                 let (_, hashing_res_temp) = hash_felts(HashingFeltInput {
                     inputs: raw_input.clone(),
                 });
-                data_8_months_temp = hashing_res_temp.f64_inputs;
+                data_8_months_temp = hashing_res_temp.f64_inputs; // Actually 2 months (1440 hours) in POC
+
+                // NOTE: POC LIMITATION - Using 720 hours (1 month) instead of 2160 hours (3 months)
+                // Extract last 720 values from the 1440 available (last 1 month from 2 months total)
                 data_3_months =
-                    data_8_months_temp[data_8_months_temp.len().saturating_sub(2160)..].to_vec();
+                    data_8_months_temp[data_8_months_temp.len().saturating_sub(720)..].to_vec();
             }
 
             let (
@@ -463,6 +479,7 @@ impl ProofProvider for BonsaiProofProvider {
                 twap_original,
             ) = Self::generate_basic_sub_proofs(raw_input, &data_3_months)?;
 
+            // NOTE: POC LIMITATION - data_8_months contains 1440 values (2 months) instead of 5760 (8 months)
             let data_8_months = hashing_res.f64_inputs;
 
             // Generate reserve price sub-proofs in parallel
@@ -495,7 +512,7 @@ impl ProofProvider for BonsaiProofProvider {
             // Log ProofCompositionInput details for verification
             tracing::info!("📊 ProofCompositionInput prepared and ready for real proof method:");
             tracing::info!(
-                "   • data_8_months: {} values (need 5760) ✓",
+                "   • data_8_months: {} values (POC: using 1440 for 2 months, production needs 5760 for 8 months)",
                 composition_input.data_8_months.len()
             );
             tracing::info!(
@@ -643,8 +660,9 @@ impl ProofProvider for BonsaiProofProvider {
                         0x12345678, 0x23456789, 0x3456789a, 0x456789ab, 0x56789abc, 0x6789abcd,
                         0x789abcde, 0x89abcdef,
                     ], // Mock hash of fee data
+                    // NOTE: POC LIMITATION - Using 2 months instead of 8 months for timestamp calculation
                     data_8_months_start_timestamp: timestamp_ranges.overall_range().0
-                        - 8 * 30 * 24 * 3600, // 8 months before start
+                        - 2 * 30 * 24 * 3600, // 2 months before start (should be 8 months for production)
                     data_8_months_end_timestamp: timestamp_ranges.overall_range().0, // Up to the start of analysis period
                     start_timestamp: timestamp_ranges.overall_range().0,
                     end_timestamp: timestamp_ranges.overall_range().1,
