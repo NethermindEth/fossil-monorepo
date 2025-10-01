@@ -23,9 +23,21 @@ mod tests {
 
         let provider = StarknetProvider::new(config).expect("Failed to create provider");
 
-        // Test timestamps
-        let end_timestamp = 1700000000u64; // Fixed timestamp for reproducible tests
-        let start_timestamp = end_timestamp - (8 * 30 * 24 * 3600); // ~8 months ago
+        // Test timestamps - use hour boundaries (multiples of 3600)
+        let end_timestamp = 1699999200u64; // Fixed timestamp on hour boundary for reproducible tests
+        let start_timestamp = end_timestamp - (8 * 30 * 24 * 3600); // ~8 months ago (also on hour boundary)
+
+        // Verify timestamps are on hour boundaries
+        assert_eq!(
+            start_timestamp % 3600,
+            0,
+            "start_timestamp should be on hour boundary"
+        );
+        assert_eq!(
+            end_timestamp % 3600,
+            0,
+            "end_timestamp should be on hour boundary"
+        );
 
         // Test get_avg_fees_in_range
         let fee_data = provider

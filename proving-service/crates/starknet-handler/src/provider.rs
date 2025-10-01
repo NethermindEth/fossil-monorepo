@@ -21,6 +21,17 @@ const DEFAULT_MAX_RETRIES: u32 = 5;
 const DEFAULT_INITIAL_BACKOFF_MS: u64 = 100;
 const DEFAULT_MAX_BACKOFF_MS: u64 = 10000; // 10 seconds
 
+// Timestamp normalization
+const HOUR_IN_SECONDS: u64 = 3600;
+
+/// Normalizes a timestamp to the nearest hour boundary (rounds down)
+/// Returns (normalized_timestamp, was_normalized)
+fn normalize_timestamp(timestamp: u64) -> (u64, bool) {
+    let normalized = (timestamp / HOUR_IN_SECONDS) * HOUR_IN_SECONDS;
+    let was_normalized = normalized != timestamp;
+    (normalized, was_normalized)
+}
+
 /// Configuration for StarkNet RPC connection
 #[derive(Clone, Debug)]
 pub struct StarkNetConfig {
@@ -184,6 +195,17 @@ impl StarknetProvider {
         start_timestamp: u64,
         end_timestamp: u64,
     ) -> Result<FeeData> {
+        // Normalize timestamps to hour boundaries (round down to nearest 3600)
+        let (start_timestamp, start_normalized) = normalize_timestamp(start_timestamp);
+        let (end_timestamp, end_normalized) = normalize_timestamp(end_timestamp);
+
+        if start_normalized || end_normalized {
+            warn!(
+                "Timestamps normalized to hour boundaries: start={} (normalized={}), end={} (normalized={})",
+                start_timestamp, start_normalized, end_timestamp, end_normalized
+            );
+        }
+
         debug!(
             start_timestamp,
             end_timestamp,
@@ -283,6 +305,17 @@ impl StarknetProvider {
         start_timestamp: u64,
         end_timestamp: u64,
     ) -> Result<Vec<Felt>> {
+        // Normalize timestamps to hour boundaries (round down to nearest 3600)
+        let (start_timestamp, start_normalized) = normalize_timestamp(start_timestamp);
+        let (end_timestamp, end_normalized) = normalize_timestamp(end_timestamp);
+
+        if start_normalized || end_normalized {
+            warn!(
+                "Timestamps normalized to hour boundaries: start={} (normalized={}), end={} (normalized={})",
+                start_timestamp, start_normalized, end_timestamp, end_normalized
+            );
+        }
+
         debug!(
             start_timestamp,
             end_timestamp,
@@ -359,6 +392,16 @@ impl StarknetProvider {
     /// Returns the cryptographic hash used for data integrity verification in RISC0
     #[instrument(skip(self), level = "debug")]
     pub async fn get_verification_hash(&self, start_timestamp: u64) -> Result<[u32; 8]> {
+        // Normalize timestamp to hour boundary (round down to nearest 3600)
+        let (start_timestamp, was_normalized) = normalize_timestamp(start_timestamp);
+
+        if was_normalized {
+            warn!(
+                "Timestamp normalized to hour boundary: {} (was normalized)",
+                start_timestamp
+            );
+        }
+
         debug!(
             start_timestamp,
             use_mock_data = self.config.use_mock_data,
@@ -432,6 +475,17 @@ impl StarknetProvider {
         start_timestamp: u64,
         end_timestamp: u64,
     ) -> Result<FeeDataWithHash> {
+        // Normalize timestamps to hour boundaries (round down to nearest 3600)
+        let (start_timestamp, start_normalized) = normalize_timestamp(start_timestamp);
+        let (end_timestamp, end_normalized) = normalize_timestamp(end_timestamp);
+
+        if start_normalized || end_normalized {
+            warn!(
+                "Timestamps normalized to hour boundaries: start={} (normalized={}), end={} (normalized={})",
+                start_timestamp, start_normalized, end_timestamp, end_normalized
+            );
+        }
+
         debug!(
             start_timestamp,
             end_timestamp, "Fetching fees with verification for RISC0 proof generation"
@@ -498,6 +552,17 @@ impl StarknetProvider {
         start_timestamp: u64,
         end_timestamp: u64,
     ) -> Result<()> {
+        // Normalize timestamps to hour boundaries (round down to nearest 3600)
+        let (start_timestamp, start_normalized) = normalize_timestamp(start_timestamp);
+        let (end_timestamp, end_normalized) = normalize_timestamp(end_timestamp);
+
+        if start_normalized || end_normalized {
+            warn!(
+                "Timestamps normalized to hour boundaries: start={} (normalized={}), end={} (normalized={})",
+                start_timestamp, start_normalized, end_timestamp, end_normalized
+            );
+        }
+
         debug!(
             start_timestamp,
             end_timestamp, "Ensuring hashes exist for proof generation"
@@ -580,6 +645,16 @@ impl StarknetProvider {
 
     /// Gets hash for a single batch (180 fees)
     async fn get_batch_hash(&self, start_timestamp: u64) -> Result<[u32; 8]> {
+        // Normalize timestamp to hour boundary (round down to nearest 3600)
+        let (start_timestamp, was_normalized) = normalize_timestamp(start_timestamp);
+
+        if was_normalized {
+            warn!(
+                "Timestamp normalized to hour boundary in get_batch_hash: {}",
+                start_timestamp
+            );
+        }
+
         let hash_store_address = self
             .hash_store_address()
             .ok_or_else(|| eyre::eyre!("Hash store address not configured"))?;
@@ -692,5 +767,29 @@ mod tests {
         );
         let provider = StarknetProvider::new(config);
         assert!(provider.is_err());
+    }
+
+    #[test]
+    fn test_normalize_timestamp_exact_hour() {
+        let timestamp = 3600 * 100; // Exactly 100 hours
+        let (normalized, was_normalized) = normalize_timestamp(timestamp);
+        assert_eq!(normalized, timestamp);
+        assert!(!was_normalized);
+    }
+
+    #[test]
+    fn test_normalize_timestamp_rounds_down() {
+        let timestamp = 3600 * 100 + 1800; // 100.5 hours
+        let (normalized, was_normalized) = normalize_timestamp(timestamp);
+        assert_eq!(normalized, 3600 * 100);
+        assert!(was_normalized);
+    }
+
+    #[test]
+    fn test_normalize_timestamp_near_hour() {
+        let timestamp = 3600 * 100 + 3599; // Almost 101 hours
+        let (normalized, was_normalized) = normalize_timestamp(timestamp);
+        assert_eq!(normalized, 3600 * 100);
+        assert!(was_normalized);
     }
 }

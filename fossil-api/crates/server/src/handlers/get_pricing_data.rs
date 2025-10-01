@@ -139,7 +139,8 @@ async fn handle_new_job_request(
     job_id: String,
     payload: PitchLakeJobRequest,
 ) -> (StatusCode, Json<JobResponse>) {
-    let current_timestamp = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+    let current_timestamp = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
+    {
         Ok(duration) => duration.as_secs() as i64,
         Err(e) => {
             tracing::error!("Failed to get current timestamp: {:?}", e);

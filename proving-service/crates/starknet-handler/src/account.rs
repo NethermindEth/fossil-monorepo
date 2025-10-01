@@ -14,6 +14,17 @@ use tracing::{debug, info, instrument, warn};
 /// Katana devnet chain ID
 const KATANA_CHAIN_ID: Felt = Felt::from_raw([0x4b4154414e41, 0, 0, 0]);
 
+// Timestamp normalization
+const HOUR_IN_SECONDS: u64 = 3600;
+
+/// Normalizes a timestamp to the nearest hour boundary (rounds down)
+/// Returns (normalized_timestamp, was_normalized)
+fn normalize_timestamp(timestamp: u64) -> (u64, bool) {
+    let normalized = (timestamp / HOUR_IN_SECONDS) * HOUR_IN_SECONDS;
+    let was_normalized = normalized != timestamp;
+    (normalized, was_normalized)
+}
+
 /// PitchLakeJobRequest struct matching the Cairo contract definition
 #[derive(Debug, Clone, Encode)]
 pub struct PitchLakeJobRequest {
@@ -71,6 +82,16 @@ impl StarknetAccount {
         hash_store_address: &str,
         start_timestamp: u64,
     ) -> Result<Felt> {
+        // Normalize timestamp to hour boundary (round down to nearest 3600)
+        let (start_timestamp, was_normalized) = normalize_timestamp(start_timestamp);
+
+        if was_normalized {
+            warn!(
+                "Timestamp normalized to hour boundary in create_batch_hash: {}",
+                start_timestamp
+            );
+        }
+
         const MAX_RETRIES: u32 = 3;
         const INITIAL_BACKOFF: Duration = Duration::from_secs(1);
 
@@ -126,6 +147,16 @@ impl StarknetAccount {
         hash_store_address: &str,
         start_timestamp: u64,
     ) -> Result<Felt> {
+        // Normalize timestamp to hour boundary (round down to nearest 3600)
+        let (start_timestamp, was_normalized) = normalize_timestamp(start_timestamp);
+
+        if was_normalized {
+            warn!(
+                "Timestamp normalized to hour boundary in create_batched_hash: {}",
+                start_timestamp
+            );
+        }
+
         const MAX_RETRIES: u32 = 3;
         const INITIAL_BACKOFF: Duration = Duration::from_secs(1);
 
