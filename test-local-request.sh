@@ -149,16 +149,12 @@ log_info "  VAULT_ADDRESS: $VAULT_ADDRESS"
 log_info "  TIMESTAMP_DECIMAL: $TIMESTAMP_DECIMAL"
 
 TEST_REQUEST="{
-  \"identifiers\": [\"$PROGRAM_ID_DECIMAL\"],
+  \"program_id\": \"$PROGRAM_ID_DECIMAL\",
+  \"vault_address\": \"$VAULT_ADDRESS\",
   \"params\": {
     \"twap\": [$TWAP_START, $TWAP_END],
-    \"volatility\": [$VOLATILITY_START, $VOLATILITY_END],
+    \"max_return\": [$VOLATILITY_START, $VOLATILITY_END],
     \"reserve_price\": [$RESERVE_PRICE_START, $RESERVE_PRICE_END]
-  },
-  \"client_info\": {
-    \"client_address\": \"0x018df581fe0ee497a4a3595cf62aea0bafa7ba1a54a7dcbafca37bfada67c718\",
-    \"vault_address\": \"$VAULT_ADDRESS\",
-    \"timestamp\": $TIMESTAMP_DECIMAL
   }
 }"
 

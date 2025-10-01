@@ -416,9 +416,29 @@ impl ProofProvider for BonsaiProofProvider {
                 }
             }
 
-            // Generate the composed proof
+            // Extract receipts from the parallel task results
+            // Each task returns a (Receipt, Output) tuple
+            let remove_seasonality_receipt = receipts.0.0;
+            let calculate_pt_pt1_receipt = receipts.1.0;
+            let add_twap_7d_receipt = receipts.2.0;
+            let simulate_price_receipt = receipts.3.0;
+
+            tracing::info!("🔗 Composing proof with 7 sub-proof assumptions");
+            tracing::debug!(
+                "Sub-proofs: hashing, max_return, twap, remove_seasonality, calculate_pt_pt1, add_twap_7d, simulate_price"
+            );
+
+            // Generate the composed proof with all sub-proof assumptions
+            // The guest code (main.rs) calls env::verify() for each of these 7 receipts
             let receipt = task::spawn_blocking(move || {
                 let env = ExecutorEnv::builder()
+                    .add_assumption(hashing_receipt) // Sub-proof #1: Data hashing
+                    .add_assumption(max_return_receipt) // Sub-proof #2: Maximum return (volatility)
+                    .add_assumption(calculate_twap_receipt) // Sub-proof #3: TWAP calculation
+                    .add_assumption(remove_seasonality_receipt) // Sub-proof #4: Seasonality removal
+                    .add_assumption(calculate_pt_pt1_receipt) // Sub-proof #5: Markov transition matrices
+                    .add_assumption(add_twap_7d_receipt) // Sub-proof #6: 7-day TWAP
+                    .add_assumption(simulate_price_receipt) // Sub-proof #7: Price simulation
                     .write(&composition_input)
                     .unwrap()
                     .build()
@@ -433,6 +453,10 @@ impl ProofProvider for BonsaiProofProvider {
             .unwrap()
             .unwrap()
             .receipt;
+
+            tracing::info!(
+                "✅ Proof composition completed successfully with all 7 sub-proofs verified"
+            );
 
             Ok(receipt)
         }

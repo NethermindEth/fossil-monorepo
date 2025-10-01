@@ -139,10 +139,20 @@ async fn handle_new_job_request(
     job_id: String,
     payload: PitchLakeJobRequest,
 ) -> (StatusCode, Json<JobResponse>) {
-    let current_timestamp = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .expect("Failed to get current timestamp")
-        .as_secs() as i64;
+    let current_timestamp = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH) {
+        Ok(duration) => duration.as_secs() as i64,
+        Err(e) => {
+            tracing::error!("Failed to get current timestamp: {:?}", e);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(JobResponse::new(
+                    job_id,
+                    Some(format!("Failed to get current timestamp: {}", e)),
+                    None,
+                )),
+            );
+        }
+    };
 
     match create_job_request_with_vault(
         state.offchain_processor_db.clone(),
@@ -336,7 +346,7 @@ async fn call_proving_service(
         "vault_address": payload.vault_address,
         "vault_timestamp": std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
-            .expect("Failed to get current timestamp")
+            .map_err(|e| eyre::eyre!("Failed to get current timestamp: {}", e))?
             .as_secs() as i64
     });
 

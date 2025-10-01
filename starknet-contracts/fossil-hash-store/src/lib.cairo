@@ -75,10 +75,8 @@ mod Sha2Input {
         owner: starknet::ContractAddress,
         fossil_store: starknet::ContractAddress,
     ) {
+        self.set_fossil_store(fossil_store);
         self.ownable.initializer(owner);
-        self
-            .fossil_store
-            .write(IFossilMinimalAvgFeeStoreDispatcher { contract_address: fossil_store });
     }
 
     #[abi(embed_v0)]
