@@ -14,8 +14,9 @@ use coprocessor_core::ProofCompositionInput;
 #[cfg(feature = "proof-composition")]
 use coprocessor_core::{
     AddTwap7dErrorBoundFloatingInput, CalculatePtPt1ErrorBoundFloatingInput, HashingFeltInput,
-    MaxReturnInput, ProofCompositionInput, RemoveSeasonalityErrorBoundFloatingInput,
-    SimulatePriceVerifyPositionInput, TwapErrorBoundInput,
+    HashingFeltOutput, MaxReturnInput, ProofCompositionInput,
+    RemoveSeasonalityErrorBoundFloatingInput, SimulatePriceVerifyPositionInput,
+    TwapErrorBoundInput,
 };
 use eyre::{Result, eyre};
 #[cfg(feature = "proof-composition")]
@@ -36,8 +37,6 @@ use risc0_zkvm::{ExecutorEnv, ProverOpts, VerifierContext, default_prover};
 use risc0_zkvm::{ExecutorEnv, Receipt, default_prover};
 #[cfg(feature = "proof-composition")]
 use simulate_price_verify_position_floating::simulate_price_verify_position;
-#[cfg(feature = "proof-composition")]
-use starknet::core::types::Felt;
 use std::cmp::{max, min};
 #[cfg(feature = "proof-composition")]
 use tokio::{task, try_join};
@@ -106,6 +105,286 @@ impl BonsaiProofProvider {
     pub const fn is_disabled(&self) -> bool {
         false
     }
+
+    #[cfg(feature = "proof-composition")]
+    /// Fetch and validate fee data from StarkNet
+    async fn fetch_and_validate_fee_data(
+        provider: &starknet_handler::provider::StarknetProvider,
+        overall_start: i64,
+        overall_end: i64,
+    ) -> Result<Vec<starknet::core::types::Felt>> {
+        use starknet::core::types::Felt;
+
+        // Fetch fees using the starknet-handler
+        let fee_data = provider
+            .get_avg_fees_in_range(overall_start as u64, overall_end as u64)
+            .await?;
+
+        // The system expects exactly 5760 fee values (8 months of hourly data)
+        // All fees must come from onchain - no padding or artificial generation!
+
+        // Validate that we have sufficient onchain data
+        if fee_data.fees.len() < 5760 {
+            return Err(eyre!(
+                "Insufficient onchain fee data: got {} values, need exactly 5760 (8 months of hourly data). \
+            Time range: {} to {}. Please ensure the fossil_store contract has sufficient historical data.",
+                fee_data.fees.len(),
+                overall_start,
+                overall_end
+            ));
+        }
+
+        // Take exactly 5760 fee values from the onchain data
+        let raw_input: Vec<Felt> = fee_data
+            .fees
+            .iter()
+            .take(5760) // Take exactly 5760 values
+            .cloned()
+            .collect();
+
+        Ok(raw_input)
+    }
+
+    #[cfg(feature = "proof-composition")]
+    /// Generate basic sub-proofs: hashing, max return, and TWAP
+    fn generate_basic_sub_proofs(
+        raw_input: Vec<starknet::core::types::Felt>,
+        data_3_months: &[f64],
+    ) -> Result<(
+        risc0_zkvm::Receipt,
+        HashingFeltOutput,
+        risc0_zkvm::Receipt,
+        f64,
+        risc0_zkvm::Receipt,
+        f64,
+    )> {
+        // Generate hashing sub-proof
+        let (hashing_receipt, hashing_res) = hash_felts(HashingFeltInput { inputs: raw_input });
+
+        // Generate max return sub-proof
+        let input = MaxReturnInput {
+            data: data_3_months.to_vec(),
+        };
+        let (max_return_receipt, max_return_res) = max_return(input);
+
+        // Generate TWAP sub-proof
+        let data_3_months_vec = data_3_months.to_vec();
+        let twap_original = floating_point::calculate_twap(&data_3_months_vec);
+        let input = TwapErrorBoundInput {
+            avg_hourly_gas_fee: data_3_months_vec,
+            twap_tolerance: 1.0,
+            twap_result: twap_original,
+        };
+        let (calculate_twap_receipt, _calculate_twap_res) = calculate_twap(input);
+
+        Ok((
+            hashing_receipt,
+            hashing_res,
+            max_return_receipt,
+            max_return_res.1, // Extract just the f64 value
+            calculate_twap_receipt,
+            twap_original,
+        ))
+    }
+
+    #[cfg(feature = "proof-composition")]
+    /// Generate reserve price sub-proofs in parallel
+    /// Returns (reserve_price_result, remove_seasonality_receipt, calculate_pt_pt1_receipt, add_twap_7d_receipt, simulate_price_receipt)
+    async fn generate_reserve_price_sub_proofs(
+        data_3_months: Vec<f64>,
+        reserve_price_start: i64,
+        overall_start: i64,
+        overall_end: i64,
+    ) -> Result<(
+        original::AllInputsToReservePrice,
+        risc0_zkvm::Receipt,
+        risc0_zkvm::Receipt,
+        risc0_zkvm::Receipt,
+        risc0_zkvm::Receipt,
+    )> {
+        let n_periods = 720;
+        let num_paths = 4000;
+        let gradient_tolerance = 5e-2;
+        let floating_point_tolerance = 0.00001; // 0.00001%
+
+        // Use reserve price specific range for data with timestamps
+        let data_with_timestamps =
+            convert_data_to_vec_of_tuples(data_3_months.clone(), reserve_price_start);
+        let res = original::calculate_reserve_price(&data_with_timestamps, 15000, n_periods);
+
+        // Spawn parallel tasks for reserve price sub-proofs
+        let remove_seasonality_input = RemoveSeasonalityErrorBoundFloatingInput {
+            data: data_3_months.clone(),
+            slope: res.slope,
+            intercept: res.intercept,
+            de_seasonalised_detrended_log_base_fee: convert_array1_to_dvec(
+                res.de_seasonalised_detrended_log_base_fee.clone(),
+            ),
+            season_param: convert_array1_to_dvec(res.season_param.clone()),
+            tolerance: floating_point_tolerance,
+        };
+        let remove_seasonality_task =
+            tokio::spawn(async move { remove_seasonality_error_bound(remove_seasonality_input) });
+
+        let calculate_pt_pt1_input = CalculatePtPt1ErrorBoundFloatingInput {
+            de_seasonalised_detrended_log_base_fee: convert_array1_to_dvec(
+                res.de_seasonalised_detrended_log_base_fee.clone(),
+            ),
+            pt: convert_array1_to_dvec(res.pt.clone()),
+            pt_1: convert_array1_to_dvec(res.pt_1.clone()),
+            tolerance: floating_point_tolerance,
+        };
+        let calculate_pt_pt1_task =
+            tokio::spawn(
+                async move { calculate_pt_pt1_error_bound_floating(calculate_pt_pt1_input) },
+            );
+
+        let add_twap_7d_input = AddTwap7dErrorBoundFloatingInput {
+            data: data_3_months.clone(),
+            twap_7d: res.twap_7d.clone(),
+            tolerance: floating_point_tolerance,
+        };
+        let add_twap_7d_task =
+            tokio::spawn(async move { add_twap_7d_error_bound(add_twap_7d_input) });
+
+        let simulate_price_input = SimulatePriceVerifyPositionInput {
+            start_timestamp: overall_start,
+            end_timestamp: overall_end,
+            positions: res.positions.clone(),
+            pt: convert_array1_to_dvec(res.pt.clone()),
+            pt_1: convert_array1_to_dvec(res.pt_1.clone()),
+            gradient_tolerance,
+            de_seasonalised_detrended_log_base_fee: convert_array1_to_dvec(
+                res.de_seasonalised_detrended_log_base_fee.clone(),
+            ),
+            n_periods,
+            num_paths,
+            season_param: convert_array1_to_dvec(res.season_param.clone()),
+            twap_7d: res.twap_7d.clone(),
+            slope: res.slope,
+            intercept: res.intercept,
+            reserve_price: res.reserve_price,
+            tolerance: floating_point_tolerance,
+            data_length: 2160,
+        };
+        let simulate_price_task =
+            tokio::spawn(async move { simulate_price_verify_position(simulate_price_input) });
+
+        // Join all tasks
+        let receipts = try_join!(
+            remove_seasonality_task,
+            calculate_pt_pt1_task,
+            add_twap_7d_task,
+            simulate_price_task
+        )
+        .map_err(|e| eyre!("Failed to join tasks: {}", e))?;
+
+        Ok((res, receipts.0.0, receipts.1.0, receipts.2.0, receipts.3.0))
+    }
+
+    #[cfg(feature = "proof-composition")]
+    /// Build ProofCompositionInput from all computed values
+    #[allow(clippy::too_many_arguments)]
+    fn build_proof_composition_input(
+        data_8_months: Vec<f64>,
+        data_8_months_hash: [u32; 8],
+        overall_start: i64,
+        overall_end: i64,
+        timestamp_ranges: &ProofTimestampRanges,
+        reserve_price_result: &original::AllInputsToReservePrice,
+        twap_original: f64,
+        max_return: f64,
+    ) -> ProofCompositionInput {
+        let n_periods = 720;
+        let num_paths = 4000;
+        let gradient_tolerance = 5e-2;
+        let floating_point_tolerance = 0.00001;
+        let reserve_price_tolerance = 5.0;
+
+        ProofCompositionInput {
+            data_8_months,
+            data_8_months_hash,
+            data_8_months_start_timestamp: overall_start - 8 * 30 * 24 * 3600,
+            data_8_months_end_timestamp: overall_start,
+            start_timestamp: overall_start,
+            end_timestamp: overall_end,
+            twap_start_timestamp: timestamp_ranges.twap.0,
+            twap_end_timestamp: timestamp_ranges.twap.1,
+            reserve_price_start_timestamp: timestamp_ranges.reserve_price.0,
+            reserve_price_end_timestamp: timestamp_ranges.reserve_price.1,
+            max_return_start_timestamp: timestamp_ranges.max_return.0,
+            max_return_end_timestamp: timestamp_ranges.max_return.1,
+            positions: reserve_price_result.positions.clone(),
+            pt: convert_array1_to_dvec(reserve_price_result.pt.clone()),
+            pt_1: convert_array1_to_dvec(reserve_price_result.pt_1.clone()),
+            gradient_tolerance,
+            de_seasonalised_detrended_log_base_fee: convert_array1_to_dvec(
+                reserve_price_result
+                    .de_seasonalised_detrended_log_base_fee
+                    .clone(),
+            ),
+            n_periods,
+            num_paths,
+            season_param: convert_array1_to_dvec(reserve_price_result.season_param.clone()),
+            twap_7d: reserve_price_result.twap_7d.clone(),
+            slope: reserve_price_result.slope,
+            intercept: reserve_price_result.intercept,
+            reserve_price: reserve_price_result.reserve_price,
+            floating_point_tolerance,
+            reserve_price_tolerance,
+            twap_tolerance: 1.0,
+            twap_result: twap_original,
+            max_return,
+        }
+    }
+
+    #[cfg(feature = "proof-composition")]
+    /// Compose final proof with all sub-proof assumptions
+    async fn compose_final_proof(
+        composition_input: ProofCompositionInput,
+        hashing_receipt: risc0_zkvm::Receipt,
+        max_return_receipt: risc0_zkvm::Receipt,
+        calculate_twap_receipt: risc0_zkvm::Receipt,
+        remove_seasonality_receipt: risc0_zkvm::Receipt,
+        calculate_pt_pt1_receipt: risc0_zkvm::Receipt,
+        add_twap_7d_receipt: risc0_zkvm::Receipt,
+        simulate_price_receipt: risc0_zkvm::Receipt,
+    ) -> Result<risc0_zkvm::Receipt> {
+        tracing::info!("🔗 Composing proof with 7 sub-proof assumptions");
+        tracing::debug!(
+            "Sub-proofs: hashing, max_return, twap, remove_seasonality, calculate_pt_pt1, add_twap_7d, simulate_price"
+        );
+
+        let receipt = task::spawn_blocking(move || {
+            let env = ExecutorEnv::builder()
+                .add_assumption(hashing_receipt) // Sub-proof #1: Data hashing
+                .add_assumption(max_return_receipt) // Sub-proof #2: Maximum return (volatility)
+                .add_assumption(calculate_twap_receipt) // Sub-proof #3: TWAP calculation
+                .add_assumption(remove_seasonality_receipt) // Sub-proof #4: Seasonality removal
+                .add_assumption(calculate_pt_pt1_receipt) // Sub-proof #5: Markov transition matrices
+                .add_assumption(add_twap_7d_receipt) // Sub-proof #6: 7-day TWAP
+                .add_assumption(simulate_price_receipt) // Sub-proof #7: Price simulation
+                .write(&composition_input)
+                .unwrap()
+                .build()
+                .unwrap();
+
+            default_prover().prove(
+                env,
+                PROOF_COMPOSITION_TWAP_MAXRETURN_RESERVEPRICE_FLOATING_HASHING_GUEST_ELF,
+            )
+        })
+        .await
+        .unwrap()
+        .unwrap()
+        .receipt;
+
+        tracing::info!(
+            "✅ Proof composition completed successfully with all 7 sub-proofs verified"
+        );
+
+        Ok(receipt)
+    }
 }
 
 impl Default for BonsaiProofProvider {
@@ -128,19 +407,25 @@ impl ProofProvider for BonsaiProofProvider {
             use crate::services::hashing_service::HashingService;
             use starknet_handler::{config::load_starknet_config, provider::StarknetProvider};
 
-            // Initialize StarkNet provider
+            // Initialize StarkNet provider and hashing service
             let config = load_starknet_config()?;
             let provider = StarknetProvider::new(config)?;
-
-            // Initialize HashingService for hash availability validation
             let hashing_provider = HashingProvider::from_env()
                 .map_err(|e| eyre!("Failed to initialize HashingProvider: {}", e))?;
             let hashing_service = HashingService::new(hashing_provider, 5760, 180);
 
-            // Get the overall range covering all calculations for fee fetching
+            // Get the overall timestamp range
             let (overall_start, overall_end) = timestamp_ranges.overall_range();
+            let (_, _, reserve_price_start, _, _, _) = (
+                timestamp_ranges.twap.0,
+                timestamp_ranges.twap.1,
+                timestamp_ranges.reserve_price.0,
+                timestamp_ranges.reserve_price.1,
+                timestamp_ranges.max_return.0,
+                timestamp_ranges.max_return.1,
+            );
 
-            // Run hash preparation before proof generation
+            // Run hash preparation
             tracing::info!(
                 "🔧 Running hash preparation for timestamp range: {} to {}",
                 overall_start,
@@ -152,190 +437,60 @@ impl ProofProvider for BonsaiProofProvider {
                 .map_err(|e| eyre!("Hash preparation failed: {}", e))?;
             tracing::info!("✅ Hash preparation completed successfully");
 
-            // Fetch fees using the new starknet-handler
-            let fee_data = provider
-                .get_avg_fees_in_range(overall_start as u64, overall_end as u64)
-                .await?;
+            // Fetch and validate fee data
+            let raw_input =
+                Self::fetch_and_validate_fee_data(&provider, overall_start, overall_end).await?;
 
-            // The system expects exactly 5760 fee values (8 months of hourly data)
-            // All fees must come from onchain - no padding or artificial generation!
-
-            // Validate that we have sufficient onchain data
-            if fee_data.fees.len() < 5760 {
-                return Err(eyre!(
-                    "Insufficient onchain fee data: got {} values, need exactly 5760 (8 months of hourly data). \
-                Time range: {} to {}. Please ensure the fossil_store contract has sufficient historical data.",
-                    fee_data.fees.len(),
-                    overall_start,
-                    overall_end
-                ));
+            // Generate basic sub-proofs
+            let data_8_months_temp: Vec<f64>;
+            let data_3_months: Vec<f64>;
+            {
+                // First, hash the data to get the f64 values
+                let (_, hashing_res_temp) = hash_felts(HashingFeltInput {
+                    inputs: raw_input.clone(),
+                });
+                data_8_months_temp = hashing_res_temp.f64_inputs;
+                data_3_months =
+                    data_8_months_temp[data_8_months_temp.len().saturating_sub(2160)..].to_vec();
             }
 
-            // Take exactly 5760 fee values from the onchain data
-            let raw_input: Vec<Felt> = fee_data
-                .fees
-                .iter()
-                .take(5760) // Take exactly 5760 values
-                .cloned()
-                .collect();
-
-            // Use the fee data directly for hashing (already as Felts)
-            let (hashing_receipt, hashing_res) = hash_felts(HashingFeltInput { inputs: raw_input });
+            let (
+                hashing_receipt,
+                hashing_res,
+                max_return_receipt,
+                max_return_value,
+                calculate_twap_receipt,
+                twap_original,
+            ) = Self::generate_basic_sub_proofs(raw_input, &data_3_months)?;
 
             let data_8_months = hashing_res.f64_inputs;
-            let data = data_8_months[data_8_months.len().saturating_sub(2160)..].to_vec();
 
-            // Extract specific timestamp ranges for each calculation
-            let (twap_start, twap_end) = timestamp_ranges.twap;
-            let (reserve_price_start, reserve_price_end) = timestamp_ranges.reserve_price;
-            let (max_return_start, max_return_end) = timestamp_ranges.max_return;
+            // Generate reserve price sub-proofs in parallel
+            let (
+                res,
+                remove_seasonality_receipt,
+                calculate_pt_pt1_receipt,
+                add_twap_7d_receipt,
+                simulate_price_receipt,
+            ) = Self::generate_reserve_price_sub_proofs(
+                data_3_months.clone(),
+                reserve_price_start,
+                overall_start,
+                overall_end,
+            )
+            .await?;
 
-            // max return
-            let input = MaxReturnInput { data: data.clone() };
-            let (max_return_receipt, max_return_res) = max_return(input);
-
-            // twap
-            // replacing  original::calculate_twap::calculate_twap with this, as we are using random avg fee hourly data
-            // that we dont have the underlying raw data for
-            let twap_original = floating_point::calculate_twap(&data);
-            let input = TwapErrorBoundInput {
-                avg_hourly_gas_fee: data.clone(),
-                twap_tolerance: 1.0,
-                twap_result: twap_original,
-            };
-
-            let (calculate_twap_receipt, _calculate_twap_res) = calculate_twap(input);
-
-            // reserve price
-            // run rust code in host
-            // ensure convergence in host
-            let n_periods = 720;
-
-            // Use reserve price specific range for data with timestamps
-            let data_with_timestamps =
-                convert_data_to_vec_of_tuples(data.clone(), reserve_price_start);
-            let res = original::calculate_reserve_price(&data_with_timestamps, 15000, n_periods);
-
-            let num_paths = 4000;
-            let gradient_tolerance = 5e-2;
-            let floating_point_tolerance = 0.00001; // 0.00001%
-            let reserve_price_tolerance = 5.0; // 5%
-
-            // Making all these async via tokio spawns
-
-            // Remove seasonality error bound
-            let remove_seasonality_error_bound_input = RemoveSeasonalityErrorBoundFloatingInput {
-                data: data.clone(),
-                slope: res.slope,
-                intercept: res.intercept,
-                de_seasonalised_detrended_log_base_fee: convert_array1_to_dvec(
-                    res.de_seasonalised_detrended_log_base_fee.clone(),
-                ),
-                season_param: convert_array1_to_dvec(res.season_param.clone()),
-                tolerance: floating_point_tolerance,
-            };
-
-            let remove_seasonality_task = tokio::spawn(async move {
-                remove_seasonality_error_bound(remove_seasonality_error_bound_input)
-            });
-
-            // Calculate PT/PT1 error bound
-            let calculate_pt_pt1_input = CalculatePtPt1ErrorBoundFloatingInput {
-                de_seasonalised_detrended_log_base_fee: convert_array1_to_dvec(
-                    res.de_seasonalised_detrended_log_base_fee.clone(),
-                ),
-                pt: convert_array1_to_dvec(res.pt.clone()),
-                pt_1: convert_array1_to_dvec(res.pt_1.clone()),
-                tolerance: floating_point_tolerance,
-            };
-
-            let calculate_pt_pt1_task = tokio::spawn(async move {
-                calculate_pt_pt1_error_bound_floating(calculate_pt_pt1_input)
-            });
-
-            // TWAP 7D error bound
-            let add_twap_7d_input = AddTwap7dErrorBoundFloatingInput {
-                data: data.clone(),
-                twap_7d: res.twap_7d.clone(),
-                tolerance: floating_point_tolerance,
-            };
-
-            let add_twap_7d_task =
-                tokio::spawn(async move { add_twap_7d_error_bound(add_twap_7d_input) });
-
-            // Simulate price verify position
-            let simulate_price_input = SimulatePriceVerifyPositionInput {
-                start_timestamp: overall_start,
-                end_timestamp: overall_end,
-                positions: res.positions.clone(),
-                pt: convert_array1_to_dvec(res.pt.clone()),
-                pt_1: convert_array1_to_dvec(res.pt_1.clone()),
-                gradient_tolerance,
-                de_seasonalised_detrended_log_base_fee: convert_array1_to_dvec(
-                    res.de_seasonalised_detrended_log_base_fee.clone(),
-                ),
-                n_periods,
-                num_paths,
-                season_param: convert_array1_to_dvec(res.season_param.clone()),
-                twap_7d: res.twap_7d.clone(),
-                slope: res.slope,
-                intercept: res.intercept,
-                reserve_price: res.reserve_price,
-                tolerance: floating_point_tolerance,
-                data_length: 2160,
-            };
-
-            let simulate_price_task =
-                tokio::spawn(async move { simulate_price_verify_position(simulate_price_input) });
-
-            // Join all the tasks
-            let receipts = match try_join!(
-                remove_seasonality_task,
-                calculate_pt_pt1_task,
-                add_twap_7d_task,
-                simulate_price_task
-            ) {
-                Ok(receipts) => receipts,
-                Err(e) => {
-                    return Err(eyre!("Failed to join tasks: {}", e));
-                }
-            };
-
-            // Compose proofs
-            let composition_input = ProofCompositionInput {
-                data_8_months: data_8_months.clone(),
-                data_8_months_hash: hashing_res.hash,
-                data_8_months_start_timestamp: overall_start - 8 * 30 * 24 * 3600, // 8 months before start
-                data_8_months_end_timestamp: overall_start, // Up to the start of analysis period
-                start_timestamp: overall_start,
-                end_timestamp: overall_end,
-                // Specific timestamp ranges for each calculation type
-                twap_start_timestamp: timestamp_ranges.twap.0,
-                twap_end_timestamp: timestamp_ranges.twap.1,
-                reserve_price_start_timestamp: timestamp_ranges.reserve_price.0,
-                reserve_price_end_timestamp: timestamp_ranges.reserve_price.1,
-                max_return_start_timestamp: timestamp_ranges.max_return.0,
-                max_return_end_timestamp: timestamp_ranges.max_return.1,
-                positions: res.positions.clone(),
-                pt: convert_array1_to_dvec(res.pt.clone()),
-                pt_1: convert_array1_to_dvec(res.pt_1.clone()),
-                gradient_tolerance,
-                de_seasonalised_detrended_log_base_fee: convert_array1_to_dvec(
-                    res.de_seasonalised_detrended_log_base_fee.clone(),
-                ),
-                n_periods,
-                num_paths,
-                season_param: convert_array1_to_dvec(res.season_param.clone()),
-                twap_7d: res.twap_7d.clone(),
-                slope: res.slope,
-                intercept: res.intercept,
-                reserve_price: res.reserve_price,
-                floating_point_tolerance,
-                reserve_price_tolerance,
-                twap_tolerance: 1.0,
-                twap_result: twap_original,
-                max_return: max_return_res.1,
-            };
+            // Build ProofCompositionInput
+            let composition_input = Self::build_proof_composition_input(
+                data_8_months.clone(),
+                hashing_res.hash,
+                overall_start,
+                overall_end,
+                &timestamp_ranges,
+                &res,
+                twap_original,
+                max_return_value,
+            );
 
             // Log ProofCompositionInput details for verification
             tracing::info!("📊 ProofCompositionInput prepared and ready for real proof method:");
@@ -416,47 +571,18 @@ impl ProofProvider for BonsaiProofProvider {
                 }
             }
 
-            // Extract receipts from the parallel task results
-            // Each task returns a (Receipt, Output) tuple
-            let remove_seasonality_receipt = receipts.0.0;
-            let calculate_pt_pt1_receipt = receipts.1.0;
-            let add_twap_7d_receipt = receipts.2.0;
-            let simulate_price_receipt = receipts.3.0;
-
-            tracing::info!("🔗 Composing proof with 7 sub-proof assumptions");
-            tracing::debug!(
-                "Sub-proofs: hashing, max_return, twap, remove_seasonality, calculate_pt_pt1, add_twap_7d, simulate_price"
-            );
-
-            // Generate the composed proof with all sub-proof assumptions
-            // The guest code (main.rs) calls env::verify() for each of these 7 receipts
-            let receipt = task::spawn_blocking(move || {
-                let env = ExecutorEnv::builder()
-                    .add_assumption(hashing_receipt) // Sub-proof #1: Data hashing
-                    .add_assumption(max_return_receipt) // Sub-proof #2: Maximum return (volatility)
-                    .add_assumption(calculate_twap_receipt) // Sub-proof #3: TWAP calculation
-                    .add_assumption(remove_seasonality_receipt) // Sub-proof #4: Seasonality removal
-                    .add_assumption(calculate_pt_pt1_receipt) // Sub-proof #5: Markov transition matrices
-                    .add_assumption(add_twap_7d_receipt) // Sub-proof #6: 7-day TWAP
-                    .add_assumption(simulate_price_receipt) // Sub-proof #7: Price simulation
-                    .write(&composition_input)
-                    .unwrap()
-                    .build()
-                    .unwrap();
-
-                default_prover().prove(
-                    env,
-                    PROOF_COMPOSITION_TWAP_MAXRETURN_RESERVEPRICE_FLOATING_HASHING_GUEST_ELF,
-                )
-            })
-            .await
-            .unwrap()
-            .unwrap()
-            .receipt;
-
-            tracing::info!(
-                "✅ Proof composition completed successfully with all 7 sub-proofs verified"
-            );
+            // Compose final proof with all sub-proof assumptions
+            let receipt = Self::compose_final_proof(
+                composition_input,
+                hashing_receipt,
+                max_return_receipt,
+                calculate_twap_receipt,
+                remove_seasonality_receipt,
+                calculate_pt_pt1_receipt,
+                add_twap_7d_receipt,
+                simulate_price_receipt,
+            )
+            .await?;
 
             Ok(receipt)
         }
