@@ -37,7 +37,7 @@ use risc0_zkvm::{ExecutorEnv, ProverOpts, VerifierContext, default_prover};
 use risc0_zkvm::{ExecutorEnv, Receipt, default_prover};
 #[cfg(feature = "proof-composition")]
 use simulate_price_verify_position_floating::simulate_price_verify_position;
-use std::cmp::{max, min};
+use std::cmp::max;
 #[cfg(feature = "proof-composition")]
 use tokio::{task, try_join};
 #[cfg(feature = "proof-composition")]
@@ -71,10 +71,46 @@ impl ProofTimestampRanges {
     }
 
     /// Returns the overall start and end timestamps covering all calculations
+    /// For fee data fetching, we need 8 months (5760 hours) of data going backwards from the highest timestamp
+    /// POC: Using 2 months (1440 hours) due to limited verified onchain data
     pub fn overall_range(&self) -> (i64, i64) {
-        let start = min(min(self.twap.0, self.reserve_price.0), self.max_return.0);
+        // Find the highest end timestamp from all ranges
         let end = max(max(self.twap.1, self.reserve_price.1), self.max_return.1);
-        (start, end)
+
+        // NOTE: Fossil store indexing lag
+        // The Fossil store requires time to index and finalize hourly fee data.
+        // We subtract a safety buffer to ensure all requested data is available onchain.
+        const FOSSIL_STORE_LAG_HOURS: i64 = 12;
+        let safe_end = end - (FOSSIL_STORE_LAG_HOURS * 3600);
+
+        // Normalize to hour boundary
+        let safe_end_normalized = (safe_end / 3600) * 3600;
+
+        // NOTE: Fee data time range configuration
+        // Production requires 5760 hours (8 months) = 32 batches × 180 hours
+        // POC uses 1440 hours (2 months) = 8 batches × 180 hours
+        // IMPORTANT: Must be a multiple of 180 hours to align with Cairo contract batch size
+        const REQUIRED_HOURS: i64 = 1440;
+
+        // NOTE: Fetch buffer for Fossil store data gaps
+        // We fetch extra hours to account for potential gaps in the Fossil store data.
+        // This ensures we get at least REQUIRED_HOURS worth of data even if some hours are missing.
+        const FETCH_BUFFER_HOURS: i64 = 120; // Fetch 120 extra hours (5 days buffer)
+
+        // Calculate start timestamp by going backwards from the safe end (with buffer)
+        let start = safe_end_normalized - ((REQUIRED_HOURS + FETCH_BUFFER_HOURS) * 3600);
+
+        tracing::info!(
+            "Timestamp range for fee data fetch: requested_end={}, adjusted_end={}, lag_hours={}, required_hours={}, buffer_hours={}, total_fetch_hours={}",
+            end,
+            safe_end_normalized,
+            FOSSIL_STORE_LAG_HOURS,
+            REQUIRED_HOURS,
+            FETCH_BUFFER_HOURS,
+            REQUIRED_HOURS + FETCH_BUFFER_HOURS
+        );
+
+        (start, safe_end_normalized)
     }
 }
 
@@ -120,18 +156,16 @@ impl BonsaiProofProvider {
             .get_avg_fees_in_range(overall_start as u64, overall_end as u64)
             .await?;
 
-        // The system expects exactly 5760 fee values (8 months of hourly data)
-        // All fees must come from onchain - no padding or artificial generation!
+        // NOTE: Fee data validation
+        // Production: 5760 hours (8 months) = 32 batches × 180 hours
+        // POC: 1440 hours (2 months) = 8 batches × 180 hours
+        // All fees must come from onchain - no padding or artificial generation
+        const REQUIRED_DATA_POINTS: usize = 1440;
 
-        // NOTE: POC LIMITATION - Currently using 2 months (1440 hours) instead of 8 months (5760 hours)
-        // due to limited verified onchain data (block 566272). Production requires full 8 months.
-        const REQUIRED_DATA_POINTS: usize = 1440; // 2 months * 30 days * 24 hours (should be 5760 for 8 months)
-
-        // Validate that we have sufficient onchain data
         if fee_data.fees.len() < REQUIRED_DATA_POINTS {
             return Err(eyre!(
-                "Insufficient onchain fee data: got {} values, need exactly {} (2 months of hourly data for POC, 8 months required for production). \
-            Time range: {} to {}. Please ensure the fossil_store contract has sufficient historical data.",
+                "Insufficient onchain fee data: received {} values, required {}. \
+                Time range: {} to {}. Ensure Fossil store has complete historical data.",
                 fee_data.fees.len(),
                 REQUIRED_DATA_POINTS,
                 overall_start,
@@ -139,10 +173,21 @@ impl BonsaiProofProvider {
             ));
         }
 
-        // NOTE: POC LIMITATION - Taking 1440 values (2 months) instead of 5760 (8 months)
+        tracing::info!(
+            "Retrieved {} fee data points from Fossil store (required: {}, taking most recent {})",
+            fee_data.fees.len(),
+            REQUIRED_DATA_POINTS,
+            REQUIRED_DATA_POINTS
+        );
+
+        // Take the LAST (most recent) REQUIRED_DATA_POINTS values
+        // This ensures we use the most recent complete data even if we fetched extra buffer hours
+        let total_fees = fee_data.fees.len();
+        let skip_count = total_fees.saturating_sub(REQUIRED_DATA_POINTS);
         let raw_input: Vec<Felt> = fee_data
             .fees
             .iter()
+            .skip(skip_count)
             .take(REQUIRED_DATA_POINTS)
             .cloned()
             .collect();
@@ -154,7 +199,8 @@ impl BonsaiProofProvider {
     /// Generate basic sub-proofs: hashing, max return, and TWAP
     fn generate_basic_sub_proofs(
         raw_input: Vec<starknet::core::types::Felt>,
-        data_3_months: &[f64],
+        data_full: &[f64], // Full dataset (POC: 1440 hours, Production: 5760 hours)
+        data_3_months: &[f64], // Subset for TWAP/reserve price (POC: 720 hours, Production: 2160 hours)
     ) -> Result<(
         risc0_zkvm::Receipt,
         HashingFeltOutput,
@@ -166,9 +212,9 @@ impl BonsaiProofProvider {
         // Generate hashing sub-proof
         let (hashing_receipt, hashing_res) = hash_felts(HashingFeltInput { inputs: raw_input });
 
-        // Generate max return sub-proof
+        // Generate max return sub-proof - uses FULL dataset
         let input = MaxReturnInput {
-            data: data_3_months.to_vec(),
+            data: data_full.to_vec(),
         };
         let (max_return_receipt, max_return_res) = max_return(input);
 
@@ -477,7 +523,7 @@ impl ProofProvider for BonsaiProofProvider {
                 max_return_value,
                 calculate_twap_receipt,
                 twap_original,
-            ) = Self::generate_basic_sub_proofs(raw_input, &data_3_months)?;
+            ) = Self::generate_basic_sub_proofs(raw_input, &data_8_months_temp, &data_3_months)?;
 
             // NOTE: POC LIMITATION - data_8_months contains 1440 values (2 months) instead of 5760 (8 months)
             let data_8_months = hashing_res.f64_inputs;

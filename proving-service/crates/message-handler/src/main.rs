@@ -7,7 +7,7 @@ use message_handler::queue::sqs_message_queue::SqsMessageQueue;
 use message_handler::services::proof_job_handler::ProofJobHandler;
 use std::sync::{Arc, atomic::AtomicBool};
 use tokio::signal;
-use tracing::{Level, debug, info};
+use tracing::{debug, info};
 use tracing_subscriber::FmtSubscriber;
 
 // Create a no-op proof provider that implements the ProofProvider trait
@@ -91,9 +91,12 @@ mod simple_mock {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize tracing with INFO level default
+    // Initialize tracing with RUST_LOG environment variable (defaults to INFO)
     let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
         .finish();
     let _ = tracing::subscriber::set_global_default(subscriber)
         .map_err(|e| eyre::eyre!("setting default subscriber failed: {}", e));
@@ -153,13 +156,13 @@ async fn main() -> Result<()> {
         Arc::new(no_op::NoOpProofProvider::new())
     };
 
-    // Note: Configure SQS with a suitable visibility timeout (300s) to match the proof generation timeout
+    // Note: Configure SQS with a suitable visibility timeout (3600s) to match the proof generation timeout
     // This helps prevent the same message from being processed multiple times
     let processor = ProofJobHandler::new(
         queue.clone(),
         terminator.clone(),
         proof_provider,
-        std::time::Duration::from_secs(300), // 5 minutes timeout for proof generation
+        std::time::Duration::from_secs(3600), // 1 hour timeout for proof generation
     );
 
     // Create an async closure to wrap the job processing logic
