@@ -134,6 +134,23 @@ dev-up: ## Start all local development services
 	@echo "  🗄️  Databases: Proving Service (5435), Fossil API (5434)"
 	@echo "  ☁️  LocalStack: http://localhost:4567"
 
+.PHONY: services-up
+services-up: ## Start infrastructure and API services with .env.sepolia (excludes katana)
+	@echo "🚀 Starting infrastructure and API services..."
+	docker-compose -f docker-compose.services.yml up -d
+	@echo "✅ Services started (using .env.sepolia):"
+	@echo "  📊 Fossil API: http://localhost:3000"
+	@echo "  🔧 Proving Service API: http://localhost:3001"
+	@echo "  🔨 Message Handler: running"
+	@echo "  🗄️  Databases: Proving Service (5435), Fossil API (5434)"
+	@echo "  ☁️  LocalStack: http://localhost:4567"
+
+.PHONY: services-down
+services-down: ## Stop services started with services-up
+	@echo "🛑 Stopping services..."
+	docker-compose -f docker-compose.services.yml down
+	@echo "✅ Services stopped"
+
 .PHONY: dev-down
 dev-down: ## Stop services and clean up (removes volumes)
 	@echo "🛑 Stopping and cleaning up..."

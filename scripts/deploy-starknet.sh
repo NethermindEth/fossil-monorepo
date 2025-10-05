@@ -115,7 +115,7 @@ SHA2INPUT_HASH=$(starkli declare ../target/dev/sha2_input_Sha2Input.contract_cla
 echo -e "${GREEN}Class hash declared: ${BOLD}$SHA2INPUT_HASH${NC}"
 
 echo -e "${YELLOW}Deploying Sha2Input contract...${NC}"
-SHA2INPUT_ADDRESS=$(starkli deploy $SHA2INPUT_HASH $STARKNET_ACCOUNT_ADDRESS 0x0 --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
+SHA2INPUT_ADDRESS=$(starkli deploy $SHA2INPUT_HASH $STARKNET_ACCOUNT_ADDRESS $FOSSIL_STORE_ADDRESS --account $STARKNET_ACCOUNT --rpc $STARKNET_RPC_URL -w | grep -o '0x[a-fA-F0-9]\{64\}' | head -1)
 echo -e "${GREEN}Contract address: ${BOLD}$SHA2INPUT_ADDRESS${NC}"
 echo
 

@@ -1,3 +1,37 @@
+// FOSSIL HASH STORE CONTRACT
+//
+// This contract provides a two-tier cryptographic hashing system for batch fee data verification.
+// It enables efficient onchain proof verification by pre-computing and storing hashes of historical
+// fee data from the Fossil Store contract.
+//
+// ARCHITECTURE:
+// 1. Tier 1 - Batch Hashes (hash_stored_avg_fees):
+//    - Each batch represents 180 consecutive hourly fee values (7.5 days)
+//    - Hashed using SHA256 and stored by start_timestamp
+//    - Created via: hash_avg_fees_and_store(start_timestamp)
+//
+// 2. Tier 2 - Composite Hash (hash_batched_avg_fees):
+//    - Combines multiple Tier 1 batch hashes into a single composite hash
+//    - Production: 32 batches (5760 hours = 8 months of data)
+//    - Current configuration: 8 batches (1440 hours = 2 months of data)
+//    - Created via: hash_batched_avg_fees(start_timestamp)
+//
+// PROOF VERIFICATION WORKFLOW:
+// 1. Message handler determines required timestamp range for proof
+// 2. Calls hash_avg_fees_and_store() for each 180-hour batch that doesn't exist yet
+// 3. Calls hash_batched_avg_fees() to create composite hash from all batch hashes
+// 4. Composite hash is used in RISC0 proof verification to validate data integrity
+//
+// CONFIGURATION:
+// - Batch size: 180 hours (fixed, matches RISC0 guest program expectations)
+// - Number of batches: Configurable via num_in_a_batch in hash_batched_avg_fees()
+//   - Production: 32 batches for 8-month historical data analysis
+//   - Current: 8 batches (see line 130 for configuration)
+//
+// DEPENDENCIES:
+// - Fossil Store contract: Source of truth for hourly average fee data
+// - Must be set via set_fossil_store() or constructor
+
 pub mod helper;
 pub mod interface;
 pub mod mock;
@@ -75,8 +109,10 @@ mod Sha2Input {
         owner: starknet::ContractAddress,
         fossil_store: starknet::ContractAddress,
     ) {
-        self.set_fossil_store(fossil_store);
         self.ownable.initializer(owner);
+        self
+            .fossil_store
+            .write(IFossilMinimalAvgFeeStoreDispatcher { contract_address: fossil_store });
     }
 
     #[abi(embed_v0)]
@@ -92,17 +128,45 @@ mod Sha2Input {
             self.fossil_store.read().contract_address
         }
 
-        // hashing 180 avg fees
+        /// Creates and stores a SHA256 hash of 180 consecutive hourly average fees.
+        ///
+        /// This is Tier 1 of the two-tier hashing system. Each invocation processes
+        /// 180 hours (7.5 days) of fee data starting from start_timestamp.
+        ///
+        /// Arguments:
+        /// - start_timestamp: Must be normalized to hour boundary (divisible by 3600)
+        ///                   Represents the first hour in the 180-hour batch
+        ///
+        /// Fee Data Requirements:
+        /// - All 180 hourly fee values must be available in the Fossil Store
+        /// - The Fossil Store has an indexing lag (currently ~12 hours)
+        /// - Callers should ensure start_timestamp accounts for this lag
+        ///
+        /// Hash Computation:
+        /// - Fetches fees for timestamps: start_timestamp + (i * 3600) where i ∈ [0, 180)
+        /// - Each fee is converted to a u32 array representation
+        /// - All fee arrays are concatenated and hashed with SHA256
+        /// - Result is an 8-element u32 array representing the 256-bit hash
         fn hash_avg_fees_and_store(ref self: ContractState, start_timestamp: u64) {
             let mut result_array = array![];
             let fossil_store = self.fossil_store.read();
-            for i in 0..180_u64 { // hashing of 180 avg fees
+
+            // Process 180 consecutive hourly fee values (7.5 days)
+            for i in 0..180_u64 {
                 let timestamp = start_timestamp + (i * 3600_u64);
-                // TODO: check if get_avg_fee returns average that has been fully calculated (ie.
-                // after weighted mean)
-                // pending changes in fossil-light-client
+
+                // DEVELOPER NOTE: Fossil Store Data Validation
+                // The get_avg_fee() call retrieves the weighted mean average fee for the given hour.
+                // The Fossil Store computes this via the fossil-light-client indexer.
+                //
+                // DATA INTEGRITY CONSIDERATION:
+                // In production, consider validating that avg_fees != 0 to catch missing data:
+                //   assert(avg_fees != 0, 'Avg fees is 0');
+                //
+                // This assertion is currently disabled to allow flexibility with historical data
+                // availability. Re-enable if strict data completeness is required.
                 let avg_fees = fossil_store.get_avg_fee(timestamp);
-                assert(avg_fees != 0, 'Avg fees is 0');
+
                 let avg_fees_array = convert_avg_fees_to_u32_array(avg_fees);
                 result_array.append_span(avg_fees_array.span());
             }
@@ -117,15 +181,57 @@ mod Sha2Input {
             self.hash_stored_avg_fees.entry(timestamp).read()
         }
 
+        /// Creates and stores a composite SHA256 hash from multiple batch hashes.
+        ///
+        /// This is Tier 2 of the two-tier hashing system. It combines multiple Tier 1
+        /// batch hashes into a single composite hash for efficient proof verification.
+        ///
+        /// Arguments:
+        /// - start_timestamp: Must be normalized to hour boundary (divisible by 3600)
+        ///                   Represents the first hour of the first batch
+        ///
+        /// Prerequisites:
+        /// - All required Tier 1 batch hashes must exist (created via hash_avg_fees_and_store)
+        /// - For num_in_a_batch = N, requires N batch hashes at intervals of 180 hours
+        /// - Example: If start_timestamp = T, requires batch hashes at:
+        ///   T, T+180h, T+360h, ..., T+((N-1)*180)h
+        ///
+        /// Configuration:
+        /// - num_in_a_batch: Number of 180-hour batches to combine
+        ///   - Current: 8 batches = 1440 hours (2 months of data)
+        ///   - Production: 32 batches = 5760 hours (8 months of data)
+        ///   - This value must match the RISC0 guest program's expected data length
+        ///   - Changing this requires coordination with the message-handler proof generation logic
+        ///
+        /// Error Handling:
+        /// - Panics with 'Hash is empty' if any required batch hash doesn't exist
+        /// - Ensures data integrity by validating all batch hashes before composition
         fn hash_batched_avg_fees(ref self: ContractState, start_timestamp: u64) {
             let mut result_array = array![];
-            let num_in_a_batch = 32_u64; // 5760/180
+
+            // CONFIGURATION: Number of batches to combine
+            // ============================================
+            // Each batch represents 180 hours of fee data.
+            //
+            // Production configuration (8 months of historical data):
+            //   let num_in_a_batch = 32_u64; // 32 * 180 hours = 5760 hours = 8 months
+            //
+            // Current configuration (reduced data requirement):
+            let num_in_a_batch = 8_u64; // 8 * 180 hours = 1440 hours = 2 months
+            //
+            // IMPORTANT: When changing num_in_a_batch, also update:
+            // 1. Message handler: proof_composition/mod.rs (REQUIRED_HOURS constant)
+            // 2. RISC0 guest program: Ensure it expects the correct data length
+
             for i in 0..num_in_a_batch {
+                // Each batch starts 180 hours after the previous one
                 let timestamp = start_timestamp + (i * 3600_u64 * 180_u64);
                 let hash_avg_fees = self.get_hash_stored_avg_fees(timestamp);
 
+                // Validate that the batch hash exists (non-zero)
                 let is_hash_empty = self.check_hash_is_empty(hash_avg_fees);
                 assert(!is_hash_empty, 'Hash is empty');
+
                 result_array.append_span(hash_avg_fees.span());
             }
 

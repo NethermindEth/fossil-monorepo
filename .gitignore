@@ -69,3 +69,5 @@ proving-service/mock_contracts/.env.local
 CLAUDE.md
 
 starknet-contracts/.snfoundry_cache/
+
+ECS_DEPLOYMENT_GUIDE.md

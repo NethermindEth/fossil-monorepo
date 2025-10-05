@@ -1,49 +1,6 @@
-# Local integration testing compose file for fossil-monorepo
-# Self-contained setup with local Katana instance instead of external fossil-network services
+# Services compose file - uses .env.sepolia for external testnet connections
 services:
-  # Katana Local Testnet
-  katana:
-    image: ghcr.io/dojoengine/katana:v1.6.3
-    ports:
-      - "5050:5050"
-    networks:
-      - local-network
-    command:
-      [
-        "katana",
-        "--http.addr",
-        "0.0.0.0",
-        "--http.port",
-        "5050",
-        "--http.cors_origins",
-        "*",
-        "--dev",
-        "--dev.no-fee",
-        "--dev.no-account-validation",
-        "-b",
-        "6000",
-        "--fork.provider",
-        "https://starknet-sepolia.public.blastapi.io",
-      ]
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "curl",
-          "-f",
-          "-X",
-          "POST",
-          "-H",
-          "Content-Type: application/json",
-          "-d",
-          '{"jsonrpc":"2.0","method":"starknet_chainId","params":[],"id":1}',
-          "http://localhost:5050",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Proving Service PostgreSQL (port 5433 to avoid conflicts with external indexer)
+  # Proving Service PostgreSQL (port 5435)
   proving_service_db:
     image: postgres:16
     environment:
@@ -53,9 +10,9 @@ services:
     ports:
       - "5435:5432"
     networks:
-      - local-network
+      - services-network
     volumes:
-      - proving_service_local_data:/var/lib/postgresql/data
+      - proving_service_data:/var/lib/postgresql/data
       - ./proving-service/tests/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
@@ -73,9 +30,9 @@ services:
     ports:
       - "5434:5432"
     networks:
-      - local-network
+      - services-network
     volumes:
-      - fossil_api_local_data:/var/lib/postgresql/data
+      - fossil_api_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -88,14 +45,14 @@ services:
     ports:
       - "4567:4566"
     networks:
-      - local-network
+      - services-network
     environment:
       - SERVICES=sqs
       - AWS_DEFAULT_REGION=us-east-1
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
     volumes:
-      - localstack_local_data:/var/lib/localstack
+      - localstack_data:/var/lib/localstack
       - ./scripts/localstack-init.sh:/etc/localstack/init/ready.d/init-sqs.sh
     healthcheck:
       test: ["CMD", "awslocal", "sqs", "list-queues", "--region", "us-east-1"]
@@ -115,7 +72,7 @@ services:
       localstack:
         condition: service_healthy
     env_file:
-      - .env.docker
+      - .env.sepolia
     environment:
       PROVING_SERVICE_DATABASE_URL: postgres://postgres:postgres@proving_service_db:5432/postgres
       DATABASE_URL: postgres://postgres:postgres@proving_service_db:5432/postgres
@@ -129,7 +86,7 @@ services:
     ports:
       - "3001:3001"
     networks:
-      - local-network
+      - services-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
       interval: 10s
@@ -145,16 +102,21 @@ services:
         condition: service_healthy
       localstack:
         condition: service_healthy
-      katana:
-        condition: service_healthy
     env_file:
-      - .env.docker
+      - .env.sepolia
     environment:
       PROVING_SERVICE_DATABASE_URL: postgres://postgres:postgres@proving_service_db:5432/postgres
       DATABASE_URL: postgres://postgres:postgres@proving_service_db:5432/postgres
+      AWS_ENDPOINT_URL: http://localstack:4566
+      SQS_QUEUE_URL: http://localstack:4566/000000000000/fossilQueue
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      ENABLE_PROOF: "true"
       RUST_LOG: info
+      RUST_BACKTRACE: "1"
     networks:
-      - local-network
+      - services-network
     restart: unless-stopped
 
   # Fossil API Service
@@ -169,7 +131,7 @@ services:
       localstack:
         condition: service_healthy
     env_file:
-      - .env.docker
+      - .env.sepolia
     environment:
       OFFCHAIN_PROCESSOR_DATABASE_URL: postgres://postgres:postgres@fossil_api_db:5432/postgres
       DATABASE_URL: postgres://postgres:postgres@fossil_api_db:5432/postgres
@@ -183,7 +145,7 @@ services:
     ports:
       - "3000:3000"
     networks:
-      - local-network
+      - services-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 10s
@@ -192,10 +154,10 @@ services:
     restart: unless-stopped
 
 networks:
-  local-network:
+  services-network:
     driver: bridge
 
 volumes:
-  proving_service_local_data:
-  fossil_api_local_data:
-  localstack_local_data:
+  proving_service_data:
+  fossil_api_data:
+  localstack_data:

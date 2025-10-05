@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     libssl3 \
     curl \
+    libopenblas0 \
+    libgfortran5 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create necessary directories for RISC0 methods
