@@ -14,6 +14,7 @@ impl<Q: Queue> JobDispatcher<Q> {
         Self { queue }
     }
 
+    #[allow(clippy::future_not_send)]
     pub async fn dispatch_job(&self, job: Job) -> Result<()> {
         // Debug logging to see what's being serialized
         if let Job::RequestProof(ref request_proof) = job {

@@ -28,6 +28,7 @@ pub struct StarknetAccount {
 }
 
 impl StarknetAccount {
+    #[allow(clippy::cognitive_complexity)]
     #[instrument(skip(provider, account_private_key), fields(address = %account_address), level = "debug")]
     pub fn new(
         provider: Arc<JsonRpcClient<HttpTransport>>,

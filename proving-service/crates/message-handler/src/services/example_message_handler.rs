@@ -23,6 +23,7 @@ impl<Q: Queue + Send + Sync + 'static> ExampleMessageHandler<Q> {
         Self { queue, terminator }
     }
 
+    #[allow(clippy::cognitive_complexity)]
     pub async fn receive_job(&self) -> Result<()> {
         info!("Job processor started, waiting for messages");
 

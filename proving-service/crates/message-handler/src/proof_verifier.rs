@@ -122,6 +122,7 @@ impl<G: Risc0ProofGenerator> IntegratedProofVerifier<G> {
     }
 
     #[cfg(not(feature = "starknet-handler"))]
+    #[allow(clippy::future_not_send)]
     async fn verify_proof_onchain(
         &self,
         _calldata: Vec<Felt>,

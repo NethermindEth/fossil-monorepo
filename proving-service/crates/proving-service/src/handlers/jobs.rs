@@ -37,6 +37,7 @@ pub struct Response {
     job_group_id: String,
 }
 
+#[allow(clippy::cognitive_complexity)]
 pub async fn handle_job_request(
     State(dispatcher): State<Arc<JobDispatcher<SqsMessageQueue>>>,
     Json(request): Json<JobRequest>,
