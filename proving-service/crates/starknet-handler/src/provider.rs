@@ -2,6 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use eyre::Result;
 use num_traits::ToPrimitive;
+use reqwest::Client;
 use starknet::{
     core::types::{BlockId, BlockTag, FunctionCall},
     macros::selector,
@@ -20,6 +21,9 @@ use crate::{
 const DEFAULT_MAX_RETRIES: u32 = 5;
 const DEFAULT_INITIAL_BACKOFF_MS: u64 = 100;
 const DEFAULT_MAX_BACKOFF_MS: u64 = 10000; // 10 seconds
+
+// HTTP timeout configuration (increased for slow katana fork)
+const DEFAULT_HTTP_TIMEOUT_SECS: u64 = 300; // 5 minutes for slow fork fetches
 
 // Timestamp normalization
 const HOUR_IN_SECONDS: u64 = 3600;
@@ -105,8 +109,21 @@ impl StarknetProvider {
         let parsed_url = Url::parse(&config.rpc_url)?;
         debug!("Parsed RPC URL successfully");
 
+        // Create custom HTTP client with extended timeout for slow katana fork
+        let http_client = Client::builder()
+            .timeout(Duration::from_secs(DEFAULT_HTTP_TIMEOUT_SECS))
+            .build()?;
+
+        info!(
+            timeout_secs = DEFAULT_HTTP_TIMEOUT_SECS,
+            "Created HTTP client with extended timeout for katana fork"
+        );
+
         Ok(Self {
-            provider: Arc::new(JsonRpcClient::new(HttpTransport::new(parsed_url))),
+            provider: Arc::new(JsonRpcClient::new(HttpTransport::new_with_client(
+                parsed_url,
+                http_client,
+            ))),
             config,
         })
     }

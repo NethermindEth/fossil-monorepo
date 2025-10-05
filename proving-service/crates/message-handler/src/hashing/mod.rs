@@ -71,7 +71,7 @@ impl HashingProvider {
     /// Creates a new `HashingProvider` instance from environment variables.
     ///
     /// Requires the following environment variables to be set:
-    /// - `RPC_URL`: URL for the Starknet RPC provider
+    /// - `STARKNET_RPC_URL`: URL for the Starknet RPC provider
     /// - `FOSSIL_STORE_ADDRESS`: Address of the fossil store contract
     /// - `HASH_STORAGE_ADDRESS`: Address of the hash storage contract
     /// - `STARKNET_PRIVATE_KEY`: Private key for the Starknet account
@@ -89,8 +89,8 @@ impl HashingProvider {
         use url::Url;
 
         // Load environment variables
-        let rpc_url =
-            env::var("RPC_URL").map_err(|_| eyre!("RPC_URL environment variable is not set"))?;
+        let rpc_url = env::var("STARKNET_RPC_URL")
+            .map_err(|_| eyre!("STARKNET_RPC_URL environment variable is not set"))?;
 
         let fossil_store_address = env::var("FOSSIL_STORE_ADDRESS")
             .map_err(|_| eyre!("FOSSIL_STORE_ADDRESS environment variable is not set"))?;
