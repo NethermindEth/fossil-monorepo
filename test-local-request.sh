@@ -24,8 +24,8 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Load local environment variables
-source .env.local
+# Load sepolia environment variables
+source .env.sepolia
 
 # Use local URLs (services running via make dev-up)
 FOSSIL_API_URL="http://localhost:3000"
@@ -72,81 +72,58 @@ log_info "✅ Generated API key: $API_KEY"
 # Step 2: Get request data from StarkNet vault
 log_info "📡 Getting request data from StarkNet vault..."
 
-REQUEST_DATA=$(starkli call $PITCHLAKE_VAULT_12MIN get_request_to_start_first_round --rpc $STARKNET_RPC_URL)
+REQUEST_DATA=$(starkli call $PITCHLAKE_VAULT_12MIN get_request_to_settle_round --rpc $STARKNET_RPC_URL)
 log_info "Request data: $REQUEST_DATA"
 
-# Extract calldata from response - parse each hex value from the array
-VAULT_ADDRESS=$(echo "$REQUEST_DATA" | sed -n '3p' | sed 's/^[[:space:]]*//' | sed 's/[",]//g')
-TIMESTAMP=$(echo "$REQUEST_DATA" | sed -n '4p' | sed 's/^[[:space:]]*//' | sed 's/[",]//g')
-PROGRAM_ID=$(echo "$REQUEST_DATA" | sed -n '5p' | sed 's/^[[:space:]]*//' | sed 's/[",]//g')
+# Parse the response array - it contains all values in order:
+# [0] program_id
+# [1] vault_address
+# [2] twap_start
+# [3] twap_end
+# [4] max_return_start
+# [5] max_return_end
+# [6] reserve_price_start
+# [7] reserve_price_end
 
-# Convert hex values to decimal for JSON
-TIMESTAMP_DECIMAL=$((TIMESTAMP))
+PROGRAM_ID_HEX=$(echo "$REQUEST_DATA" | sed -n '2p' | sed 's/^[[:space:]]*//' | sed 's/[",]//g')
+VAULT_ADDRESS_HEX=$(echo "$REQUEST_DATA" | sed -n '3p' | sed 's/^[[:space:]]*//' | sed 's/[",]//g')
+TWAP_START_HEX=$(echo "$REQUEST_DATA" | sed -n '4p' | sed 's/^[[:space:]]*//' | sed 's/[",]//g')
+TWAP_END_HEX=$(echo "$REQUEST_DATA" | sed -n '5p' | sed 's/^[[:space:]]*//' | sed 's/[",]//g')
+VOLATILITY_START_HEX=$(echo "$REQUEST_DATA" | sed -n '6p' | sed 's/^[[:space:]]*//' | sed 's/[",]//g')
+VOLATILITY_END_HEX=$(echo "$REQUEST_DATA" | sed -n '7p' | sed 's/^[[:space:]]*//' | sed 's/[",]//g')
+RESERVE_PRICE_START_HEX=$(echo "$REQUEST_DATA" | sed -n '8p' | sed 's/^[[:space:]]*//' | sed 's/[",]//g')
+RESERVE_PRICE_END_HEX=$(echo "$REQUEST_DATA" | sed -n '9p' | sed 's/^[[:space:]]*//' | sed 's/[",]//g')
 
-# Get proving delay for validation purposes only
-PROVING_DELAY_HEX=$(starkli call $PITCHLAKE_VAULT_12MIN get_proving_delay --rpc $STARKNET_RPC_URL | grep -o '0x[0-9a-f]*')
-PROVING_DELAY=$((PROVING_DELAY_HEX))
+# Convert hex to decimal
+PROGRAM_ID_DECIMAL=$((PROGRAM_ID_HEX))
+# Keep vault address as hex string (it's too large for bash arithmetic)
+VAULT_ADDRESS="$VAULT_ADDRESS_HEX"
+TWAP_START=$((TWAP_START_HEX))
+TWAP_END=$((TWAP_END_HEX))
+VOLATILITY_START=$((VOLATILITY_START_HEX))
+VOLATILITY_END=$((VOLATILITY_END_HEX))
+RESERVE_PRICE_START=$((RESERVE_PRICE_START_HEX))
+RESERVE_PRICE_END=$((RESERVE_PRICE_END_HEX))
 
-# Calculate the maximum provable timestamp for reference
-CURRENT_TIMESTAMP=$(date +%s)
-MAX_PROVABLE_TIMESTAMP=$((CURRENT_TIMESTAMP - PROVING_DELAY))
-
-log_info "Timestamp validation:"
-log_info "  Current timestamp: $CURRENT_TIMESTAMP"
-log_info "  Proving delay: $PROVING_DELAY seconds"
-log_info "  Max provable timestamp: $MAX_PROVABLE_TIMESTAMP"
-log_info "  Original request timestamp: $TIMESTAMP_DECIMAL"
-
-# Use the original timestamp from the vault contract - this is what the contract expects
-log_info "Using original timestamp from vault contract as required"
-
-# Use the correct program ID that the contract expects
-PROGRAM_ID_DECIMAL="24847450290753728453128705585"
-
-log_info "Parsed data:"
+log_info "Parsed data from vault:"
+log_info "  Program ID: $PROGRAM_ID_DECIMAL"
 log_info "  Vault Address: $VAULT_ADDRESS"
-log_info "  Timestamp: $TIMESTAMP (decimal: $TIMESTAMP_DECIMAL)"
-log_info "  Program ID: $PROGRAM_ID (using correct decimal: $PROGRAM_ID_DECIMAL)"
-
-# Step 3: Calculate correct timestamp ranges from vault contract
-log_info "🕐 Calculating correct timestamp ranges from vault..."
-
-# Get round duration from vault
-ROUND_DURATION_HEX=$(starkli call $PITCHLAKE_VAULT_12MIN get_round_duration --rpc $STARKNET_RPC_URL | grep -o '0x[0-9a-f]*')
-ROUND_DURATION=$((ROUND_DURATION_HEX))
-
-# Get deployment date from round 1 (since we're starting first round)
-DEPLOYMENT_DATE_HEX=$(starkli call $OPTION_ROUND_12MIN get_deployment_date --rpc $STARKNET_RPC_URL | grep -o '0x[0-9a-f]*')
-UPPER_BOUND=$((DEPLOYMENT_DATE_HEX))
-
-# Calculate the expected timestamp ranges based on vault contract logic
-TWAP_START=$((UPPER_BOUND - ROUND_DURATION))
-TWAP_END=$UPPER_BOUND
-RESERVE_PRICE_START=$((UPPER_BOUND - 3 * ROUND_DURATION))
-RESERVE_PRICE_END=$UPPER_BOUND
-VOLATILITY_START=$RESERVE_PRICE_START
-VOLATILITY_END=$UPPER_BOUND
-
-log_info "Calculated timestamp ranges:"
-log_info "  Round duration: $ROUND_DURATION seconds"
-log_info "  Upper bound: $UPPER_BOUND"
 log_info "  TWAP: [$TWAP_START, $TWAP_END]"
-log_info "  Reserve price: [$RESERVE_PRICE_START, $RESERVE_PRICE_END]"
-log_info "  Volatility: [$VOLATILITY_START, $VOLATILITY_END]"
+log_info "  Max Return (Volatility): [$VOLATILITY_START, $VOLATILITY_END]"
+log_info "  Reserve Price: [$RESERVE_PRICE_START, $RESERVE_PRICE_END]"
 
-# Step 4: Send test request to fossil-api
+# Step 3: Send test request to fossil-api
 log_info "📊 Sending pricing data request..."
 
 log_info "🔍 Debug: Request data being sent:"
 log_info "  PROGRAM_ID_DECIMAL: $PROGRAM_ID_DECIMAL"
+log_info "  VAULT_ADDRESS: $VAULT_ADDRESS"
 log_info "  TWAP_START: $TWAP_START"
 log_info "  TWAP_END: $TWAP_END"
 log_info "  VOLATILITY_START: $VOLATILITY_START"
 log_info "  VOLATILITY_END: $VOLATILITY_END"
 log_info "  RESERVE_PRICE_START: $RESERVE_PRICE_START"
 log_info "  RESERVE_PRICE_END: $RESERVE_PRICE_END"
-log_info "  VAULT_ADDRESS: $VAULT_ADDRESS"
-log_info "  TIMESTAMP_DECIMAL: $TIMESTAMP_DECIMAL"
 
 TEST_REQUEST="{
   \"program_id\": \"$PROGRAM_ID_DECIMAL\",
@@ -168,7 +145,7 @@ RESPONSE=$(curl -s -X POST "$FOSSIL_API_URL/pricing_data" \
 
 log_info "Response: $RESPONSE"
 
-# Step 5: Extract job ID from response
+# Step 4: Extract job ID from response
 JOB_ID=$(echo $RESPONSE | grep -o '"job_id":"[^"]*"' | cut -d'"' -f4)
 
 if [ -z "$JOB_ID" ]; then
@@ -179,7 +156,7 @@ fi
 
 log_info "✅ Job created with ID: $JOB_ID"
 
-# Step 6: Monitor job status
+# Step 5: Monitor job status
 log_info "👁️  Monitoring job status..."
 MAX_STATUS_RETRIES=30
 STATUS_RETRY_COUNT=0
@@ -208,14 +185,14 @@ if [ $STATUS_RETRY_COUNT -eq $MAX_STATUS_RETRIES ]; then
     log_warn "Final status: $STATUS"
 fi
 
-# Step 7: Get detailed job result
+# Step 6: Get detailed job result
 log_info "📋 Getting detailed job result..."
 RESULT_RESPONSE=$(curl -s "$FOSSIL_API_URL/job_result/$JOB_ID" \
   -H "X-API-Key: $API_KEY")
 
 log_info "Detailed result: $RESULT_RESPONSE"
 
-# Step 8: Test batch job status
+# Step 7: Test batch job status
 log_info "📦 Testing batch job status endpoint..."
 BATCH_REQUEST='{"job_ids": ["'$JOB_ID'"]}'
 BATCH_RESPONSE=$(curl -s -X POST "$FOSSIL_API_URL/batch_job_status" \

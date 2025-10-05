@@ -9,8 +9,8 @@ cargo clippy \
     --no-deps \
     -p server \
     -p db-access \
-    -p starknet-handler \
     -- \
+    -W clippy::cognitive_complexity \
     -W clippy::branches_sharing_code \
     -W clippy::clear_with_drain \
     -W clippy::derive_partial_eq_without_eq \
@@ -68,4 +68,5 @@ cargo clippy \
     -W clippy::match_bool \
     -D clippy::needless_bool \
     -W clippy::unwrap_used \
-    -W clippy::expect_used
+    -W clippy::expect_used \
+    -W clippy::nursery

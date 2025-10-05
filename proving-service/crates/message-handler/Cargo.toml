@@ -96,63 +96,63 @@ optional = true
 git = "https://github.com/NethermindEth/pitchlake-coprocessor"
 package = "common"
 optional = true
-branch = "main" 
+branch = "main"
 
 [dependencies.coprocessor_core]
 git = "https://github.com/NethermindEth/pitchlake-coprocessor"
 package = "core"
 optional = true
-branch = "main" 
+branch = "main"
 
 # Coprocessor computation methods
 [dependencies.add_twap_7d_error_bound_floating]
 git = "https://github.com/NethermindEth/pitchlake-coprocessor"
 package = "add-twap-7d-error-bound-floating"
 optional = true
-branch = "main" 
+branch = "main"
 
 [dependencies.max_return_floating]
 git = "https://github.com/NethermindEth/pitchlake-coprocessor"
 package = "max-return-floating"
 optional = true
-branch = "main" 
+branch = "main"
 
 [dependencies.remove_seasonality_error_bound_floating]
 git = "https://github.com/NethermindEth/pitchlake-coprocessor"
 package = "remove-seasonality-error-bound-floating"
 optional = true
-branch = "main" 
+branch = "main"
 
 [dependencies.simulate_price_verify_position_floating]
 git = "https://github.com/NethermindEth/pitchlake-coprocessor"
 package = "simulate-price-verify-position-floating"
 optional = true
-branch = "main" 
+branch = "main"
 
 [dependencies.calculate_pt_pt1_error_bound_floating]
 git = "https://github.com/NethermindEth/pitchlake-coprocessor"
 package = "calculate-pt-pt1-error-bound-floating"
 optional = true
-branch = "main" 
+branch = "main"
 
 [dependencies.twap_error_bound_floating]
 git = "https://github.com/NethermindEth/pitchlake-coprocessor"
 package = "twap-error-bound-floating"
 optional = true
-branch = "main" 
+branch = "main"
 
 [dependencies.hashing_felts]
 git = "https://github.com/NethermindEth/pitchlake-coprocessor"
 package = "hashing-felts"
 optional = true
-branch = "main" 
+branch = "main"
 
 # Proof composition dependencies
 [dependencies.proof_composition_twap_maxreturn_reserveprice_floating_hashing_methods]
 git = "https://github.com/NethermindEth/pitchlake-coprocessor"
 package = "proof-composition-twap-maxreturn-reserveprice-floating-hashing-methods"
 optional = true
-branch = "main" 
+branch = "main"
 
 [dependencies.mock-proof-composition-methods]
 git = "https://github.com/NethermindEth/pitchlake-coprocessor"
