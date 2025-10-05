@@ -71,6 +71,7 @@ where
         }
     }
 
+    #[allow(clippy::cognitive_complexity)]
     pub async fn receive_job(&self) -> Result<()> {
         // Check if proof provider is disabled at startup
         if self.proof_provider.is_disabled() {
@@ -198,6 +199,7 @@ where
                         if should_delete {
                             info!("Job ID {} has failed {} times, will delete after processing", job.job_id, failure_entry.failure_count);
                         }
+                        drop(failures);
                         should_delete
                     };
 
@@ -276,6 +278,7 @@ where
                                 failure_entry.failure_count += 1;
                                 failure_entry.last_failure_time = std::time::Instant::now();
                                 info!("Job ID {} has failed {} times", job.job_id, failure_entry.failure_count);
+                                drop(failures);
                             }
                             // Delete if we've reached max failures
                             if should_delete_after_processing {
@@ -306,6 +309,7 @@ where
                                 failure_entry.failure_count += 1;
                                 failure_entry.last_failure_time = std::time::Instant::now();
                                 info!("Job ID {} has timed out {} times", job.job_id, failure_entry.failure_count);
+                                drop(failures);
                             }
                             // Delete if we've reached max failures
                             if should_delete_after_processing {
@@ -335,6 +339,7 @@ where
     }
 }
 
+#[allow(clippy::future_not_send)]
 async fn send_job_to_queue<Q: Queue>(queue: &Arc<Q>, job: &Job) -> Result<()> {
     let job_str =
         serde_json::to_string(job).map_err(|e| eyre!("Failed to serialize job: {}", e))?;
