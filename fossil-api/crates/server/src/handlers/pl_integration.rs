@@ -21,38 +21,57 @@ pub async fn get_job_result(
                 job.status,
                 job_id
             );
-            (
-                StatusCode::OK,
-                Json(Ok(JobResultResponse {
-                    job_id: job.job_id,
-                    status: job.status,
-                    result: job.result,
-                    created_at: Some(job.created_at.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
-                    completed_at: job
-                        .updated_at
-                        .map(|t| t.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
-                })),
-            )
+            create_job_result_success_response(job)
         }
         Ok(None) => {
             tracing::info!("Job not found for job_id: {}", job_id);
-            (
-                StatusCode::NOT_FOUND,
-                Json(Err(ErrorResponse {
-                    error: "Job not found".to_string(),
-                })),
-            )
+            create_job_result_not_found_response()
         }
         Err(e) => {
             tracing::error!("Failed to get job result for job_id {}: {:?}", job_id, e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(Err(ErrorResponse {
-                    error: "An internal error occurred. Please try again later.".to_string(),
-                })),
-            )
+            create_job_result_error_response()
         }
     }
+}
+
+// Create success response for job result
+fn create_job_result_success_response(
+    job: db_access::models::JobRequest,
+) -> (StatusCode, Json<Result<JobResultResponse, ErrorResponse>>) {
+    (
+        StatusCode::OK,
+        Json(Ok(JobResultResponse {
+            job_id: job.job_id,
+            status: job.status,
+            result: job.result,
+            created_at: Some(job.created_at.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+            completed_at: job
+                .updated_at
+                .map(|t| t.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+        })),
+    )
+}
+
+// Create not found response for job result
+fn create_job_result_not_found_response(
+) -> (StatusCode, Json<Result<JobResultResponse, ErrorResponse>>) {
+    (
+        StatusCode::NOT_FOUND,
+        Json(Err(ErrorResponse {
+            error: "Job not found".to_string(),
+        })),
+    )
+}
+
+// Create error response for job result
+fn create_job_result_error_response() -> (StatusCode, Json<Result<JobResultResponse, ErrorResponse>>)
+{
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(Err(ErrorResponse {
+            error: "An internal error occurred. Please try again later.".to_string(),
+        })),
+    )
 }
 
 // Batch job status endpoint for PitchLake to query multiple jobs efficiently
@@ -63,75 +82,99 @@ pub async fn get_batch_job_status(
 ) -> (StatusCode, Json<BatchJobStatusResponse>) {
     tracing::info!("Getting batch status for {} jobs", payload.job_ids.len());
 
+    if let Some(response) = validate_batch_request(&payload) {
+        return response;
+    }
+
+    match get_multiple_job_requests(state.offchain_processor_db, &payload.job_ids).await {
+        Ok(jobs) => create_batch_success_response(jobs, payload.job_ids),
+        Err(e) => create_batch_error_response(e, payload.job_ids),
+    }
+}
+
+// Validate batch request parameters
+fn validate_batch_request(
+    payload: &BatchJobStatusRequest,
+) -> Option<(StatusCode, Json<BatchJobStatusResponse>)> {
     if payload.job_ids.is_empty() {
-        return (
+        return Some((
             StatusCode::BAD_REQUEST,
             Json(BatchJobStatusResponse {
                 jobs: vec![],
                 not_found: vec![],
             }),
-        );
+        ));
     }
 
     if payload.job_ids.len() > 100 {
         tracing::warn!("Batch request too large: {} jobs", payload.job_ids.len());
-        return (
+        return Some((
             StatusCode::BAD_REQUEST,
             Json(BatchJobStatusResponse {
                 jobs: vec![],
-                not_found: payload.job_ids,
+                not_found: payload.job_ids.clone(),
             }),
-        );
+        ));
     }
 
-    match get_multiple_job_requests(state.offchain_processor_db, &payload.job_ids).await {
-        Ok(jobs) => {
-            let found_jobs: std::collections::HashSet<_> =
-                jobs.iter().map(|j| j.job_id.clone()).collect();
-            let not_found: Vec<String> = payload
-                .job_ids
-                .into_iter()
-                .filter(|id| !found_jobs.contains(id))
-                .collect();
+    None
+}
 
-            let job_responses: Vec<JobResultResponse> = jobs
-                .into_iter()
-                .map(|job| JobResultResponse {
-                    job_id: job.job_id,
-                    status: job.status,
-                    result: job.result,
-                    created_at: Some(job.created_at.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
-                    completed_at: job
-                        .updated_at
-                        .map(|t| t.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
-                })
-                .collect();
+// Create success response for batch request
+fn create_batch_success_response(
+    jobs: Vec<db_access::models::JobRequest>,
+    requested_ids: Vec<String>,
+) -> (StatusCode, Json<BatchJobStatusResponse>) {
+    let found_jobs: std::collections::HashSet<_> = jobs.iter().map(|j| j.job_id.clone()).collect();
 
-            tracing::info!(
-                "Found {} jobs, {} not found",
-                job_responses.len(),
-                not_found.len()
-            );
+    let not_found: Vec<String> = requested_ids
+        .into_iter()
+        .filter(|id| !found_jobs.contains(id))
+        .collect();
 
-            (
-                StatusCode::OK,
-                Json(BatchJobStatusResponse {
-                    jobs: job_responses,
-                    not_found,
-                }),
-            )
-        }
-        Err(e) => {
-            tracing::error!("Failed to get batch job status: {:?}", e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(BatchJobStatusResponse {
-                    jobs: vec![],
-                    not_found: payload.job_ids,
-                }),
-            )
-        }
+    let job_responses: Vec<JobResultResponse> = jobs.into_iter().map(job_to_result).collect();
+
+    tracing::info!(
+        "Found {} jobs, {} not found",
+        job_responses.len(),
+        not_found.len()
+    );
+
+    (
+        StatusCode::OK,
+        Json(BatchJobStatusResponse {
+            jobs: job_responses,
+            not_found,
+        }),
+    )
+}
+
+// Convert job request to job result response
+fn job_to_result(job: db_access::models::JobRequest) -> JobResultResponse {
+    JobResultResponse {
+        job_id: job.job_id,
+        status: job.status,
+        result: job.result,
+        created_at: Some(job.created_at.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
+        completed_at: job
+            .updated_at
+            .map(|t| t.format("%Y-%m-%dT%H:%M:%SZ").to_string()),
     }
+}
+
+// Create error response for batch request
+fn create_batch_error_response(
+    e: sqlx::Error,
+    requested_ids: Vec<String>,
+) -> (StatusCode, Json<BatchJobStatusResponse>) {
+    tracing::error!("Failed to get batch job status: {:?}", e);
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(BatchJobStatusResponse {
+            jobs: vec![],
+            not_found: requested_ids,
+        }),
+    )
 }
 
 // Webhook callback endpoint for PitchLake notifications

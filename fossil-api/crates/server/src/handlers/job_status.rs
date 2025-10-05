@@ -16,54 +16,75 @@ pub async fn get_job_status(
     match get_job_request(state.offchain_processor_db, &job_id).await {
         Ok(Some(job)) => {
             tracing::info!("Found job status: {:?} for job_id: {}", job.status, job_id);
-
-            let message = match job.status {
-                JobStatus::Pending => {
-                    if job.vault_address.is_some() {
-                        Some(
-                            "Job is pending on-chain confirmation via FossilCallbackSuccess event"
-                                .to_string(),
-                        )
-                    } else {
-                        Some("Job is pending".to_string())
-                    }
-                }
-                JobStatus::Completed => {
-                    if job.l1_data.is_some() {
-                        Some("Job completed with on-chain confirmation".to_string())
-                    } else {
-                        Some("Job completed".to_string())
-                    }
-                }
-                JobStatus::Failed => Some("Job failed".to_string()),
-            };
-
-            (
-                StatusCode::OK,
-                Json(GetJobStatusResponseEnum::Success(
-                    JobResponse::from_job_request(&job, message),
-                )),
-            )
+            create_success_response(job)
         }
         Ok(None) => {
             tracing::info!("Job not found for job_id: {}", job_id);
-            (
-                StatusCode::NOT_FOUND,
-                Json(GetJobStatusResponseEnum::Error(ErrorResponse {
-                    error: "Job not found".to_string(),
-                })),
-            )
+            create_not_found_response()
         }
         Err(e) => {
             tracing::error!("Failed to get job status for job_id {}: {:?}", job_id, e);
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(GetJobStatusResponseEnum::Error(ErrorResponse {
-                    error: "An internal error occurred. Please try again later.".to_string(),
-                })),
-            )
+            create_error_response()
         }
     }
+}
+
+// Create success response with job details
+fn create_success_response(
+    job: db_access::models::JobRequest,
+) -> (StatusCode, Json<GetJobStatusResponseEnum>) {
+    let message = build_status_message(&job);
+
+    (
+        StatusCode::OK,
+        Json(GetJobStatusResponseEnum::Success(
+            JobResponse::from_job_request(&job, message),
+        )),
+    )
+}
+
+// Build status message based on job status and data
+fn build_status_message(job: &db_access::models::JobRequest) -> Option<String> {
+    match job.status {
+        JobStatus::Pending => {
+            if job.vault_address.is_some() {
+                Some(
+                    "Job is pending on-chain confirmation via FossilCallbackSuccess event"
+                        .to_string(),
+                )
+            } else {
+                Some("Job is pending".to_string())
+            }
+        }
+        JobStatus::Completed => {
+            if job.l1_data.is_some() {
+                Some("Job completed with on-chain confirmation".to_string())
+            } else {
+                Some("Job completed".to_string())
+            }
+        }
+        JobStatus::Failed => Some("Job failed".to_string()),
+    }
+}
+
+// Create not found response
+fn create_not_found_response() -> (StatusCode, Json<GetJobStatusResponseEnum>) {
+    (
+        StatusCode::NOT_FOUND,
+        Json(GetJobStatusResponseEnum::Error(ErrorResponse {
+            error: "Job not found".to_string(),
+        })),
+    )
+}
+
+// Create internal error response
+fn create_error_response() -> (StatusCode, Json<GetJobStatusResponseEnum>) {
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        Json(GetJobStatusResponseEnum::Error(ErrorResponse {
+            error: "An internal error occurred. Please try again later.".to_string(),
+        })),
+    )
 }
 
 #[cfg(test)]

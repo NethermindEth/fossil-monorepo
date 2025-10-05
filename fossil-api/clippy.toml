@@ -1,0 +1,5 @@
+# Clippy configuration for fossil-api
+# https://doc.rust-lang.org/clippy/lint_configuration.html
+
+# Set cognitive complexity threshold to 35
+cognitive-complexity-threshold = 35

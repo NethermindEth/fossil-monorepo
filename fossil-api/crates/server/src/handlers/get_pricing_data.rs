@@ -26,15 +26,7 @@ pub async fn get_pricing_data(
     State(state): State<AppState>,
     Json(payload): Json<PitchLakeJobRequest>,
 ) -> (StatusCode, Json<JobResponse>) {
-    let context = format!(
-        "program_id={}, twap-range=({},{}), max_return-range=({},{}), reserve_price-range=({},{}), vault_address={}",
-        payload.program_id,
-        payload.params.twap.0, payload.params.twap.1,
-        payload.params.max_return.0, payload.params.max_return.1,
-        payload.params.reserve_price.0, payload.params.reserve_price.1,
-        payload.vault_address,
-    );
-
+    let context = build_request_context(&payload);
     tracing::info!("Received pricing data request. {}", context);
 
     if let Err(boxed_error) = validate_request(&payload) {
@@ -44,25 +36,46 @@ pub async fn get_pricing_data(
     }
 
     let job_id = generate_job_id(&payload.program_id, &payload.params);
-
     tracing::info!("Generated job_id: {}. {}", job_id, context);
 
-    match get_job_request(state.offchain_processor_db.clone(), &job_id).await {
+    process_job_request(&state, &job_id, payload, &context).await
+}
+
+// Build context string for request logging
+fn build_request_context(payload: &PitchLakeJobRequest) -> String {
+    format!(
+        "program_id={}, twap-range=({},{}), max_return-range=({},{}), reserve_price-range=({},{}), vault_address={}",
+        payload.program_id,
+        payload.params.twap.0, payload.params.twap.1,
+        payload.params.max_return.0, payload.params.max_return.1,
+        payload.params.reserve_price.0, payload.params.reserve_price.1,
+        payload.vault_address,
+    )
+}
+
+// Process the job request by checking existing jobs or creating new ones
+async fn process_job_request(
+    state: &AppState,
+    job_id: &str,
+    payload: PitchLakeJobRequest,
+    context: &str,
+) -> (StatusCode, Json<JobResponse>) {
+    match get_job_request(state.offchain_processor_db.clone(), job_id).await {
         Ok(Some(job_request)) => {
             tracing::info!(
                 "Found existing job with status: {}. {}",
                 job_request.status,
                 context
             );
-            handle_existing_job(&state, job_request.status, job_id, payload).await
+            handle_existing_job(state, job_request.status, job_id.to_string(), payload).await
         }
         Ok(None) => {
             tracing::info!("Creating new job request. {}", context);
-            handle_new_job_request(&state, job_id, payload).await
+            handle_new_job_request(state, job_id.to_string(), payload).await
         }
         Err(e) => {
             tracing::error!("Database error: {}. {}", e, context);
-            internal_server_error(e, job_id)
+            internal_server_error(e, job_id.to_string())
         }
     }
 }
@@ -139,23 +152,17 @@ async fn handle_new_job_request(
     job_id: String,
     payload: PitchLakeJobRequest,
 ) -> (StatusCode, Json<JobResponse>) {
-    let current_timestamp = match std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)
-    {
-        Ok(duration) => duration.as_secs() as i64,
+    let current_timestamp = match get_current_timestamp() {
+        Ok(ts) => ts,
         Err(e) => {
-            tracing::error!("Failed to get current timestamp: {:?}", e);
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(JobResponse::new(
-                    job_id,
-                    Some(format!("Failed to get current timestamp: {}", e)),
-                    None,
-                )),
+                Json(JobResponse::new(job_id, Some(e), None)),
             );
         }
     };
 
-    match create_job_request_with_vault(
+    if let Err(e) = create_job_request_with_vault(
         state.offchain_processor_db.clone(),
         &job_id,
         JobStatus::Pending,
@@ -164,38 +171,50 @@ async fn handle_new_job_request(
     )
     .await
     {
-        Ok(_) => {
-            tracing::info!("New job request registered and processing initiated.");
-            let offchain_processor_db_clone = state.offchain_processor_db.clone();
-            let job_id_clone = job_id.clone();
-            let handle = Handle::current();
-            let payload_clone = payload.clone();
-
-            tokio::task::spawn_blocking(move || {
-                handle.block_on(process_job(
-                    offchain_processor_db_clone,
-                    job_id_clone,
-                    payload_clone,
-                ));
-            });
-
-            (
-                StatusCode::CREATED,
-                Json(JobResponse {
-                    job_id: job_id.clone(),
-                    message: Some(
-                        "New job request registered and processing initiated.".to_string(),
-                    ),
-                    status: Some(JobStatus::Pending),
-                    vault_address: Some(payload.vault_address.clone()),
-                    expected_timestamp: Some(current_timestamp),
-                    l1_data: None,
-                    on_chain_confirmation: None,
-                }),
-            )
-        }
-        Err(e) => internal_server_error(e, job_id),
+        return internal_server_error(e, job_id);
     }
+
+    tracing::info!("New job request registered and processing initiated.");
+    spawn_job_processor(state.offchain_processor_db.clone(), &job_id, &payload);
+
+    (
+        StatusCode::CREATED,
+        Json(JobResponse {
+            job_id: job_id.clone(),
+            message: Some("New job request registered and processing initiated.".to_string()),
+            status: Some(JobStatus::Pending),
+            vault_address: Some(payload.vault_address.clone()),
+            expected_timestamp: Some(current_timestamp),
+            l1_data: None,
+            on_chain_confirmation: None,
+        }),
+    )
+}
+
+// Get current Unix timestamp
+fn get_current_timestamp() -> Result<i64, String> {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .map_err(|e| {
+            tracing::error!("Failed to get current timestamp: {:?}", e);
+            format!("Failed to get current timestamp: {}", e)
+        })
+}
+
+// Spawn background task to process job
+fn spawn_job_processor(
+    db: Arc<OffchainProcessorDbConnection>,
+    job_id: &str,
+    payload: &PitchLakeJobRequest,
+) {
+    let job_id_clone = job_id.to_string();
+    let payload_clone = payload.clone();
+    let handle = Handle::current();
+
+    tokio::task::spawn_blocking(move || {
+        handle.block_on(process_job(db, job_id_clone, payload_clone));
+    });
 }
 
 // Helper to handle failed job reprocessing
@@ -214,17 +233,8 @@ async fn reprocess_failed_job(
     {
         return internal_server_error(e, job_id);
     }
-    let offchain_processor_db_clone = state.offchain_processor_db.clone();
-    let job_id_clone = job_id.clone();
-    let handle = Handle::current();
 
-    tokio::task::spawn_blocking(move || {
-        handle.block_on(process_job(
-            offchain_processor_db_clone,
-            job_id_clone,
-            payload,
-        ));
-    });
+    spawn_job_processor(state.offchain_processor_db.clone(), &job_id, &payload);
 
     job_response(
         StatusCode::OK,
@@ -265,7 +275,19 @@ async fn process_job(
     job_id: String,
     payload: PitchLakeJobRequest,
 ) {
-    let context = format!(
+    let context = build_job_context(&job_id, &payload);
+    tracing::info!("Starting job processing. {}", context);
+    tracing::debug!("Payload received: {:?}. {}", payload, context);
+
+    match call_proving_service(&job_id, &payload).await {
+        Ok(_) => handle_proving_service_success(&job_id, &payload.vault_address, &context),
+        Err(e) => handle_proving_service_error(offchain_processor_db, &job_id, e, &context).await,
+    }
+}
+
+// Build context string for logging
+fn build_job_context(job_id: &str, payload: &PitchLakeJobRequest) -> String {
+    format!(
         "job_id={}, program_id={}, twap=({},{}), max_return=({},{}), reserve_price=({},{}), vault_address={}",
         job_id,
         payload.program_id,
@@ -273,48 +295,44 @@ async fn process_job(
         payload.params.max_return.0, payload.params.max_return.1,
         payload.params.reserve_price.0, payload.params.reserve_price.1,
         payload.vault_address,
+    )
+}
+
+// Handle successful proving service response
+fn handle_proving_service_success(job_id: &str, vault_address: &str, context: &str) {
+    tracing::info!(
+        job_id = %job_id,
+        vault_address = %vault_address,
+        "Proving service completed successfully, awaiting on-chain confirmation via FossilCallbackSuccess event"
     );
+    tracing::info!(
+        "Proving service request completed, job remains pending for on-chain confirmation. {}",
+        context
+    );
+}
 
-    tracing::info!("Starting job processing. {}", context);
-    tracing::debug!("Payload received: {:?}. {}", payload, context);
+// Handle proving service errors
+async fn handle_proving_service_error(
+    db: Arc<OffchainProcessorDbConnection>,
+    job_id: &str,
+    error: eyre::Error,
+    context: &str,
+) {
+    let error_msg = format!("Error calling proving service: {:?}", error);
+    tracing::error!("{}. {}", error_msg, context);
 
-    let job_result = match call_proving_service(&job_id, &payload).await {
-        Ok(_result) => {
-            tracing::info!(
-                job_id = %job_id,
-                vault_address = %payload.vault_address,
-                "Proving service completed successfully, awaiting on-chain confirmation via FossilCallbackSuccess event"
-            );
-            // Job stays Pending - will be completed by event monitor
-            true
-        }
-        Err(e) => {
-            let error_msg = format!("Error calling proving service: {:?}", e);
-            tracing::error!("{}. {}", error_msg, context);
-            let _ = update_job_status(
-                offchain_processor_db.clone(),
-                &job_id,
-                JobStatus::Failed,
-                Some(serde_json::json!({
-                    "error": error_msg
-                })),
-            )
-            .await;
-            false
-        }
-    };
+    let _ = update_job_status(
+        db,
+        job_id,
+        JobStatus::Failed,
+        Some(serde_json::json!({ "error": error_msg })),
+    )
+    .await;
 
-    if job_result {
-        tracing::info!(
-            "Proving service request completed, job remains pending for on-chain confirmation. {}",
-            context
-        );
-    } else {
-        tracing::error!(
-            "Job processing failed. See previous errors for details. {}",
-            context
-        );
-    }
+    tracing::error!(
+        "Job processing failed. See previous errors for details. {}",
+        context
+    );
 }
 
 // Call the proving service API
@@ -324,13 +342,25 @@ async fn call_proving_service(
 ) -> Result<serde_json::Value, eyre::Error> {
     dotenv().ok();
 
-    // Get proving service URL from environment variables, with a default value
     let proving_service_url =
         env::var("PROVING_SERVICE_URL").unwrap_or_else(|_| "http://127.0.0.1:3000".to_string());
 
-    let client = Client::new();
+    let api_payload = build_proving_service_payload(job_id, payload)?;
+    tracing::debug!("Sending request to proving service: {:?}", api_payload);
 
-    let api_payload = json!({
+    let response = send_proving_service_request(&proving_service_url, &api_payload).await?;
+    parse_proving_service_response(response).await
+}
+
+// Build the payload for the proving service API
+fn build_proving_service_payload(
+    job_id: &str,
+    payload: &PitchLakeJobRequest,
+) -> Result<serde_json::Value> {
+    let vault_timestamp =
+        get_current_timestamp().map_err(|e| eyre!("Failed to get current timestamp: {}", e))?;
+
+    Ok(json!({
         "job_group_id": job_id,
         "twap": {
             "start_timestamp": payload.params.twap.0,
@@ -345,21 +375,25 @@ async fn call_proving_service(
             "end_timestamp": payload.params.max_return.1
         },
         "vault_address": payload.vault_address,
-        "vault_timestamp": std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|e| eyre::eyre!("Failed to get current timestamp: {}", e))?
-            .as_secs() as i64
-    });
+        "vault_timestamp": vault_timestamp
+    }))
+}
 
-    tracing::debug!("Sending request to proving service: {:?}", api_payload);
-
-    let response = client
-        .post(format!("{}/api/job", proving_service_url))
-        .json(&api_payload)
+// Send request to proving service
+async fn send_proving_service_request(
+    url: &str,
+    payload: &serde_json::Value,
+) -> Result<reqwest::Response> {
+    Client::new()
+        .post(format!("{}/api/job", url))
+        .json(payload)
         .send()
         .await
-        .map_err(|e| eyre!("Failed to send request to proving service: {}", e))?;
+        .map_err(|e| eyre!("Failed to send request to proving service: {}", e))
+}
 
+// Parse response from proving service
+async fn parse_proving_service_response(response: reqwest::Response) -> Result<serde_json::Value> {
     if !response.status().is_success() {
         let error_text = response
             .text()
@@ -374,7 +408,6 @@ async fn call_proving_service(
         .map_err(|e| eyre!("Failed to parse response from proving service: {}", e))?;
 
     tracing::debug!("Received response from proving service: {:?}", result);
-
     Ok(result)
 }
 
