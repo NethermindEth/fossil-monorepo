@@ -1,4 +1,4 @@
-name: Deploy Fossil light client to ECS
+name: Deploy Fossil message handler to ECS
 on:
   push:
     branches:

@@ -1,4 +1,4 @@
-name: Deploy Fossil light client to ECS
+name: Deploy Fossil api to ECS
 on:
   push:
     branches:
@@ -12,7 +12,7 @@ on:
 env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: fossil-images-repository
-  ECS_SERVICE: fossil-api-ecs
+  ECS_SERVICE: fossil-fossil-api-ecs
   ECS_CLUSTER: fossil-ecs-cluster
   CONTAINER_NAME: fossil-api
   TASK_NAME: fossil-api-ecs
