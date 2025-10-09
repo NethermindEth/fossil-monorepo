@@ -15,7 +15,7 @@ env:
   ECS_SERVICE: fossil-fossil-api-ecs
   ECS_CLUSTER: fossil-ecs-cluster
   CONTAINER_NAME: fossil-api
-  TASK_NAME: fossil-api-ecs
+  TASK_NAME: fossil-fossil-api-ecs
   DOCKER_IMAGE: ametelnethermind/fossil-api:latest
 
 permissions:
