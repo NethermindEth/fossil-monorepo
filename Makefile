@@ -1,196 +1,199 @@
 .DEFAULT_GOAL := help
 
 ##@ Setup
+
 .PHONY: setup
-setup: setup-shared setup-ps setup-op ## Set up the complete development environment for all projects
-	@echo "✅ Complete development environment set up successfully!"
-
-.PHONY: setup-shared
-setup-shared: ## Install shared dependencies
-	@echo "🔧 Setting up shared dependencies..."
-	make setup-rust
-	make setup-coverage
-	@echo "✅ Shared dependencies installed"
-
-.PHONY: setup-ps
-setup-ps: ## Set up Proving Service
-	@echo "🔧 Setting up Proving Service environment..."
-	make setup-postgres
-	make setup-localstack
-	cd proving-service && make setup-dev-env
-	@echo "✅ Proving Service environment set up"
-
-.PHONY: setup-op
-setup-op: ## Set up Offchain Processor
-	@echo "🔧 Setting up Offchain Processor environment..."
-	docker compose -f offchain-processor/docker-compose.test.yml up -d offchain_processor_db
-	cd offchain-processor && make setup-platform
-	@echo "✅ Offchain Processor environment set up"
-
-.PHONY: setup-rust
-setup-rust: ## Install Rust and toolchains
-	@echo "🔧 Checking Rust installation..."
+setup: ## Install all dependencies and set up the complete development environment
+	@echo "🚀 Setting up Fossil Monorepo development environment..."
+	@echo ""
+	@echo "1️⃣  Checking Docker..."
+	@if ! command -v docker >/dev/null 2>&1; then \
+		echo "   ❌ Docker is not installed!"; \
+		echo "   Please install Docker Desktop from https://www.docker.com/products/docker-desktop/"; \
+		echo "   After installation, make sure Docker is running and try again."; \
+		exit 1; \
+	else \
+		echo "   ✅ Docker is installed"; \
+	fi
+	@if ! docker info >/dev/null 2>&1; then \
+		echo "   ❌ Docker daemon is not running!"; \
+		echo "   Please start Docker Desktop and try again."; \
+		exit 1; \
+	else \
+		echo "   ✅ Docker daemon is running"; \
+	fi
+	@echo ""
+	@echo "2️⃣  Installing Rust..."
 	@if ! command -v rustup &> /dev/null; then \
-		echo "Installing Rust..."; \
 		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; \
-	else \
-		echo "✅ Rust already installed"; \
+		. $$HOME/.cargo/env; \
 	fi
-	@if ! rustup toolchain list | grep -q "nightly"; then \
-		echo "Installing Rust nightly..."; \
-		rustup toolchain install nightly; \
-		rustup default nightly; \
+	@rustup toolchain install stable
+	@rustup default stable
+	@rustup component add rustfmt clippy
+	@echo "   ✅ Rust stable installed"
+	@echo ""
+	@echo "3️⃣  Installing RISC Zero..."
+	@if ! command -v rzup &> /dev/null; then \
+		curl -L https://risczero.com/install | bash; \
+		. $$HOME/.cargo/env; \
+		$$HOME/.risc0/bin/rzup install; \
 	else \
-		echo "✅ Rust nightly already installed"; \
+		$$HOME/.risc0/bin/rzup install; \
 	fi
-	rustup component add rustfmt clippy
-	rustup component add rustfmt clippy --toolchain nightly
-
-.PHONY: setup-postgres
-setup-postgres: ## Set up PostgreSQL for development
-	docker compose -f proving-service/docker/docker-compose.test.yml up -d postgres
-
-.PHONY: setup-localstack
-setup-localstack: ## Set up LocalStack for AWS services
-	docker compose -f proving-service/docker/docker-compose.sqs.yml up -d
-	./proving-service/scripts/setup-localstack.sh
-
-.PHONY: setup-coverage
-setup-coverage: ## Install code coverage tools
-	@echo "🔧 Setting up code coverage tools..."
-	cargo install cargo-tarpaulin
-	@rustup component add llvm-tools-preview
-	@if ! command -v grcov &> /dev/null; then \
-		echo "Installing grcov..."; \
-		cargo install grcov; \
+	@echo "   ✅ RISC Zero installed"
+	@echo ""
+	@echo "4️⃣  Checking asdf version manager..."
+	@if ! command -v asdf &> /dev/null; then \
+		echo "   ❌ asdf is not installed!"; \
+		echo ""; \
+		echo "   Please install asdf by following the instructions at:"; \
+		echo "   👉 https://asdf-vm.com/guide/getting-started.html"; \
+		echo ""; \
+		echo "   Quick install for macOS/Linux:"; \
+		echo "   1. git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.14.0"; \
+		echo "   2. Add to your shell profile (~/.bashrc or ~/.zshrc):"; \
+		echo "      . \"$$HOME/.asdf/asdf.sh\""; \
+		echo "   3. Restart your terminal"; \
+		echo "   4. Run 'make setup' again"; \
+		exit 1; \
 	else \
-		echo "✅ grcov already installed"; \
+		echo "   ✅ asdf is installed"; \
 	fi
+	@asdf plugin add scarb 2>/dev/null || true
+	@asdf plugin add starknet-foundry 2>/dev/null || true
+	@asdf plugin add starkli 2>/dev/null || true
+	@echo ""
+	@echo "5️⃣  Installing StarkNet tools from .tool-versions..."
+	@asdf install
+	@echo "   ✅ Installed versions from .tool-versions:"
+	@echo "      - Scarb 2.12.1"
+	@echo "      - StarkNet Foundry 0.49.0"
+	@echo "      - Starkli 0.4.2"
+	@echo ""
+	@echo "6️⃣  Setting up environment files..."
+	@if [ ! -f .env.local ]; then \
+		cp .env.example .env.local; \
+		echo "   ✅ Created .env.local from .env.example"; \
+	else \
+		echo "   ✅ .env.local already exists"; \
+	fi
+	@if [ ! -f .env.docker ]; then \
+		cp .env.example .env.docker; \
+		sed -i.bak 's|STARKNET_RPC_URL=http://localhost:5050|STARKNET_RPC_URL=http://katana:5050|g' .env.docker; \
+		sed -i.bak 's|OFFCHAIN_PROCESSOR_DATABASE_URL=postgresql://postgres:postgres@localhost:5434/postgres|OFFCHAIN_PROCESSOR_DATABASE_URL=postgresql://postgres:postgres@fossil_api_db:5432/postgres|g' .env.docker; \
+		sed -i.bak 's|PROVING_SERVICE_DATABASE_URL=postgresql://postgres:postgres@localhost:5435/postgres|PROVING_SERVICE_DATABASE_URL=postgresql://postgres:postgres@proving_service_db:5432/postgres|g' .env.docker; \
+		sed -i.bak 's|AWS_ENDPOINT_URL=http://localhost:4567|AWS_ENDPOINT_URL=http://localstack:4566|g' .env.docker; \
+		sed -i.bak 's|SQS_QUEUE_URL=http://localhost:4567/000000000000/fossilQueue|SQS_QUEUE_URL=http://localstack:4566/000000000000/fossilQueue|g' .env.docker; \
+		sed -i.bak 's|PROVING_SERVICE_URL=http://127.0.0.1:3001|PROVING_SERVICE_URL=http://proving-service-api:3001|g' .env.docker; \
+		rm -f .env.docker.bak; \
+		echo "   ✅ Created .env.docker with Docker service URLs"; \
+	else \
+		echo "   ✅ .env.docker already exists"; \
+	fi
+	@echo ""
+	@echo "7️⃣  Building release versions..."
+	@$(MAKE) build
+	@echo ""
+	@echo "✅ Setup complete! You can now run:"
+	@echo "   make dev-up    - Start the development environment"
+	@echo "   make dev-down  - Stop the development environment"
+	@echo ""
+	@echo "💡 Note: You may need to restart your shell or run:"
+	@echo "   source ~/.asdf/asdf.sh"
+	@echo "   to use the StarkNet tools immediately."
 
-##@ Monorepo Management
+##@ Development
 
-.PHONY: build-all
-build-all: ## Build all projects in release mode.
-	make ps-build
-	make op-build
+.PHONY: dev-up
+dev-up: ## Start all local development services
+	@echo "🚀 Starting local development services..."
+	@echo "📋 Step 1: Starting infrastructure services..."
+	docker-compose -f docker-compose.local.yml up -d katana proving_service_db fossil_api_db localstack
+	@echo "⏳ Waiting for Katana to be healthy..."
+	@timeout=60; while [ "$$timeout" -gt 0 ]; do \
+		if docker-compose -f docker-compose.local.yml exec -T katana sh -c 'curl -s -X POST -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"method\":\"starknet_chainId\",\"params\":[],\"id\":1}" http://localhost:5050' > /dev/null 2>&1; then \
+			echo "✅ Katana is healthy"; \
+			break; \
+		fi; \
+		echo "   Waiting for Katana... ($$timeout seconds left)"; \
+		sleep 2; \
+		timeout=$$((timeout-2)); \
+	done; \
+	if [ "$$timeout" -le 0 ]; then \
+		echo "❌ Timeout waiting for Katana to be healthy"; \
+		exit 1; \
+	fi
+	@echo "🔧 Step 2: Deploying contracts..."
+	docker-compose -f docker-compose.deploy.yml run --rm contract-deployer
+	@echo "🚀 Step 3: Starting application services..."
+	docker-compose -f docker-compose.local.yml up -d
+	@echo "✅ Services started:"
+	@echo "  📡 Katana: http://localhost:5050"
+	@echo "  📊 Fossil API: http://localhost:3000"
+	@echo "  🗄️  Databases: Proving Service (5435), Fossil API (5434)"
+	@echo "  ☁️  LocalStack: http://localhost:4567"
 
-.PHONY: build-all-debug
-build-all-debug: ## Build all projects in debug mode.
-	cd proving-service && cargo build
-	cd offchain-processor && cargo build
+.PHONY: services-up
+services-up: ## Start infrastructure and API services with .env.sepolia (excludes katana)
+	@echo "🚀 Starting infrastructure and API services..."
+	docker-compose -f docker-compose.services.yml up -d
+	@echo "✅ Services started (using .env.sepolia):"
+	@echo "  📊 Fossil API: http://localhost:3000"
+	@echo "  🔧 Proving Service API: http://localhost:3001"
+	@echo "  🔨 Message Handler: running"
+	@echo "  🗄️  Databases: Proving Service (5435), Fossil API (5434)"
+	@echo "  ☁️  LocalStack: http://localhost:4567"
 
-.PHONY: test-all
-test-all: ## Run tests for all projects.
-	make ps-test
-	make op-test
+.PHONY: services-down
+services-down: ## Stop services started with services-up
+	@echo "🛑 Stopping services..."
+	docker-compose -f docker-compose.services.yml down
+	@echo "✅ Services stopped"
 
-.PHONY: lint-all
-lint-all: ## Run linters for all projects.
-	cd proving-service && make lint
-	cd offchain-processor && make lint
+.PHONY: dev-down
+dev-down: ## Stop services and clean up (removes volumes)
+	@echo "🛑 Stopping and cleaning up..."
+	@echo "📋 Step 1: Stopping application services..."
+	docker-compose -f docker-compose.local.yml down -v --remove-orphans
+	@echo "📋 Step 2: Cleaning up deployment containers..."
+	docker-compose -f docker-compose.deploy.yml down -v --remove-orphans 2>/dev/null || true
+	@echo "📋 Step 3: Removing any remaining networks..."
+	docker network prune -f
+	@echo "✅ Environment completely cleaned"
+
+.PHONY: logs
+logs: ## View logs from all services
+	docker-compose -f docker-compose.local.yml logs -f
+
+##@ Build & Test
+
+.PHONY: build
+build: ## Build all projects in release mode
+	cd proving-service && cargo build --release
+	cd fossil-api && cargo build --release
+	@echo "✅ Build complete"
+
+.PHONY: build-message-handler-image
+build-message-handler-image: ## Build message-handler Docker image with pre-compiled mock-proof binary
+	@echo "🔧 Building message-handler Docker image with mock-proof features..."
+	./scripts/build-message-handler-image.sh
+	@echo "✅ Message handler image ready: fossil-message-handler:with-files"
+
+.PHONY: test
+test: ## Run all tests
+	cd proving-service && make test
+	cd fossil-api && make test
+	@echo "✅ Tests complete"
 
 .PHONY: pr
-pr: lint-all test-all ## Prepare all projects for a pull request.
-	@echo "✅ All projects prepared for PR"
-
-.PHONY: clean-all
-clean-all: ## Clean all projects.
-	make ps-clean
-	make op-clean
-
-##@ Proving Service
-
-.PHONY: ps-build
-ps-build: ## Build Proving Service in release mode.
-	cd proving-service && cargo build --release
-
-.PHONY: ps-test
-ps-test: ## Run tests for Proving Service.
-	cd proving-service && make test
-
-.PHONY: ps-run
-ps-run: ## Run Proving Service.
-	cd proving-service && cargo run
-
-.PHONY: ps-clean
-ps-clean: ## Clean Proving Service build artifacts.
-	cd proving-service && cargo clean
-	rm -rf proving-service/target
-
-##@ Offchain Processor
-
-.PHONY: op-build
-op-build: ## Build Offchain Processor in release mode.
-	cd offchain-processor && cargo build --release
-
-.PHONY: op-test
-op-test: ## Run tests for Offchain Processor.
-	cd offchain-processor && make test
-
-.PHONY: op-run
-op-run: ## Run Offchain Processor.
-	cd offchain-processor && cargo run
-
-.PHONY: op-clean
-op-clean: ## Clean Offchain Processor build artifacts.
-	cd offchain-processor && cargo clean
-	rm -rf offchain-processor/target
-
-##@ Development Environment
-
-.PHONY: dev-services
-dev-services: ## Start all development services.
-	docker compose -f proving-service/docker/docker-compose.test.yml up -d
-	docker compose -f proving-service/docker/docker-compose.sqs.yml up -d
-	docker compose -f offchain-processor/docker-compose.test.yml up -d
-
-.PHONY: dev-services-stop
-dev-services-stop: ## Stop all development services.
-	docker compose -f proving-service/docker/docker-compose.test.yml down
-	docker compose -f proving-service/docker/docker-compose.sqs.yml down
-	docker compose -f offchain-processor/docker-compose.test.yml down
-
-##@ Code Coverage
-
-.PHONY: coverage-all
-coverage-all: ## Run code coverage for all projects
-	@echo "🔍 Running coverage for Proving Service..."
-	cd proving-service && make coverage-clean && \
-	{ docker compose -f docker/docker-compose.test.yml up -d && \
-		CARGO_INCREMENTAL=0 \
-		RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
-		LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
-		cargo test --workspace && \
-		grcov . --binary-path ./target/debug/ -s . -t html  --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/html && \
-		grcov . --binary-path ./target/debug/ -s . -t lcov  --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info && \
-		echo "Coverage report generated at .coverage/html/index.html"; \
-		docker compose -f docker/docker-compose.test.yml down -v; \
-	}
-	@echo "🔍 Running coverage for Offchain Processor..."
-	cd offchain-processor && make coverage-clean && \
-	{ docker compose -f docker-compose.test.yml up -d offchain_processor_db && \
-		CARGO_INCREMENTAL=0 \
-		RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
-		LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
-		cargo test --workspace --all-features && \
-		grcov . --binary-path ./target/debug/ -s . -t html --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/html && \
-		grcov . --binary-path ./target/debug/ -s . -t lcov --ignore-not-existing --ignore "/*" --ignore "tests/*" -o .coverage/lcov.info && \
-		echo "Coverage report generated at .coverage/html/index.html"; \
-		docker compose -f docker-compose.test.yml down -v; \
-	}
-	@echo "✅ Coverage reports generated for all projects"
-	@echo "📊 Proving Service coverage: proving-service/.coverage/html/index.html"
-	@echo "📊 Offchain Processor coverage: offchain-processor/.coverage/html/index.html"
-
-##@ Testing
-.PHONY: test-clean
-test-clean: ## Clean up test environment
-	docker compose -f proving-service/docker/docker-compose.test.yml down -v
-	docker compose -f proving-service/docker/docker-compose.sqs.yml down -v
-	docker compose -f offchain-processor/docker-compose.test.yml down -v
+pr: ## Run lints and tests for all projects (use before submitting PRs)
+	cd proving-service && make pr
+	cd fossil-api && make pr
+	@echo "✅ PR checks complete"
 
 ##@ Help
 
 .PHONY: help
-help: ## Display this help.
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
+help: ## Display this help
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)

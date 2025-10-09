@@ -1,0 +1,35 @@
+# Use Ubuntu 24.04 (Noble Numbat) which has GLIBC 2.39
+FROM ubuntu:noble
+
+WORKDIR /app
+
+# Install only the absolutely necessary runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    libssl3 \
+    curl \
+    libopenblas0 \
+    libgfortran5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create necessary directories for RISC0 methods
+RUN mkdir -p /app/target/release/build/mock-proof-composition-methods/out
+
+# The binary and method ELFs will be copied during the build script
+# using docker cp commands after the container is created
+
+# Set environment variables
+ENV RUST_LOG=info
+
+# Create wrapper script for message-handler
+RUN printf '%s\n' \
+    '#!/bin/bash' \
+    '' \
+    '# Run the message-handler application' \
+    'exec /usr/local/bin/message-handler "$@"' \
+    > /usr/local/bin/message-handler-wrapper.sh
+
+RUN chmod +x /usr/local/bin/message-handler-wrapper.sh
+
+# Use ENTRYPOINT so it runs even with empty entrypoint/command arrays
+ENTRYPOINT ["/usr/local/bin/message-handler-wrapper.sh"]

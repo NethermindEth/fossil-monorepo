@@ -26,8 +26,7 @@ impl Default for LocalMessageQueue {
 #[async_trait]
 impl Queue for LocalMessageQueue {
     async fn send_message(&self, message: String) -> Result<(), QueueError> {
-        let mut messages = self.messages.lock().await;
-        messages.push(QueueMessage {
+        self.messages.lock().await.push(QueueMessage {
             id: Some(Uuid::new_v4().to_string()),
             body: message,
         });
@@ -35,8 +34,7 @@ impl Queue for LocalMessageQueue {
     }
 
     async fn receive_messages(&self) -> Result<Vec<QueueMessage>, QueueError> {
-        let messages = self.messages.lock().await;
-        let result = messages.clone();
+        let result = self.messages.lock().await.clone();
         Ok(result)
     }
 
@@ -49,6 +47,7 @@ impl Queue for LocalMessageQueue {
             return Ok(());
         };
         messages.remove(index);
+        drop(messages);
         Ok(())
     }
 }

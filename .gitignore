@@ -19,7 +19,9 @@ Cargo.lock
 .env
 */.env
 **/.env
-**/.env.*
+**/.env.docker
+**/.env.local
+**/.env.sepolia
 
 # Build artifacts
 debug/
@@ -36,7 +38,7 @@ Thumbs.db
 
 # Project specific
 proving-service/target/
-offchain-processor/target/
+fossil-api/target/
 
 # Common system files
 .DS_Store
@@ -51,5 +53,21 @@ data.csv
 crates/mmr-accumulator/db-instances/
 zkvm/.bonsai-env
 zkvm/.bonsay-env
-changes.diff 
-offchain-processor/tarpaulin-report.html
+changes.diff
+fossil-api/tarpaulin-report.html
+
+proving-service/mock_contracts/.env.katana
+
+proving-service/mock_contracts/.env.devnet
+
+proving-service/message_handler.log
+
+proving-service/mock_contracts/.env.local
+
+*.log
+
+CLAUDE.md
+
+starknet-contracts/.snfoundry_cache/
+
+ECS_DEPLOYMENT_GUIDE.md

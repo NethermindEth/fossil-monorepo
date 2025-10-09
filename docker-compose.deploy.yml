@@ -1,0 +1,26 @@
+services:
+  contract-deployer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.deploy
+    image: fossil-deploy:latest
+    networks:
+      - fossil-monorepo_local-network
+    volumes:
+      - ./starknet-contracts:/app/starknet-contracts
+      - ./scripts:/app/scripts
+      - ./.env.docker:/app/.env.docker
+      - ./.env.local:/app/.env.local
+    working_dir: /app
+    environment:
+      - STARKNET_RPC_URL=http://katana:5050
+    command:
+      [
+        "sh",
+        "-c",
+        "chmod +x scripts/deploy-starknet.sh && ./scripts/deploy-starknet.sh docker",
+      ]
+
+networks:
+  fossil-monorepo_local-network:
+    external: true

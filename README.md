@@ -1,108 +1,304 @@
-<div align="center">
-
 # Fossil Monorepo
 
-[![CI Status](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/monorepo-ci.yml/badge.svg)](https://github.com/NethermindEth/fossil-prover-service/actions/workflows/monorepo-ci.yml)
+A complete RISC Zero proof generation and StarkNet verification system for cryptographic proofs of financial data calculations.
 
-| **Proving Service**    | ![PS Coverage][ps-coverage-badge] |
-|:----------------------:|:---------------------------------:|
-| **Offchain Processor** | ![OP Coverage][op-coverage-badge] |
+## Overview
 
-</div>
+The Fossil system consists of three main components:
 
-This monorepo contains two separate projects:
+- **Fossil API** - HTTP API for job management and pricing data requests
+- **Proving Service** - RISC Zero proof generation via Bonsai API
+- **StarkNet Contracts** - Onchain proof verification and hash storage
 
-1. **Proving Service**: A service that handles proof generation and verification
-2. **Offchain Processor**: A service that processes offchain data and prepares it for proof generation
+## Documentation
 
-## Getting Started
+### 📚 Getting Started
+- [Installation Guide](docs/getting-started/installation.md) - Set up your development environment
+- [Local Development](docs/getting-started/local-development.md) - Run the complete development stack
+- [Testing Guide](docs/getting-started/testing.md) - Run tests and write new ones
 
-### One-Command Setup
+### 🏗️ Architecture
+- [Architecture Overview](docs/architecture/overview.md) - High-level system design
+- [Data Flow](docs/architecture/data-flow.md) - End-to-end request processing
+- [Proving Service](docs/architecture/proving-service.md) - Proof generation architecture
+- [Fossil API](docs/architecture/fossil-api.md) - API service architecture
+- [StarkNet Contracts](docs/architecture/starknet-contracts.md) - Smart contract architecture
 
-To set up the complete development environment:
+### 📖 Guides
+- [Environment Setup](docs/guides/environment-setup.md) - Configure environment variables
+- [Database Management](docs/guides/database-management.md) - Migrations and queries
+- [Running Services](docs/guides/running-services.md) - Docker vs native execution
+- [Debugging](docs/guides/debugging.md) - Troubleshooting and logging
+- [Deployment](docs/guides/deployment.md) - Production deployment (AWS ECS)
+
+### 🔌 API Reference
+- [Fossil API Endpoints](docs/api-reference/fossil-api-endpoints.md) - Complete API documentation
+- [Proving Service Endpoints](docs/api-reference/proving-service-endpoints.md) - Internal API
+- [Authentication](docs/api-reference/authentication.md) - API key management
+
+### 📦 Crates
+**Proving Service:**
+- [db](docs/crates/proving-service/db.md) - Database layer
+- [message-handler](docs/crates/proving-service/message-handler.md) - SQS and proof generation
+- [proving-service](docs/crates/proving-service/proving-service.md) - HTTP API
+- [starknet-handler](docs/crates/proving-service/starknet-handler.md) - StarkNet integration
+
+**Fossil API:**
+- [db-access](docs/crates/fossil-api/db-access.md) - Database and authentication
+- [server](docs/crates/fossil-api/server.md) - HTTP server
+
+### 📜 Contracts
+- [Fossil Hash Store](docs/contracts/fossil-hash-store.md) - Hierarchical hash storage
+- [PitchLake Verifier](docs/contracts/pitchlake-verifier.md) - RISC Zero proof verification
+- [Mocks](docs/contracts/mocks.md) - Testing contracts
+
+## Quick Start
+
+### 1. Initial Setup
 
 ```bash
 make setup
 ```
 
-This will:
+This installs all dependencies:
+- Rust toolchain with required components
+- RISC0 toolchain via rzup
+- StarkNet tools (Starkli, Scarb, Starknet Foundry) via asdf
+- Environment file configuration
 
-- Install Rust and required toolchains
-- Set up PostgreSQL databases for both projects
-- Configure LocalStack for AWS services
-- Install code coverage tools
-- Set up project-specific dependencies
-
-You can also set up individual components:
+### 2. Start Development Stack
 
 ```bash
-make setup-ps    # Set up Proving Service only
-make setup-op    # Set up Offchain Processor only
-make setup-rust  # Set up Rust only
+make dev-up
+```
+
+This starts the complete local development environment:
+1. **Infrastructure**: Katana (StarkNet devnet), PostgreSQL databases, LocalStack (AWS SQS)
+2. **Contract Deployment**: Automatically deploys fresh contracts to Katana including multiple vault configurations (12min, 3hour, 1month)
+3. **Services**: Fossil API, Proving Service API, Message Handler
+
+### 3. Stop Development Stack
+
+```bash
+make dev-down
+```
+
+## Environment Configuration
+
+The system uses three environment files:
+
+### `.env.local` (Host services)
+For running services directly on your machine:
+- `STARKNET_RPC_URL=http://localhost:5050` - Points to local Katana
+- Contract addresses updated by deployment script
+- Database URLs pointing to `localhost` ports
+
+### `.env.docker` (Container services)  
+For services running inside Docker containers:
+- `STARKNET_RPC_URL=http://katana:5050` - Points to Katana container
+- Same contract addresses as `.env.local`
+- Database URLs using Docker service names
+
+### Key Environment Variables
+- `PITCHLAKE_VERIFIER_CONTRACT` - StarkNet contract for proof verification
+- `PITCHLAKE_VAULT` - Default vault contract address (12-minute rounds)
+- `PITCHLAKE_VAULT_12MIN` - 12-minute vault contract address
+- `PITCHLAKE_VAULT_3H` - 3-hour vault contract address  
+- `PITCHLAKE_VAULT_1M` - 1-month vault contract address
+- `BONSAI_API_KEY` - RISC0 Bonsai API key for proof generation
+- `ENABLE_PROOF=true` - Enable proof generation in message handler
+- `USE_RISC0_INTEGRATION=true` - Use RISC0 for proof generation
+- `VERIFY_PROOFS_ONCHAIN=true` - Submit proofs to StarkNet for verification
+
+## Testing the System
+
+### Running the Test Script
+
+```bash
+./test-local-request.sh
+```
+
+This comprehensive test:
+
+1. **Health Checks**: Verifies all services are responding
+2. **API Key Generation**: Creates authentication token
+3. **Contract Integration**: Automatically retrieves request data from StarkNet vault contracts
+4. **Timestamp Calculation**: Dynamically calculates valid timestamp ranges based on vault contract parameters
+5. **Pricing Data Request**: Submits properly formatted requests with correct vault addresses and timestamp ranges
+6. **Job Monitoring**: Tracks job status with detailed progress reporting
+7. **Result Verification**: Retrieves and validates job completion and results
+8. **Batch Testing**: Tests batch job status endpoints
+
+### Manual API Testing
+
+#### 1. Generate API Key
+```bash
+curl -X POST "http://localhost:3000/api_key" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "test_key"}'
+```
+
+#### 2. Submit Pricing Data Request
+```bash
+curl -X POST "http://localhost:3000/pricing_data" \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: YOUR_API_KEY" \
+  -d '{
+    "program_id": "RISC0_MOCK_PROOF_TEST",
+    "vault_address": "YOUR_PITCHLAKE_VAULT_ADDRESS",
+    "params": {
+      "twap": [1672531200, 1672617600],
+      "max_return": [1672531200, 1672617600],
+      "reserve_price": [1672531200, 1672617600]
+    }
+  }'
+```
+
+**Note**: Replace `YOUR_PITCHLAKE_VAULT_ADDRESS` with one of the deployed vault addresses:
+- `PITCHLAKE_VAULT_12MIN` for 12-minute rounds
+- `PITCHLAKE_VAULT_3H` for 3-hour rounds  
+- `PITCHLAKE_VAULT_1M` for 1-month rounds
+
+**Tip**: The `test-local-request.sh` script automatically calculates valid timestamp ranges and vault addresses by querying the deployed contracts, eliminating the need for manual timestamp calculation.
+
+#### 3. Check Job Status
+```bash
+curl "http://localhost:3000/job_status/JOB_ID"
+```
+
+#### 4. Get Job Result
+```bash
+curl "http://localhost:3000/job_result/JOB_ID" \
+  -H "X-API-Key: YOUR_API_KEY"
+```
+
+## Service URLs
+
+When `make dev-up` is running:
+
+- **Fossil API**: http://localhost:3000
+- **Proving Service API**: http://localhost:3001
+- **Katana StarkNet Devnet**: http://localhost:5050
+- **LocalStack (AWS SQS)**: http://localhost:4567
+- **PostgreSQL Databases**:
+  - Proving Service: localhost:5435
+  - Fossil API: localhost:5434
+
+## Monitoring
+
+Check service logs:
+```bash
+# Message Handler (RISC0 proof generation)
+docker logs fossil-monorepo-message-handler-1 -f
+
+# Fossil API (HTTP API)
+docker logs fossil-monorepo-fossil-api-1 -f
+
+# Proving Service API
+docker logs fossil-monorepo-proving-service-api-1 -f
 ```
 
 ## Development Workflow
 
-> **IMPORTANT:** Always run `make pr` before submitting your changes!
->
-> This ensures your code:
->
-> - Passes all linters (formatting and static analysis)
-> - Passes all tests in both projects
-> - Is ready for review without CI pipeline failures
+1. **Make Changes**: Edit code in `proving-service/` or `fossil-api/`
+2. **Restart Services**: `make dev-down && make dev-up` (restarts all services with fresh contracts)
+3. **Test Changes**: Run `./test-local-request.sh` (automatically adapts to new contract deployments)
+4. **Advanced Testing**: Use individual API endpoints for specific component testing
 
-## Monorepo Structure
+## Key Features
 
-```text
+- **Asynchronous Proof Generation** - Jobs queued in SQS for background processing
+- **RISC Zero Integration** - zkVM proofs via Bonsai API
+- **StarkNet Verification** - Onchain proof verification with Groth16
+- **Hierarchical Hashing** - Efficient data integrity verification
+- **API Key Authentication** - Secure access control
+- **Multi-Vault Support** - 12-minute, 3-hour, and 1-month vaults
+- **Event Monitoring** - Background StarkNet event tracking
+- **Comprehensive Testing** - Unit, integration, and E2E tests
+
+## Troubleshooting
+
+For detailed troubleshooting, see the [Debugging Guide](docs/guides/debugging.md).
+
+**Common Issues:**
+- **Contract address mismatches**: Restart with `make dev-down && make dev-up` (deploys fresh contracts)
+- **Service health issues**: Check logs with `docker logs` commands above
+- **Test script failures**: Ensure all services are healthy before running `./test-local-request.sh`
+- **Timestamp validation errors**: The test script automatically calculates valid ranges, but manual requests must use appropriate timestamps relative to contract deployment
+- **API key issues**: Each test run generates a fresh API key; reuse keys from previous runs if needed
+
+## Technology Stack
+
+**Backend:**
+- Rust (stable) - Core implementation
+- Tokio - Async runtime
+- Axum - HTTP framework
+- SQLx - Database ORM
+- PostgreSQL - Data storage
+- AWS SQS - Job queue (LocalStack for local dev)
+
+**Blockchain:**
+- StarkNet - Smart contract platform
+- Cairo 2.x - Contract language
+- RISC Zero - zkVM proof generation
+- Groth16 - Proof verification scheme
+
+**Infrastructure:**
+- Docker & Docker Compose - Containerization
+- AWS ECS - Production deployment
+- Katana - Local StarkNet devnet
+
+## Project Structure
+
+```
 fossil-monorepo/
-├── proving-service/     # Contains the Proving Service implementation
-└── offchain-processor/  # Contains the Offchain Processor implementation
+├── docs/                      # Complete documentation
+│   ├── getting-started/       # Setup and testing guides
+│   ├── architecture/          # System design docs
+│   ├── guides/               # Operational guides
+│   ├── api-reference/        # API documentation
+│   ├── crates/               # Crate-specific docs
+│   └── contracts/            # Contract documentation
+├── fossil-api/               # HTTP API service
+│   ├── crates/
+│   │   ├── server/          # HTTP server
+│   │   └── db-access/       # Database layer
+├── proving-service/          # Proof generation service
+│   ├── crates/
+│   │   ├── proving-service/ # HTTP API
+│   │   ├── message-handler/ # SQS & proof generation
+│   │   ├── db/             # Database layer
+│   │   └── starknet-handler/# StarkNet integration
+├── starknet-contracts/       # Smart contracts
+│   ├── fossil-hash-store/   # Hash storage contract
+│   ├── pitchlake-verifier/  # Proof verifier
+│   └── mocks/               # Test contracts
+├── scripts/                  # Deployment scripts
+└── docker/                   # Docker configurations
 ```
 
-## Monorepo Commands
+## Contributing
 
-The root Makefile provides convenience commands for working across both projects:
+Before submitting changes:
 
 ```bash
-# Setup
-make setup            # Set up complete development environment
-make setup-ps         # Set up Proving Service only
-make setup-op         # Set up Offchain Processor only
+# Run all tests and linters
+make pr
 
-# Building
-make build-all         # Build all projects in release mode
-make build-all-debug   # Build all projects in debug mode
-make ps-build          # Build Proving Service only
-make op-build          # Build Offchain Processor only
-
-# Testing
-make test-all          # Test all projects
-make ps-test           # Test Proving Service only
-make op-test           # Test Offchain Processor only
-
-# Linting and PR Preparation
-make lint-all          # Run linters on all projects
-make pr                # Run linters and tests to prepare for a pull request
-
-# Development Services
-make dev-services      # Start all development services
-make dev-services-stop # Stop all development services
-
-# Cleaning
-make clean-all         # Clean all projects
-make ps-clean          # Clean Proving Service only
-make op-clean          # Clean Offchain Processor only
-
-# Help
-make help              # Show all available commands
+# Individual operations
+make test-all    # Run all tests
+make lint-all    # Run linters
+make build-all   # Build all projects
 ```
 
-## Project Documentation
+See [CLAUDE.md](CLAUDE.md) for development workflow details.
 
-For detailed information about each project, see their respective READMEs:
+## License
 
-- [Proving Service](proving-service/README.md)
-- [Offchain Processor](offchain-processor/README.md)
+[Add license information]
 
-[ps-coverage-badge]: https://img.shields.io/badge/coverage-78.5%25-green
-[op-coverage-badge]: https://img.shields.io/badge/coverage-82.3%25-green
+## Support
+
+- **Documentation**: Start with [Getting Started](docs/getting-started/installation.md)
+- **Issues**: Report bugs and request features via GitHub Issues
+- **API Reference**: [Fossil API Endpoints](docs/api-reference/fossil-api-endpoints.md)

@@ -23,6 +23,7 @@ impl<Q: Queue + Send + Sync + 'static> ExampleMessageHandler<Q> {
         Self { queue, terminator }
     }
 
+    #[allow(clippy::cognitive_complexity)]
     pub async fn receive_job(&self) -> Result<()> {
         info!("Job processor started, waiting for messages");
 
@@ -52,9 +53,9 @@ impl<Q: Queue + Send + Sync + 'static> ExampleMessageHandler<Q> {
                         let queue_clone = self.queue.clone();
                         task::spawn(async move {
                             let message_clone = message.clone();
-                            println!("Received & processing job: {:?}", job);
+                            println!("Received & processing job: {job:?}");
                             if let Err(e) = queue_clone.delete_message(&message_clone).await {
-                                eprintln!("Failed to delete message: {}", e);
+                                eprintln!("Failed to delete message: {e}");
                             }
                         });
                     }

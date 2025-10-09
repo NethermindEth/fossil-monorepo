@@ -18,9 +18,9 @@ pub enum QueueError {
 impl std::fmt::Display for QueueError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::SendError(msg) => write!(f, "Failed to send message: {}", msg),
-            Self::ReceiveError(msg) => write!(f, "Failed to receive message: {}", msg),
-            Self::DeleteError(msg) => write!(f, "Failed to delete message: {}", msg),
+            Self::SendError(msg) => write!(f, "Failed to send message: {msg}"),
+            Self::ReceiveError(msg) => write!(f, "Failed to receive message: {msg}"),
+            Self::DeleteError(msg) => write!(f, "Failed to delete message: {msg}"),
         }
     }
 }

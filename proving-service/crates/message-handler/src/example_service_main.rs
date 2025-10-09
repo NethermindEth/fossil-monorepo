@@ -49,20 +49,28 @@ async fn main() -> Result<()> {
                     start_timestamp: match SystemTime::now().duration_since(UNIX_EPOCH) {
                         Ok(duration) => duration.as_secs() as i64,
                         Err(e) => {
-                            println!("Failed to get duration: {}", e);
+                            println!("Failed to get duration: {e}");
                             0 // Fallback value
                         }
                     },
                     end_timestamp: match SystemTime::now().duration_since(UNIX_EPOCH) {
                         Ok(duration) => duration.as_secs() as i64,
                         Err(e) => {
-                            println!("Failed to get duration: {}", e);
+                            println!("Failed to get duration: {e}");
                             0 // Fallback value
                         }
                     },
+                    twap_start_timestamp: None,
+                    twap_end_timestamp: None,
+                    reserve_price_start_timestamp: None,
+                    reserve_price_end_timestamp: None,
+                    max_return_start_timestamp: None,
+                    max_return_end_timestamp: None,
+                    vault_address: None,
+                    vault_timestamp: None,
                 }))
                 .await;
-            println!("Job dispatched: {:?}", result);
+            println!("Job dispatched: {result:?}");
             i += 1;
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
         }

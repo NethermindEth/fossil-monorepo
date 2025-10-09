@@ -14,7 +14,7 @@ env:
 jobs:
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       
@@ -55,7 +55,7 @@ jobs:
       - name: Sqlx prepare
         run: |
           if [ "${{ inputs.component }}" == "op" ]; then
-            cd offchain-processor && cargo sqlx prepare --workspace --check
+            cd fossil-api && cargo sqlx prepare --workspace --check
           fi
           
       # Install grcov for coverage
@@ -73,7 +73,7 @@ jobs:
             LLVM_PROFILE_FILE=".coverage/fossil-%p-%m.profraw" \
             cargo test --workspace
           else
-            cd offchain-processor
+            cd fossil-api
             mkdir -p .coverage
             CARGO_INCREMENTAL=0 \
             RUSTFLAGS="-C instrument-coverage -C codegen-units=1" \
@@ -87,7 +87,7 @@ jobs:
           if [ "${{ inputs.component }}" == "ps" ]; then
             cd proving-service
           else
-            cd offchain-processor
+            cd fossil-api
           fi
           
           # Ensure coverage directory exists
@@ -116,7 +116,7 @@ jobs:
           if [ "${{ inputs.component }}" == "ps" ]; then
             cd proving-service
           else
-            cd offchain-processor
+            cd fossil-api
           fi
           
           # Extract coverage percentage from lcov info
@@ -160,15 +160,15 @@ jobs:
         run: docker compose -f proving-service/docker/docker-compose.test.yml down
         
       # Make sure the badge file is accessible regardless of component
-      - name: Prepare coverage artifact 
+      - name: Prepare coverage artifact
         run: |
           # Create a simplified directory structure for the artifact
           mkdir -p /tmp/coverage-artifacts/
-          
+
           if [ "${{ inputs.component }}" == "ps" ]; then
             cp -r proving-service/.coverage/* /tmp/coverage-artifacts/
           else
-            cp -r offchain-processor/.coverage/* /tmp/coverage-artifacts/
+            cp -r fossil-api/.coverage/* /tmp/coverage-artifacts/
           fi
           
           # List contents to confirm

@@ -1,0 +1,28 @@
+[package]
+name = "sha2_input"
+version = "0.1.0"
+edition = "2023_11"
+
+# See more keys and their definitions at https://docs.swmansion.com/scarb/docs/reference/manifest.html
+
+[dependencies]
+starknet.workspace = true
+fp.workspace = true
+openzeppelin_upgrades.workspace = true
+openzeppelin_access.workspace = true
+# fossil_store = { git = "https://github.com/OilerNetwork/fossil-light-client.git", package = "fossil_store" }
+
+[dev-dependencies]
+snforge_std.workspace = true
+assert_macros.workspace = true
+
+[[target.starknet-contract]]
+sierra = true
+
+[scripts]
+test = "snforge test"
+
+[tool.scarb]
+allow-prebuilt-plugins = [
+    "snforge_std",
+] # Feature name and list of other features that should be enabled with it

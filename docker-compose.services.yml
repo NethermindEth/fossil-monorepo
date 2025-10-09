@@ -1,0 +1,163 @@
+# Services compose file - uses .env.sepolia for external testnet connections
+services:
+  # Proving Service PostgreSQL (port 5435)
+  proving_service_db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5435:5432"
+    networks:
+      - services-network
+    volumes:
+      - proving_service_data:/var/lib/postgresql/data
+      - ./proving-service/tests/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Fossil API PostgreSQL (port 5434)
+  fossil_api_db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "5434:5432"
+    networks:
+      - services-network
+    volumes:
+      - fossil_api_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # LocalStack for SQS (AWS emulation)
+  localstack:
+    image: localstack/localstack:latest
+    ports:
+      - "4567:4566"
+    networks:
+      - services-network
+    environment:
+      - SERVICES=sqs
+      - AWS_DEFAULT_REGION=us-east-1
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - ./scripts/localstack-init.sh:/etc/localstack/init/ready.d/init-sqs.sh
+    healthcheck:
+      test: ["CMD", "awslocal", "sqs", "list-queues", "--region", "us-east-1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Proving Service HTTP API
+  proving-service-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.proving-service-api
+    image: fossil-proving-service-api:latest
+    depends_on:
+      proving_service_db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    env_file:
+      - .env.sepolia
+    environment:
+      PROVING_SERVICE_DATABASE_URL: postgres://postgres:postgres@proving_service_db:5432/postgres
+      DATABASE_URL: postgres://postgres:postgres@proving_service_db:5432/postgres
+      AWS_ENDPOINT_URL: http://localstack:4566
+      SQS_QUEUE_URL: http://localstack:4566/000000000000/fossilQueue
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      RUST_LOG: info
+      SERVER_PORT: 3001
+    ports:
+      - "3001:3001"
+    networks:
+      - services-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Message Handler Background Service
+  message-handler:
+    image: fossil-message-handler:with-files
+    depends_on:
+      proving_service_db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    env_file:
+      - .env.sepolia
+    environment:
+      PROVING_SERVICE_DATABASE_URL: postgres://postgres:postgres@proving_service_db:5432/postgres
+      DATABASE_URL: postgres://postgres:postgres@proving_service_db:5432/postgres
+      AWS_ENDPOINT_URL: http://localstack:4566
+      SQS_QUEUE_URL: http://localstack:4566/000000000000/fossilQueue
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      ENABLE_PROOF: "true"
+      RUST_LOG: info
+      RUST_BACKTRACE: "1"
+    networks:
+      - services-network
+    restart: unless-stopped
+
+  # Fossil API Service
+  fossil-api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.fossil-api
+    image: fossil-api:latest
+    depends_on:
+      fossil_api_db:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    env_file:
+      - .env.sepolia
+    environment:
+      OFFCHAIN_PROCESSOR_DATABASE_URL: postgres://postgres:postgres@fossil_api_db:5432/postgres
+      DATABASE_URL: postgres://postgres:postgres@fossil_api_db:5432/postgres
+      AWS_ENDPOINT_URL: http://localstack:4566
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      PROVING_SERVICE_URL: http://proving-service-api:3001
+      RUST_LOG: info
+      SERVER_PORT: 3000
+    ports:
+      - "3000:3000"
+    networks:
+      - services-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+networks:
+  services-network:
+    driver: bridge
+
+volumes:
+  proving_service_data:
+  fossil_api_data:
+  localstack_data:

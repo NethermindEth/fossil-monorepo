@@ -1,0 +1,53 @@
+# Contract Deployer Docker Image
+FROM ubuntu:22.04
+
+# Prevent interactive prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    bash \
+    grep \
+    gawk \
+    ca-certificates \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Install asdf version manager
+RUN git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.14.0 && \
+    echo '. $HOME/.asdf/asdf.sh' >> ~/.bashrc && \
+    echo '. $HOME/.asdf/completions/asdf.bash' >> ~/.bashrc
+
+# Set up asdf in current shell
+ENV PATH="/root/.asdf/bin:/root/.asdf/shims:${PATH}"
+
+# Install starkli via asdf
+RUN /bin/bash -c "source ~/.asdf/asdf.sh && \
+    asdf plugin add starkli && \
+    asdf install starkli latest && \
+    asdf global starkli latest"
+
+# Install scarb via asdf
+RUN /bin/bash -c "source ~/.asdf/asdf.sh && \
+    asdf plugin add scarb && \
+    asdf install scarb latest && \
+    asdf global scarb latest"
+
+# Create directories for contracts and scripts
+RUN mkdir -p /app/starknet-contracts /app/scripts
+
+# Set up healthcheck file location
+RUN mkdir -p /tmp
+
+# Default environment
+ENV STARKNET_RPC_URL=""
+ENV STARKNET_ACCOUNT=""
+ENV STARKNET_ACCOUNT_ADDRESS=""
+
+# Keep container running by default (can be overridden)
+CMD ["tail", "-f", "/dev/null"]

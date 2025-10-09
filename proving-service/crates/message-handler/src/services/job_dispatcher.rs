@@ -14,8 +14,23 @@ impl<Q: Queue> JobDispatcher<Q> {
         Self { queue }
     }
 
+    #[allow(clippy::future_not_send)]
     pub async fn dispatch_job(&self, job: Job) -> Result<()> {
+        // Debug logging to see what's being serialized
+        if let Job::RequestProof(ref request_proof) = job {
+            tracing::info!(
+                "🔍 JobDispatcher - Serializing RequestProof: vault_address={:?}, vault_timestamp={:?}",
+                request_proof.vault_address,
+                request_proof.vault_timestamp
+            );
+        }
+
         let message_body = serde_json::to_string(&job)?;
+        tracing::info!(
+            "🔍 JobDispatcher - Sending message to queue: {}",
+            message_body
+        );
+
         self.queue
             .send_message(message_body)
             .await

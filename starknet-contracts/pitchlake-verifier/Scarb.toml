@@ -1,0 +1,28 @@
+[package]
+name = "pitchlake_verifier"
+version = "0.1.0"
+edition = "2023_11"
+
+# See more keys and their definitions at https://docs.swmansion.com/scarb/docs/reference/manifest.html
+
+[dependencies]
+openzeppelin_upgrades.workspace = true
+openzeppelin_access.workspace = true
+starknet.workspace = true
+fp.workspace = true
+pitch_lake.workspace = true
+
+garaga = { git = "https://github.com/keep-starknet-strange/garaga.git", branch = "main" }
+
+[dev-dependencies]
+snforge_std.workspace = true
+assert_macros.workspace = true
+cairo_test.workspace = true
+
+[[target.starknet-contract]]
+build-external-contracts = ["pitch_lake::vault::contract::Vault", "pitch_lake::option_round::contract::OptionRound"]
+casm = true
+casm-add-pythonic-hints = true
+
+[tool]
+fmt.workspace = true

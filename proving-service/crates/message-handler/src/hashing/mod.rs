@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 #[cfg(feature = "proof-composition")]
 use coprocessor_common::convert_felt_to_f64;
+use eyre::{Result, eyre};
 use starknet::{
     accounts::{Account, SingleOwnerAccount},
     core::types::{BlockId, BlockTag, Call, Felt, FunctionCall, InvokeTransactionResult, U256},
@@ -20,7 +21,7 @@ pub fn convert_felt_to_f64(felt: Felt) -> f64 {
 
 pub struct HashingProvider {
     provider: JsonRpcClient<HttpTransport>,
-    fossil_light_client_address: Felt,
+    fossil_store_address: Felt,
     hash_storage_address: Felt,
     account: SingleOwnerAccount<JsonRpcClient<HttpTransport>, LocalWallet>,
 }
@@ -28,13 +29,18 @@ pub struct HashingProvider {
 #[async_trait]
 pub trait HashingProviderTrait {
     fn get_provider(&self) -> &JsonRpcClient<HttpTransport>;
-    fn get_fossil_light_client_address(&self) -> &Felt;
+    fn get_fossil_store_address(&self) -> &Felt;
     fn get_hash_storage_address(&self) -> &Felt;
     async fn get_avg_fees_in_range(
         &self,
         start_timestamp: u64,
         end_timestamp: u64,
     ) -> Result<Vec<f64>, ProviderError>;
+    async fn get_avg_fees_in_range_as_felt(
+        &self,
+        start_timestamp: u64,
+        end_timestamp: u64,
+    ) -> Result<Vec<Felt>, ProviderError>;
     async fn get_hash_stored_avg_fees(&self, timestamp: u64) -> Result<[u32; 8], ProviderError>;
     async fn get_hash_batched_avg_fees(
         &self,
@@ -43,26 +49,102 @@ pub trait HashingProviderTrait {
     async fn hash_avg_fees_and_store(
         &self,
         start_timestamp: u64,
-    ) -> Result<InvokeTransactionResult, String>;
-    async fn hash_batched_avg_fees(
-        &self,
-        start_timestamp: u64,
-    ) -> Result<InvokeTransactionResult, String>;
+    ) -> Result<InvokeTransactionResult>;
+    async fn hash_batched_avg_fees(&self, start_timestamp: u64) -> Result<InvokeTransactionResult>;
 }
 
 impl HashingProvider {
     pub const fn new(
         provider: JsonRpcClient<HttpTransport>,
-        fossil_light_client_address: Felt,
+        fossil_store_address: Felt,
         hash_storage_address: Felt,
         account: SingleOwnerAccount<JsonRpcClient<HttpTransport>, LocalWallet>,
     ) -> Self {
         Self {
             provider,
-            fossil_light_client_address,
+            fossil_store_address,
             hash_storage_address,
             account,
         }
+    }
+
+    /// Creates a new `HashingProvider` instance from environment variables.
+    ///
+    /// Requires the following environment variables to be set:
+    /// - `STARKNET_RPC_URL`: URL for the Starknet RPC provider
+    /// - `FOSSIL_STORE_ADDRESS`: Address of the fossil store contract
+    /// - `HASH_STORAGE_ADDRESS`: Address of the hash storage contract
+    /// - `STARKNET_PRIVATE_KEY`: Private key for the Starknet account
+    /// - `STARKNET_ACCOUNT_ADDRESS`: Address of the Starknet account
+    ///
+    /// # Returns
+    /// A Result containing the `HashingProvider` or an error
+    pub fn from_env() -> Result<Self> {
+        use starknet::{
+            accounts::ExecutionEncoding,
+            core::chain_id,
+            signers::{LocalWallet, SigningKey},
+        };
+        use std::env;
+        use url::Url;
+
+        // Load environment variables
+        let rpc_url = env::var("STARKNET_RPC_URL")
+            .map_err(|_| eyre!("STARKNET_RPC_URL environment variable is not set"))?;
+
+        let fossil_store_address = env::var("FOSSIL_STORE_ADDRESS")
+            .map_err(|_| eyre!("FOSSIL_STORE_ADDRESS environment variable is not set"))?;
+
+        let hash_storage_address = env::var("HASH_STORAGE_ADDRESS")
+            .map_err(|_| eyre!("HASH_STORAGE_ADDRESS environment variable is not set"))?;
+
+        let private_key = env::var("STARKNET_PRIVATE_KEY")
+            .map_err(|_| eyre!("STARKNET_PRIVATE_KEY environment variable is not set"))?;
+
+        let account_address = env::var("STARKNET_ACCOUNT_ADDRESS")
+            .map_err(|_| eyre!("STARKNET_ACCOUNT_ADDRESS environment variable is not set"))?;
+
+        // Create the provider
+        let provider = JsonRpcClient::new(HttpTransport::new(
+            Url::parse(&rpc_url).map_err(|e| eyre!("Failed to parse RPC URL: {}", e))?,
+        ));
+
+        // Convert addresses to Felt
+        let fossil_store_felt = Felt::from_hex(&fossil_store_address)
+            .map_err(|e| eyre!("Invalid FOSSIL_STORE_ADDRESS: {}", e))?;
+
+        let hash_storage_felt = Felt::from_hex(&hash_storage_address)
+            .map_err(|e| eyre!("Invalid HASH_STORAGE_ADDRESS: {}", e))?;
+
+        // Create the signer from private key
+        let signer = LocalWallet::from(SigningKey::from_secret_scalar(
+            Felt::from_hex(&private_key)
+                .map_err(|e| eyre!("Invalid STARKNET_PRIVATE_KEY: {}", e))?,
+        ));
+
+        // Create account address from hex
+        let signer_address = Felt::from_hex(&account_address)
+            .map_err(|e| eyre!("Invalid STARKNET_ACCOUNT_ADDRESS: {}", e))?;
+
+        // Create the account
+        let mut account = SingleOwnerAccount::new(
+            provider.clone(),
+            signer,
+            signer_address,
+            chain_id::SEPOLIA,
+            ExecutionEncoding::New,
+        );
+
+        // Set block ID to pending for better transaction handling
+        account.set_block_id(BlockId::Tag(BlockTag::Pending));
+
+        // Create and return the HashingProvider
+        Ok(Self::new(
+            provider,
+            fossil_store_felt,
+            hash_storage_felt,
+            account,
+        ))
     }
 }
 
@@ -72,8 +154,8 @@ impl HashingProviderTrait for HashingProvider {
         &self.provider
     }
 
-    fn get_fossil_light_client_address(&self) -> &Felt {
-        &self.fossil_light_client_address
+    fn get_fossil_store_address(&self) -> &Felt {
+        &self.fossil_store_address
     }
 
     fn get_hash_storage_address(&self) -> &Felt {
@@ -85,11 +167,28 @@ impl HashingProviderTrait for HashingProvider {
         start_timestamp: u64,
         end_timestamp: u64,
     ) -> Result<Vec<f64>, ProviderError> {
+        let call_result = self
+            .get_avg_fees_in_range_as_felt(start_timestamp, end_timestamp)
+            .await?;
+
+        let avg_hourly_fees = call_result
+            .iter()
+            .map(|fee| convert_felt_to_f64(*fee))
+            .collect();
+
+        Ok(avg_hourly_fees)
+    }
+
+    async fn get_avg_fees_in_range_as_felt(
+        &self,
+        start_timestamp: u64,
+        end_timestamp: u64,
+    ) -> Result<Vec<Felt>, ProviderError> {
         let mut call_result = self
             .provider
             .call(
                 FunctionCall {
-                    contract_address: self.fossil_light_client_address,
+                    contract_address: self.fossil_store_address,
                     entry_point_selector: selector!("get_avg_fees_in_range"),
                     calldata: vec![Felt::from(start_timestamp), Felt::from(end_timestamp)],
                 },
@@ -98,12 +197,7 @@ impl HashingProviderTrait for HashingProvider {
             .await?;
         call_result.remove(0); // the first element is the length of the array, which is not needed by us
 
-        let avg_hourly_fees = call_result
-            .iter()
-            .map(|fee| convert_felt_to_f64(*fee))
-            .collect();
-
-        Ok(avg_hourly_fees)
+        Ok(call_result)
     }
 
     async fn get_hash_stored_avg_fees(&self, timestamp: u64) -> Result<[u32; 8], ProviderError> {
@@ -154,7 +248,7 @@ impl HashingProviderTrait for HashingProvider {
     async fn hash_avg_fees_and_store(
         &self,
         start_timestamp: u64,
-    ) -> Result<InvokeTransactionResult, String> {
+    ) -> Result<InvokeTransactionResult> {
         self.account
             .execute_v3(vec![Call {
                 to: self.hash_storage_address,
@@ -163,13 +257,10 @@ impl HashingProviderTrait for HashingProvider {
             }])
             .send()
             .await
-            .map_err(|_| "Error".to_string())
+            .map_err(|e| eyre!("Failed to hash and store average fees: {}", e))
     }
 
-    async fn hash_batched_avg_fees(
-        &self,
-        start_timestamp: u64,
-    ) -> Result<InvokeTransactionResult, String> {
+    async fn hash_batched_avg_fees(&self, start_timestamp: u64) -> Result<InvokeTransactionResult> {
         self.account
             .execute_v3(vec![Call {
                 to: self.hash_storage_address,
@@ -178,7 +269,7 @@ impl HashingProviderTrait for HashingProvider {
             }])
             .send()
             .await
-            .map_err(|_| "Error".to_string())
+            .map_err(|e| eyre!("Failed to hash batched average fees: {}", e))
     }
 }
 
@@ -198,13 +289,13 @@ mod tests {
         let provider = JsonRpcClient::new(HttpTransport::new(
             Url::parse(&env::var("RPC_URL").unwrap()).unwrap(),
         ));
-        let fossil_light_client_address =
-            Felt::from_hex(&env::var("FOSSIL_LIGHT_CLIENT_ADDRESS").unwrap()).unwrap();
+        let fossil_store_address =
+            Felt::from_hex(&env::var("FOSSIL_STORE_ADDRESS").unwrap()).unwrap();
         let hash_storage_address =
             Felt::from_hex(&env::var("HASH_STORAGE_ADDRESS").unwrap()).unwrap();
 
         let private_key = env::var("STARKNET_PRIVATE_KEY").unwrap();
-        let account_address = env::var("STARKNET_ACCOUNT").unwrap();
+        let account_address = env::var("STARKNET_ACCOUNT_ADDRESS").unwrap();
         let signer = LocalWallet::from(SigningKey::from_secret_scalar(
             Felt::from_hex(&private_key).unwrap(),
         ));
@@ -223,7 +314,7 @@ mod tests {
 
         HashingProvider::new(
             provider,
-            fossil_light_client_address,
+            fossil_store_address,
             hash_storage_address,
             account,
         )
