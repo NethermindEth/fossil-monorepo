@@ -42,6 +42,50 @@ Ethereum L1 → Indexer → MMR Builder → Fossil Store (Starknet) → Pitchlak
 
 For more details on the broader Fossil architecture (MMR Builder, Light Client), see the Fossil Technical Specification.
 
+### Complete System Architecture Diagram
+
+The following diagram illustrates the complete Fossil data and computation pipeline, showing both the upstream Fossil infrastructure and the Pitchlake Coprocessor components:
+
+![Fossil System Architecture](../images/fossil-system-architecture.png)
+
+**Diagram Components:**
+
+**Upstream Fossil Infrastructure (Not in this repository):**
+- **Fossil Light Client**: Continuously validates and relays finalized Ethereum blocks
+  - **Relayer**: Fetches block headers and validates integrity
+  - **Ghost**: Monitors L1→L2 messaging
+  - **IPFS**: Distributed storage for MMR snapshots
+  - **Headers DB Indexer**: Indexes finalized block headers
+- **MMR Builder**: Processes blocks in batches, constructs Merkle Mountain Ranges with integrity proofs
+- **Ethereum L1**: Source of base fee data via L1Message Sender
+- **Starknet L2 (Fossil Store)**:
+  - **L1Message Proxy**: Receives finalized block data from L1
+  - **Fossil Verifier**: Validates MMR proofs
+  - **Store Contract**: Maintains hourly average base fee data and MMR roots
+
+**Pitchlake Coprocessor (This repository):**
+- **Fossil API**: HTTP endpoints for pricing data requests (POST /pricing_data, GET /job_status, GET /health)
+- **Fossil Proving Service**:
+  - **API**: Job submission endpoint (POST /api/job, GET /health)
+  - **SQS Queue**: Asynchronous job queue
+  - **Message Handler**: Generates Pitchlake pricing proofs using RISC0 zkVM
+- **Starknet L2 (Verification)**:
+  - **Pitchlake Verifier**: Verifies RISC0 Groth16 proofs onchain
+  - **Pitchlake Vault**: Receives verified computation results
+
+**Data Flow:**
+1. Finalized Ethereum block headers are indexed and validated through the Fossil Light Client
+2. MMR Builder processes blocks, validates integrity, computes hourly average fees, and stores proofs on Starknet
+3. The Pitchlake Coprocessor queries validated fee data from the Fossil Store contract
+4. Pricing computations (TWAP, max return, reserve price) are executed in RISC0 zkVM
+5. Generated proofs are submitted to the Pitchlake Verifier for onchain verification
+6. Verified results are published to the Pitchlake Vault contract for protocol-level use
+
+**Key Notes:**
+- The MMR Builder and Light Client components handle Ethereum block ingestion and validation (upstream Fossil infrastructure)
+- The Pitchlake Coprocessor focuses exclusively on consuming validated fee data and performing verifiable pricing computations
+- All data integrity is cryptographically guaranteed through MMR proofs (Fossil) and zkVM proofs (Pitchlake)
+
 ### High-Level Architecture
 
 ```
