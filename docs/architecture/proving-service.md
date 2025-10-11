@@ -52,6 +52,40 @@ The Proving Service is responsible for:
 - **Graceful Shutdown**: Clean termination of running jobs on shutdown signal
 - **Comprehensive Testing**: Unit and integration tests with Docker-based test infrastructure
 
+### ⚠️ Important: Bonsai Prover Transition
+
+**Current State:** The Pitchlake Coprocessor currently relies on **Bonsai**, a managed proving service operated by the RISC0 team.
+
+**Upcoming Changes:** RISC0 has announced plans to deprecate Bonsai in favor of **Boundless**, a decentralized and trustless proving marketplace.
+
+**Migration Considerations:**
+
+1. **Boundless Migration (RISC0 Continuation):**
+   - Requires modifications to proof submission and verification workflows
+   - Changes to proof batching, verification latency, and cost structures
+   - Security guarantees remain equivalent but require additional protocol-level coordination
+   - Integration complexity: Non-trivial architectural changes
+
+2. **Alternative: SP1 Evaluation (Performance-Focused):**
+   - **SP1 (Succinct)** offers lower proof generation latency and improved scalability
+   - Better suited for large, data-heavy computations like Pitchlake's pricing models
+   - Would require adapting proof format and verification contracts
+   - Trade-off: Migration effort vs. long-term performance gains
+
+**Recommendation for Future Maintainers:**
+
+Given the computational complexity of Pitchlake's pricing models (TWAP, reserve price with Monte Carlo simulation, max return calculations) and the size of Fossil's aggregated datasets, the development team should carefully assess:
+
+- Migrating to **Boundless** if maintaining RISC0 compatibility is a priority
+- Evaluating **SP1** as a potential replacement for better performance characteristics
+- Impact on proof generation costs, latency, and operational complexity
+
+**Current Configuration References:**
+- Bonsai API configuration: `proving-service/crates/message-handler/src/main.rs:714` (BONSAI_API_KEY)
+- Proof generation timeout: `proving-service/crates/message-handler/src/main.rs:764` (1 hour default)
+- Concurrent proof limits: `proving-service/crates/message-handler/src/services/proof_job_handler.rs:489` (MAX_CONCURRENT_PROOFS)
+- Retry configuration: Environment variables RISC0_MAX_RETRIES, RISC0_INITIAL_RETRY_DELAY_MS
+
 ## Crate Organization
 
 The Proving Service is organized as a Rust workspace with four crates:
@@ -68,7 +102,7 @@ proving-service/
 
 ### Workspace Dependencies
 
-The workspace defines shared dependencies in `/home/ametel/source/fossil-monorepo/proving-service/Cargo.toml`:
+The workspace defines shared dependencies in `proving-service/Cargo.toml`:
 
 ```toml
 [workspace.dependencies]
@@ -169,7 +203,9 @@ proving-service (HTTP API)
 
 The `db` crate provides database access for querying historical blockchain data needed for proof generation.
 
-**Location:** `/home/ametel/source/fossil-monorepo/proving-service/crates/db/`
+**Note:** In the current implementation, the Pitchlake Coprocessor primarily fetches validated base fee data from the **Fossil Store Contract** on Starknet (via `starknet-handler` crate). The `db` crate was originally designed for direct database access but has been largely superseded by querying the on-chain Fossil Store.
+
+**Location:** `proving-service/crates/db/`
 
 ### Architecture
 
@@ -332,7 +368,7 @@ The `message-handler` crate is the core processing engine that:
 - Submits proofs to StarkNet for verification
 - Manages job lifecycle and error handling
 
-**Location:** `/home/ametel/source/fossil-monorepo/proving-service/crates/message-handler/`
+**Location:** `proving-service/crates/message-handler/`
 
 ### Module Organization
 
@@ -567,6 +603,33 @@ pub async fn receive_job(&self) -> Result<()> {
 
 ### Proof Composition
 
+**Overview:**
+
+The Pitchlake Coprocessor generates cryptographic proofs for three key pricing calculations used in the Pitchlake options market:
+
+- **TWAP** (Time-Weighted Average Price) - Volatility measurement over specified time ranges
+- **Max Return** - Maximum return calculation for risk assessment across full dataset
+- **Reserve Price** - Monte Carlo simulation for option pricing based on statistical models
+
+Each calculation is performed in the RISC0 zkVM with sub-proofs that are composed into a final proof:
+
+1. **Data Hashing** - Integrity verification of input fee data
+2. **Statistical Calculations** - TWAP and max return computations
+3. **Reserve Price Sub-Models**:
+   - Deseasonalization (remove trends)
+   - Markov transition matrices (PT/PT1 calculations)
+   - 7-day moving average (TWAP 7D)
+   - Monte Carlo price simulation
+
+**Why Proof Composition?**
+
+Pitchlake's pricing models are computationally intensive, especially the reserve price calculation which involves complex statistical operations and Monte Carlo simulation. Breaking computations into sub-proofs provides:
+
+- **Parallel proof generation** - Sub-proofs can be generated concurrently
+- **Reduced complexity** - Each sub-proof has a smaller circuit size
+- **Independent verification** - Sub-components can be verified separately
+- **Better error isolation** - Failures can be traced to specific sub-computations
+
 **ProofProvider Trait:**
 
 ```rust
@@ -786,7 +849,7 @@ async fn main() -> Result<()> {
 
 The `proving-service` crate provides an HTTP API for receiving proof generation requests from the Fossil API and dispatching them to the SQS queue.
 
-**Location:** `/home/ametel/source/fossil-monorepo/proving-service/crates/proving-service/`
+**Location:** `proving-service/crates/proving-service/`
 
 ### HTTP Endpoints
 
@@ -1012,7 +1075,7 @@ The `starknet-handler` crate provides StarkNet blockchain integration for:
 - Submitting proofs to verifier contracts
 - Managing StarkNet account and transactions
 
-**Location:** `/home/ametel/source/fossil-monorepo/proving-service/crates/starknet-handler/`
+**Location:** `proving-service/crates/starknet-handler/`
 
 ### Module Organization
 

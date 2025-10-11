@@ -4,7 +4,7 @@
 
 The `db` crate provides the database layer for the Proving Service. It handles PostgreSQL database connections, connection pooling, and data access for blockchain block header information. This crate is designed to query block header data from the indexer database, specifically focusing on retrieving base fee per gas information for proof generation.
 
-**Location**: `/home/ametel/source/fossil-monorepo/proving-service/crates/db/`
+**Location**: `proving-service/crates/db/`
 
 **Purpose**:
 - Manage PostgreSQL database connections with connection pooling
@@ -49,7 +49,7 @@ lazy_static = { workspace = true }     # Static initialization for test infrastr
 
 The `DbConnection` struct manages a PostgreSQL connection pool using SQLx.
 
-**File**: `/home/ametel/source/fossil-monorepo/proving-service/crates/db/src/lib.rs`
+**File**: `proving-service/crates/db/src/lib.rs`
 
 ```rust
 use eyre::{Result, eyre};
@@ -104,7 +104,7 @@ async fn main() -> eyre::Result<()> {
 
 The `BlockHeader` struct represents a complete Ethereum block header record from the database.
 
-**File**: `/home/ametel/source/fossil-monorepo/proving-service/crates/db/src/models.rs`
+**File**: `proving-service/crates/db/src/models.rs`
 
 ```rust
 #[derive(sqlx::FromRow, Debug)]
@@ -260,7 +260,7 @@ async fn main() -> eyre::Result<()> {
 
 ### blockheaders Table
 
-The complete schema for the `blockheaders` table as defined in `/home/ametel/source/fossil-monorepo/proving-service/tests/init.sql`:
+The complete schema for the `blockheaders` table as defined in `proving-service/tests/init.sql`:
 
 ```sql
 CREATE TABLE blockheaders (
@@ -308,7 +308,7 @@ CREATE TABLE blockheaders (
 
 The proving service has **read-only access** to this database via the `INDEXER_DATABASE_URL` environment variable.
 
-For testing purposes, the schema is created in test containers using the SQL script at `/home/ametel/source/fossil-monorepo/proving-service/tests/init.sql`.
+For testing purposes, the schema is created in test containers using the SQL script at `proving-service/tests/init.sql`.
 
 ## Usage Examples
 
@@ -430,7 +430,7 @@ The `db` crate uses **testcontainers** to spin up ephemeral PostgreSQL databases
 
 ### Test Setup
 
-**File**: `/home/ametel/source/fossil-monorepo/proving-service/crates/db/src/models.rs`
+**File**: `proving-service/crates/db/src/models.rs`
 
 ```rust
 #[cfg(test)]
@@ -661,10 +661,10 @@ INDEXER_DATABASE_URL=postgresql://user:password@sepolia-indexer.example.com:5432
 
 As per the project's centralized environment management:
 
-1. **Root level**: `/home/ametel/source/fossil-monorepo/.env.local`
+1. **Root level**: `.env.local`
    - Contains `INDEXER_DATABASE_URL` and other shared variables
 
-2. **Service level**: `/home/ametel/source/fossil-monorepo/proving-service/.env.local`
+2. **Service level**: `proving-service/.env.local`
    - Service-specific overrides only
 
 ### Configuration Example
@@ -1075,7 +1075,7 @@ async fn inspect_test_data() {
 
 To add new query functions:
 
-1. Add the function to `/home/ametel/source/fossil-monorepo/proving-service/crates/db/src/models.rs`
+1. Add the function to `proving-service/crates/db/src/models.rs`
 2. Follow the pattern of existing functions (use `Arc<DbConnection>`, return `Result`)
 3. Add comprehensive tests using `setup_db()`
 4. Document the function with examples

@@ -1335,4 +1335,4 @@ EVENT_MONITOR_POLLING_INTERVAL=30
 EVENT_MONITOR_BLOCKS_PER_SCAN=1000
 ```
 
-See [.env.example](/home/ametel/source/fossil-monorepo/.env.example) for complete configuration options.
+See [.env.example](.env.example) for complete configuration options.

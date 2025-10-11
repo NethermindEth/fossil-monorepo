@@ -433,8 +433,8 @@ The service requires the following environment variables:
 
 Configuration is loaded from `.env` files. The service uses the centralized environment management system:
 
-1. Root level: `/home/ametel/source/fossil-monorepo/.env.local`
-2. Service level overrides: `/home/ametel/source/fossil-monorepo/proving-service/.env.local`
+1. Root level: `.env.local`
+2. Service level overrides: `proving-service/.env.local`
 
 **Example Configuration (from root `.env.example`):**
 ```bash

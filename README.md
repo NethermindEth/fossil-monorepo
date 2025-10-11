@@ -1,14 +1,18 @@
 # Fossil Monorepo
 
-A complete RISC Zero proof generation and StarkNet verification system for cryptographic proofs of financial data calculations.
+This repository implements the **Pitchlake Coprocessor**, a specialized component of the Fossil infrastructure that performs verifiable computations for the Pitchlake options market using zero-knowledge proofs.
 
 ## Overview
 
-The Fossil system consists of three main components:
+**Fossil** is a trustless data infrastructure that records Ethereum Layer 1 (L1) base gas fee data on Starknet. The broader Fossil system includes components for historical data reconstruction (MMR Builder) and real-time synchronization (Light Client), which maintain a cryptographically verifiable record of Ethereum's base fee history.
+
+This repository contains the **Pitchlake Coprocessor**, which consumes validated Ethereum L1 base fee data from the broader Fossil infrastructure and performs verifiable pricing computations for the Pitchlake options market. The Pitchlake Coprocessor consists of three main components:
 
 - **Fossil API** - HTTP API for job management and pricing data requests
-- **Proving Service** - RISC Zero proof generation via Bonsai API
-- **StarkNet Contracts** - Onchain proof verification and hash storage
+- **Proving Service** - RISC Zero proof generation via Bonsai API for financial calculations (TWAP, max return, reserve price)
+- **StarkNet Contracts** - Onchain proof verification and computation result storage
+
+**Note:** The MMR Builder and Light Client components (which handle Ethereum block ingestion and MMR construction) are part of the upstream Fossil infrastructure and are not included in this repository.
 
 ## Documentation
 
@@ -293,9 +297,46 @@ make build-all   # Build all projects
 
 See [CLAUDE.md](CLAUDE.md) for development workflow details.
 
+## Current Limitations and Future Considerations
+
+### Bonsai Prover Deprecation
+
+Fossil currently relies on the **Bonsai remote prover**, a managed proving service operated by the RISC Zero team. However, the RISC Zero team has announced plans to **deprecate Bonsai**, and they recommend migrating to **Boundless**, a decentralized and trustless proving marketplace.
+
+This transition is non-trivial, as it introduces architectural and operational implications:
+
+- Integration with Boundless requires modifications to Fossil's proof submission and verification workflows
+- Proof batching, verification latency, and cost structures will change compared to the managed Bonsai environment
+- Security guarantees remain equivalent but require additional protocol-level coordination
+
+### Evaluation of Alternative Proving Systems
+
+Given the computational complexity of Pitchlake's pricing models and the size of Fossil's aggregated datasets, **RISC Zero may not be the most efficient long-term proving system**.
+
+The development team maintaining Fossil and Pitchlake should consider:
+
+- **Migrating to Boundless** if maintaining zkVM compatibility is a priority
+- **Evaluating SP1 (Succinct)** or similar high-performance zkVMs as potential replacements for RISC Zero
+  - SP1 offers lower proof generation latency and improved scalability for large, data-heavy computations
+  - Migration would require adapting Fossil's proof format and verification contracts but could significantly reduce compute costs
+
+**Future contributors should carefully assess the trade-offs between maintaining RISC0 compatibility versus migrating to a more performant proving backend.**
+
+For detailed technical considerations, see:
+- [Proving Service Architecture](docs/architecture/proving-service.md#future-considerations)
+- [Deployment Guide](docs/guides/deployment.md)
+
 ## License
 
-[Add license information]
+**MIT License**
+
+Copyright (c) 2024 Fossil Team
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 ## Support
 

@@ -1157,27 +1157,27 @@ cargo test -- --nocapture
 ## Related Files
 
 **Core Files:**
-- `/home/ametel/source/fossil-monorepo/fossil-api/crates/server/src/lib.rs` - Application setup
-- `/home/ametel/source/fossil-monorepo/fossil-api/crates/server/src/main.rs` - Server entry point
-- `/home/ametel/source/fossil-monorepo/fossil-api/crates/server/src/types.rs` - Request/response types
+- `fossil-api/crates/server/src/lib.rs` - Application setup
+- `fossil-api/crates/server/src/main.rs` - Server entry point
+- `fossil-api/crates/server/src/types.rs` - Request/response types
 
 **Handlers:**
-- `/home/ametel/source/fossil-monorepo/fossil-api/crates/server/src/handlers/health_check.rs`
-- `/home/ametel/source/fossil-monorepo/fossil-api/crates/server/src/handlers/api_key.rs`
-- `/home/ametel/source/fossil-monorepo/fossil-api/crates/server/src/handlers/get_pricing_data.rs`
-- `/home/ametel/source/fossil-monorepo/fossil-api/crates/server/src/handlers/job_status.rs`
-- `/home/ametel/source/fossil-monorepo/fossil-api/crates/server/src/handlers/pl_integration.rs`
+- `fossil-api/crates/server/src/handlers/health_check.rs`
+- `fossil-api/crates/server/src/handlers/api_key.rs`
+- `fossil-api/crates/server/src/handlers/get_pricing_data.rs`
+- `fossil-api/crates/server/src/handlers/job_status.rs`
+- `fossil-api/crates/server/src/handlers/pl_integration.rs`
 
 **Middleware:**
-- `/home/ametel/source/fossil-monorepo/fossil-api/crates/server/src/middlewares/auth.rs`
+- `fossil-api/crates/server/src/middlewares/auth.rs`
 
 **StarkNet Integration:**
-- `/home/ametel/source/fossil-monorepo/fossil-api/crates/server/src/starknet_provider.rs`
-- `/home/ametel/source/fossil-monorepo/fossil-api/crates/server/src/event_monitor.rs`
+- `fossil-api/crates/server/src/starknet_provider.rs`
+- `fossil-api/crates/server/src/event_monitor.rs`
 
 **Binaries:**
-- `/home/ametel/source/fossil-monorepo/fossil-api/crates/server/src/bin/event_monitor.rs`
-- `/home/ametel/source/fossil-monorepo/fossil-api/crates/server/src/scripts/create_api_key.rs`
+- `fossil-api/crates/server/src/bin/event_monitor.rs`
+- `fossil-api/crates/server/src/scripts/create_api_key.rs`
 
 **Tests:**
-- `/home/ametel/source/fossil-monorepo/fossil-api/crates/server/src/handlers/fixtures/mod.rs`
+- `fossil-api/crates/server/src/handlers/fixtures/mod.rs`

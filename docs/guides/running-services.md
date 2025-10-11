@@ -149,11 +149,11 @@ docker compose -f docker-compose.local.yml ps
 
 The HTTP server for offchain data processing.
 
-**Location:** `/home/ametel/source/fossil-monorepo/fossil-api`
+**Location:** `fossil-api/` (from repository root)
 
 **Run in development mode:**
 ```bash
-cd /home/ametel/source/fossil-monorepo/fossil-api
+cd fossil-api
 
 # Load environment and run
 export $(grep -v '^#' ../.env.local | xargs)
@@ -162,7 +162,7 @@ cargo run --bin server
 
 **Build release version:**
 ```bash
-cd /home/ametel/source/fossil-monorepo/fossil-api
+cd fossil-api
 make build
 
 # Run the binary directly
@@ -193,11 +193,11 @@ SERVER_PORT=3005 cargo run --bin server
 
 The HTTP API for proof job management.
 
-**Location:** `/home/ametel/source/fossil-monorepo/proving-service`
+**Location:** `proving-service/` (from repository root)
 
 **Run in development mode:**
 ```bash
-cd /home/ametel/source/fossil-monorepo/proving-service
+cd proving-service
 
 # Load environment and run
 export $(grep -v '^#' ../.env.local | xargs)
@@ -206,7 +206,7 @@ cargo run --bin proving-service
 
 **Build release version:**
 ```bash
-cd /home/ametel/source/fossil-monorepo/proving-service
+cd proving-service
 make build
 
 # Run with mock-proof feature (faster for testing)
@@ -224,11 +224,11 @@ cargo run --bin proving-service --release --features mock-proof
 
 Background service that processes SQS messages and generates proofs.
 
-**Location:** `/home/ametel/source/fossil-monorepo/proving-service`
+**Location:** `proving-service/` (from repository root)
 
 **Run in development mode:**
 ```bash
-cd /home/ametel/source/fossil-monorepo/proving-service
+cd proving-service
 
 # Load environment and run
 export $(grep -v '^#' ../.env.local | xargs)
@@ -237,7 +237,7 @@ cargo run --bin message-handler --features mock-proof
 
 **Build release version:**
 ```bash
-cd /home/ametel/source/fossil-monorepo/proving-service
+cd proving-service
 
 # Build with mock proofs for faster testing
 cargo build --release --features mock-proof --bin message-handler
@@ -606,7 +606,7 @@ cargo install cargo-watch
 
 **Fossil API with auto-reload:**
 ```bash
-cd /home/ametel/source/fossil-monorepo/fossil-api
+cd fossil-api
 
 # Watch and run
 cargo watch -x 'run --bin server'
@@ -620,7 +620,7 @@ cargo watch -x test
 
 **Proving Service API with auto-reload:**
 ```bash
-cd /home/ametel/source/fossil-monorepo/proving-service
+cd proving-service
 
 # Watch and run with features
 cargo watch -x 'run --bin proving-service --features mock-proof'
@@ -631,7 +631,7 @@ cargo watch -w src/main.rs -w src/handlers/ -x 'run --bin proving-service'
 
 **Message Handler with auto-reload:**
 ```bash
-cd /home/ametel/source/fossil-monorepo/proving-service
+cd proving-service
 
 # Watch and run
 cargo watch -x 'run --bin message-handler --features mock-proof'
@@ -716,22 +716,22 @@ make build
 **Build individual services:**
 ```bash
 # Fossil API
-cd /home/ametel/source/fossil-monorepo/fossil-api
+cd fossil-api
 cargo build --release
 
 # Proving Service (with proof composition)
-cd /home/ametel/source/fossil-monorepo/proving-service
+cd proving-service
 cargo build --release --features proof-composition
 
 # Message Handler (with proof composition)
-cd /home/ametel/source/fossil-monorepo/proving-service
+cd proving-service
 cargo build --release --features proof-composition --bin message-handler
 ```
 
 **Binary locations:**
-- Fossil API: `/home/ametel/source/fossil-monorepo/fossil-api/target/release/server`
-- Proving Service: `/home/ametel/source/fossil-monorepo/proving-service/target/release/proving-service`
-- Message Handler: `/home/ametel/source/fossil-monorepo/proving-service/target/release/message-handler`
+- Fossil API: `fossil-api/target/release/server`
+- Proving Service: `proving-service/target/release/proving-service`
+- Message Handler: `proving-service/target/release/message-handler`
 
 ### Running Release Binaries
 

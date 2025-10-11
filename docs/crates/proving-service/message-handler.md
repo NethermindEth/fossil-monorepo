@@ -1648,10 +1648,10 @@ async fn main() -> eyre::Result<()> {
 
 ### Related Documentation
 
-- **[Proving Service Overview](/home/ametel/source/fossil-monorepo/docs/crates/proving-service/)** - Parent service architecture
-- **[DB Crate](/home/ametel/source/fossil-monorepo/docs/crates/proving-service/db.md)** - Database models and queries
-- **[StarkNet Handler Crate](/home/ametel/source/fossil-monorepo/proving-service/crates/starknet-handler/)** - StarkNet integration
-- **[Fossil API](/home/ametel/source/fossil-monorepo/docs/crates/fossil-api/)** - API service that dispatches proof jobs
+- **[Proving Service Overview](docs/crates/proving-service/)** - Parent service architecture
+- **[DB Crate](docs/crates/proving-service/db.md)** - Database models and queries
+- **[StarkNet Handler Crate](proving-service/crates/starknet-handler/)** - StarkNet integration
+- **[Fossil API](docs/crates/fossil-api/)** - API service that dispatches proof jobs
 
 ### Development Resources
 
@@ -1665,7 +1665,7 @@ async fn main() -> eyre::Result<()> {
 Run tests:
 ```bash
 # Unit tests
-cd /home/ametel/source/fossil-monorepo/proving-service/crates/message-handler
+cd proving-service/crates/message-handler
 cargo test
 
 # Integration tests with specific features

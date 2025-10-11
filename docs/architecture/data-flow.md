@@ -12,16 +12,55 @@ This document describes the end-to-end data flow in the Fossil system, from the 
 
 ## Overview
 
-The Fossil system processes pricing data requests through multiple stages, generating cryptographic proofs and submitting them to StarkNet for verification.
+This document describes the end-to-end data flow for the **Pitchlake Coprocessor**, which processes pricing data requests through multiple stages, generating cryptographic proofs and submitting them to StarkNet for verification.
 
-### System Components
+## Fossil Data Lifecycle (Context)
+
+Before the Pitchlake Coprocessor processes data, the broader Fossil system has already prepared the validated base fee data:
+
+### Upstream Fossil Infrastructure (Not in this repository)
+
+**1. Header Ingestion**
+- External indexer fetches finalized Ethereum block headers
+- Stores in Fossil Postures Database
+
+**2. MMR Construction (MMR Builder)**
+- Processes headers in batches of 1024 blocks
+- Validates block integrity (computed hash == block hash)
+- Validates parent-child relationships for chronological continuity
+- Extracts `base_fee_per_gas` from each header
+- Computes hourly average base fee across the batch
+- Constructs Merkle Mountain Range (MMR) using block hashes as leaves
+- Exports MMR state to SQLite, uploads to IPFS
+- Stores MMR root hash, IPFS CID, and hourly averages onchain (Fossil Store Contract)
+
+**3. Forward Synchronization (Light Client)**
+- Continuously monitors for new finalized Ethereum blocks
+- Off-chain relayer sends block hashes via L1 → L2 messaging every 6 hours
+- L1MessageProxy receives messages and forwards to Fossil Store
+- Light Client updates MMR incrementally from previous state
+
+### Pitchlake Coprocessor Processing (This Repository)
+
+**4. Data Query and Computation**
+- Queries validated hourly average base fee data from Fossil Store contract on Starknet
+- Performs verifiable computations in RISC0 zkVM:
+  - TWAP (Time-Weighted Average Price)
+  - Max Return (volatility measurement)
+  - Reserve Price (Monte Carlo simulation)
+- Generates zero-knowledge proofs
+- Submits proofs to Starknet for verification
+- Results forwarded to Pitchlake Vault contracts
+
+### System Components (Pitchlake Coprocessor)
 
 1. **Fossil API**: Client-facing HTTP API for job management
 2. **Proving Service API**: Internal API for proof job dispatch
 3. **Message Handler**: Background worker for proof generation
 4. **Database**: Job status and metadata storage
 5. **SQS Queue**: Asynchronous job processing queue
-6. **StarkNet**: Onchain proof verification
+6. **Fossil Store Contract**: Source of validated base fee data (read-only)
+7. **StarkNet Verification**: Onchain proof verification
 
 ## Component Flow
 
@@ -48,6 +87,12 @@ The Fossil system processes pricing data requests through multiple stages, gener
                                                                              ┌──────────────┐
                                                                              │   StarkNet   │
                                                                              │   Network    │
+                                                                             │              │
+                                                                             │ ┌──────────┐ │
+                                                                             │ │ Fossil   │ │
+                                                                             │ │ Store    │ │◀── Data Source
+                                                                             │ │ Contract │ │    (hourly avg
+                                                                             │ └──────────┘ │     base fees)
                                                                              └──────────────┘
 ```
 

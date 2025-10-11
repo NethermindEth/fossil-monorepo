@@ -4,7 +4,7 @@
 
 The `db-access` crate provides the complete database layer for the Fossil API service. It handles PostgreSQL database connections, schema migrations, data models, authentication, and all database queries. This crate serves as the persistence layer for job tracking, API key management, and vault event processing.
 
-**Location:** `/home/ametel/source/fossil-monorepo/fossil-api/crates/db-access/`
+**Location:** `fossil-api/crates/db-access/`
 
 **Key Responsibilities:**
 - PostgreSQL connection pooling and management
@@ -495,7 +495,7 @@ The crate uses SQLx's migration system to manage database schema evolution.
 
 ### Migration Files
 
-Migrations are located in `/home/ametel/source/fossil-monorepo/fossil-api/crates/db-access/migrations/`
+Migrations are located in `fossil-api/crates/db-access/migrations/`
 
 #### 1. Initial Job Requests Table (20241024044528)
 
@@ -889,7 +889,7 @@ Current configuration in `DbConnection::new()`:
 - **Connection Timeout:** Default (SQLx default is 30 seconds)
 - **Idle Timeout:** Default (SQLx default is 10 minutes)
 
-To customize, modify `/home/ametel/source/fossil-monorepo/fossil-api/crates/db-access/src/lib.rs`:
+To customize, modify `fossil-api/crates/db-access/src/lib.rs`:
 
 ```rust
 let pool = PgPoolOptions::new()
@@ -914,7 +914,7 @@ This creates `.sqlx/` directory with query metadata for offline compilation.
 
 ## Dependencies
 
-From `/home/ametel/source/fossil-monorepo/fossil-api/crates/db-access/Cargo.toml`:
+From `fossil-api/crates/db-access/Cargo.toml`:
 
 ```toml
 [dependencies]
@@ -1044,9 +1044,9 @@ error: mismatched types, expected JobStatus, found String
 
 ## Related Documentation
 
-- [Fossil API Server Documentation](/home/ametel/source/fossil-monorepo/docs/crates/fossil-api/server.md)
-- [Fossil API Architecture](/home/ametel/source/fossil-monorepo/docs/architecture/fossil-api.md)
-- [Database Setup Guide](/home/ametel/source/fossil-monorepo/docs/setup/database.md)
+- [Fossil API Server Documentation](docs/crates/fossil-api/server.md)
+- [Fossil API Architecture](docs/architecture/fossil-api.md)
+- [Database Setup Guide](docs/setup/database.md)
 
 ## Next Steps
 
@@ -1071,8 +1071,8 @@ error: mismatched types, expected JobStatus, found String
    ```
 
 4. **Explore the code:**
-   - Read `/home/ametel/source/fossil-monorepo/fossil-api/crates/db-access/src/models.rs`
-   - Study `/home/ametel/source/fossil-monorepo/fossil-api/crates/db-access/src/queries.rs`
+   - Read `fossil-api/crates/db-access/src/models.rs`
+   - Study `fossil-api/crates/db-access/src/queries.rs`
    - Review migration files for schema evolution
 
 ### For Contributors
@@ -1095,7 +1095,7 @@ error: mismatched types, expected JobStatus, found String
 
 - [SQLx Documentation](https://docs.rs/sqlx/)
 - [PostgreSQL JSON Types](https://www.postgresql.org/docs/current/datatype-json.html)
-- [Fossil API CLAUDE.md](/home/ametel/source/fossil-monorepo/CLAUDE.md)
+- [Fossil API CLAUDE.md](CLAUDE.md)
 
 ---
 

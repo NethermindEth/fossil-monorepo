@@ -582,11 +582,11 @@ fn owner() -> starknet::ContractAddress {
 
 ```bash
 # Run all contract tests
-cd /home/ametel/source/fossil-monorepo/starknet-contracts
+cd starknet-contracts
 scarb test
 
 # Run Fossil Hash Store tests specifically
-cd /home/ametel/source/fossil-monorepo/starknet-contracts/fossil-hash-store
+cd starknet-contracts/fossil-hash-store
 scarb test
 
 # Run specific test
@@ -684,7 +684,7 @@ starknet-contracts/fossil-hash-store/
 For mocks used across multiple contracts, deploy from `/starknet-contracts/mocks/`:
 
 ```bash
-cd /home/ametel/source/fossil-monorepo/starknet-contracts/mocks
+cd starknet-contracts/mocks
 
 # Build mock contracts
 scarb build

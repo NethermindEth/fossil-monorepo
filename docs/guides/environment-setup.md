@@ -104,8 +104,24 @@ OPTION_ROUND_1M=
 
 # Class hash for deploying new rounds
 OPTION_ROUND_CLASS_HASH=
+```
 
-# Fossil store address
+#### Fossil Store Contract (Upstream Infrastructure)
+
+```bash
+# =============================================================================
+# FOSSIL STORE CONFIGURATION (Upstream Fossil Infrastructure)
+# =============================================================================
+# Fossil Store contract address on Starknet
+# This contract is part of the broader Fossil infrastructure (MMR Builder, Light Client)
+# and is NOT managed in this repository.
+#
+# Purpose: Provides validated hourly average base fee data from Ethereum L1
+# Queried by: proving-service/crates/starknet-handler (get_avg_fees_in_range)
+# Data Source: Populated by upstream Fossil MMR Builder with cryptographically verified data
+#
+# ⚠️ Important: This address should NOT be changed unless coordinating with the
+# Fossil infrastructure team, as it points to the canonical data source.
 FOSSIL_STORE_ADDRESS=0x00e581139553c8666f60b6646f277a336f99f108f8e5fa7cb300b6a6ce7c3b8c
 ```
 
@@ -127,10 +143,14 @@ OFFCHAIN_PROCESSOR_DATABASE_URL=postgresql://user:password@db.example.com:5432/f
 
 **Schema:** API keys, job requests, job status, pricing data results
 
-#### Indexer Database
+#### Indexer Database (Legacy - Mostly Unused)
 
 ```bash
 # Read-only database populated by fossil indexer
+# ⚠️ Note: In current implementation, the Pitchlake Coprocessor primarily fetches
+# data from the Fossil Store Contract on Starknet, not from this database.
+# This configuration is maintained for legacy compatibility.
+
 # Local development:
 INDEXER_DATABASE_URL=postgresql://postgres:postgres@localhost:5433/postgres
 
@@ -139,6 +159,7 @@ INDEXER_DATABASE_URL=postgresql://postgres:postgres@indexer_db:5432/postgres
 ```
 
 **Schema:** Historical blockchain data (blocks, transactions, events)
+**Current Usage:** Minimal - Most data queries now use Fossil Store Contract on Starknet
 
 #### Proving Service Database
 

@@ -5,6 +5,7 @@ This document provides a comprehensive overview of the StarkNet smart contract i
 ## Table of Contents
 - [Overview](#overview)
 - [Contract Organization](#contract-organization)
+- [Fossil Store Contract (Upstream Infrastructure)](#fossil-store-contract-upstream-infrastructure)
 - [Fossil Hash Store](#fossil-hash-store)
 - [PitchLake Verifier](#pitchlake-verifier)
 - [Mock Contracts](#mock-contracts)
@@ -90,6 +91,60 @@ openzeppelin_access = "2.0.0"
 snforge_std = "0.49.0"
 pitch_lake = {git = "https://github.com/ametel01/pitchlake_starknet.git", branch = "scarb-updates"}
 ```
+
+## Fossil Store Contract (Upstream Infrastructure)
+
+### Purpose
+
+**Important:** The **Fossil Store Contract** is part of the broader Fossil infrastructure and is **not managed in this repository**. It is maintained by the upstream Fossil system (MMR Builder and Light Client components).
+
+The Fossil Store Contract serves as the **primary data source** for the Pitchlake Coprocessor, providing validated hourly average base fee data from Ethereum L1.
+
+### Role in the Fossil Ecosystem
+
+```
+Ethereum L1 → Indexer → MMR Builder → Fossil Store (Starknet) → Pitchlake Coprocessor (this repo)
+```
+
+The Fossil Store Contract:
+- Stores hourly average base fee data computed by the MMR Builder
+- Maintains MMR root hashes for data integrity verification
+- Provides IPFS references to complete MMR snapshots
+- Stores proof journals from zkVM executions in the upstream Fossil system
+
+### Integration with Pitchlake Coprocessor
+
+The Pitchlake Coprocessor queries the Fossil Store Contract for validated base fee data:
+
+**Location:** `proving-service/crates/starknet-handler/src/provider.rs:1238-1268`
+
+**Key Function:**
+```rust
+pub async fn get_avg_fees_in_range(
+    &self,
+    start_timestamp: u64,
+    end_timestamp: u64,
+) -> Result<FeeData> {
+    // Calls Fossil Store contract's get_avg_fees_in_range method
+    // Returns: FeeData with hourly average base fees
+}
+```
+
+**Data Flow:**
+1. Message Handler requests fee data for specific timestamp range
+2. StarkNet Provider queries Fossil Store contract on Starknet
+3. Fossil Store returns validated hourly average base fees
+4. Data is used for TWAP, max return, and reserve price calculations in RISC0
+
+### Configuration
+
+The Fossil Store contract address is configured via environment variable:
+
+```bash
+FOSSIL_STORE_ADDRESS=0x00e581139553c8666f60b6646f277a336f99f108f8e5fa7cb300b6a6ce7c3b8c
+```
+
+This address points to the upstream Fossil Store contract deployed and maintained by the Fossil infrastructure team.
 
 ## Fossil Hash Store
 
@@ -907,15 +962,15 @@ Tests include:
 
 ```bash
 # Test all contracts
-cd /home/ametel/source/fossil-monorepo/starknet-contracts
+cd starknet-contracts
 scarb test
 
 # Test specific contract
-cd /home/ametel/source/fossil-monorepo/starknet-contracts/fossil-hash-store
+cd starknet-contracts/fossil-hash-store
 scarb test
 
 # Test with coverage
-cd /home/ametel/source/fossil-monorepo/starknet-contracts/pitchlake-verifier
+cd starknet-contracts/pitchlake-verifier
 scarb test --coverage
 ```
 
@@ -1077,23 +1132,23 @@ USE_RISC0_INTEGRATION=true
 
 For detailed implementation documentation, see:
 
-- **Fossil Hash Store**: [`/starknet-contracts/fossil-hash-store/ARCHITECTURE.md`](/home/ametel/source/fossil-monorepo/starknet-contracts/fossil-hash-store/ARCHITECTURE.md)
+- **Fossil Hash Store**: [`/starknet-contracts/fossil-hash-store/ARCHITECTURE.md`](starknet-contracts/fossil-hash-store/ARCHITECTURE.md)
   - Detailed hashing algorithms
   - HashingService integration roadmap
   - Performance characteristics
   - Future improvements
 
-- **Fossil Hash Store README**: [`/starknet-contracts/fossil-hash-store/README.md`](/home/ametel/source/fossil-monorepo/starknet-contracts/fossil-hash-store/README.md)
+- **Fossil Hash Store README**: [`/starknet-contracts/fossil-hash-store/README.md`](starknet-contracts/fossil-hash-store/README.md)
   - Build requirements
   - Deployment instructions
   - Version compatibility notes
 
 ### Related Architecture Documents
 
-- [Architecture Overview](/home/ametel/source/fossil-monorepo/docs/architecture/overview.md) - System-wide architecture
-- [Data Flow](/home/ametel/source/fossil-monorepo/docs/architecture/data-flow.md) - End-to-end data processing
-- [Proving Service Architecture](/home/ametel/source/fossil-monorepo/docs/architecture/proving-service.md) - RISC Zero proof generation
-- [Fossil API Architecture](/home/ametel/source/fossil-monorepo/docs/architecture/fossil-api.md) - API design and endpoints
+- [Architecture Overview](docs/architecture/overview.md) - System-wide architecture
+- [Data Flow](docs/architecture/data-flow.md) - End-to-end data processing
+- [Proving Service Architecture](docs/architecture/proving-service.md) - RISC Zero proof generation
+- [Fossil API Architecture](docs/architecture/fossil-api.md) - API design and endpoints
 
 ### Development Resources
 
@@ -1108,7 +1163,7 @@ For detailed implementation documentation, see:
 
 ```bash
 # 1. Install dependencies
-# See: /home/ametel/source/fossil-monorepo/docs/getting-started/installation.md
+# See: docs/getting-started/installation.md
 
 # 2. Start local Katana devnet
 docker-compose -f docker-compose.local.yml up -d katana
@@ -1132,7 +1187,7 @@ For end-to-end integration testing including contract interactions:
 
 ```bash
 # Run full E2E test suite (includes contract deployment)
-# See: /home/ametel/source/fossil-monorepo/docs/getting-started/testing.md
+# See: docs/getting-started/testing.md
 
 # Test hash generation workflow
 cd proving-service

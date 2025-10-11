@@ -12,11 +12,35 @@ This document provides a high-level overview of the Fossil monorepo architecture
 
 ## System Overview
 
-Fossil is a complete RISC Zero proof generation and StarkNet verification system that provides cryptographic proofs for financial data calculations. The system consists of three main services:
+This repository implements the **Pitchlake Coprocessor**, a RISC Zero proof generation and StarkNet verification system that provides cryptographic proofs for financial data calculations used in the Pitchlake options market. The Pitchlake Coprocessor consists of three main services:
 
 1. **Fossil API** - HTTP API for job management and pricing data requests
 2. **Proving Service** - RISC Zero proof generation via Bonsai API
 3. **StarkNet Contracts** - Onchain proof verification and data storage
+
+### Relationship to Broader Fossil Infrastructure
+
+The Pitchlake Coprocessor operates as part of the Fossil ecosystem, which is a trustless data infrastructure that records Ethereum Layer 1 (L1) base gas fee data on Starknet.
+
+**Upstream Components (Not in this repository):**
+- **Fossil Postures Database** - Stores finalized Ethereum block headers indexed by an external indexer
+- **MMR Builder** - Processes blocks in batches of 1024, validates headers, computes hourly average base fees, and constructs Merkle Mountain Ranges (MMR) with proofs stored on Starknet
+- **Light Client** - Continuously updates Fossil's state with new finalized Ethereum blocks via L1 → L2 messaging
+- **L1MessageProxy** - Receives L1 → L2 messages containing finalized block data from Ethereum
+- **Fossil Store Contract** - Maintains proof metadata, MMR root hashes, IPFS references, and hourly average base fee data on Starknet
+
+**This Repository (Pitchlake Coprocessor):**
+- Queries validated hourly average base fee data from Fossil Store contract on Starknet
+- Executes verifiable pricing computations in RISC0 zkVM (TWAP, max return, reserve price)
+- Generates zero-knowledge proofs for Pitchlake market pricing calculations
+- Submits proofs to Starknet for verification
+
+**Data Flow:**
+```
+Ethereum L1 → Indexer → MMR Builder → Fossil Store (Starknet) → Pitchlake Coprocessor → Proof Verification (Starknet)
+```
+
+For more details on the broader Fossil architecture (MMR Builder, Light Client), see the Fossil Technical Specification.
 
 ### High-Level Architecture
 
@@ -221,10 +245,15 @@ See: [StarkNet Contracts Architecture](starknet-contracts.md)
 - StarkNet transaction hashes
 - Verification results
 
-**StarkNet Onchain:**
-- Verified proofs
-- Hash storage
-- Merkle roots
+**Fossil Store Contract (StarkNet):**
+- Hourly average base fee data from Ethereum L1
+- MMR root hashes for data integrity
+- IPFS references to complete MMR snapshots
+- Proof journals from zkVM executions
+
+**StarkNet Verification Contracts:**
+- Verified proofs for Pitchlake calculations
+- Computation results (TWAP, max return, reserve price)
 - Access control data
 
 See: [Data Flow Documentation](data-flow.md)
@@ -251,7 +280,7 @@ Long-running tasks (proof generation) are handled asynchronously:
 Each service has its own database:
 - **Fossil API DB** - Client-facing data
 - **Proving Service DB** - Internal proof processing
-- **Indexer DB** (read-only) - Historical blockchain data
+- **Fossil Store Contract** (read-only) - Historical Ethereum L1 base fee data maintained by upstream Fossil infrastructure
 
 This enables independent scaling and reduces coupling.
 
